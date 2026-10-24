@@ -20,7 +20,7 @@ flowchart LR
 | BioAmp EXG Pill, 6 boards | Boost each channel about 1,000x and cancel the hum shared by all pads |
 | Breadboard | Shares the Uno's 5V and ground with all 6 boards |
 | Arduino Uno | Reads each board 1,000 times a second and sends the numbers over USB |
-| Thai's Mac | Reads the Uno, filters out hum, and runs the quick phrases classifier |
+| Thai's Mac | Reads the Uno, filters out hum with `rig/filters.py`, and runs the quick phrases classifier |
 | Austin's laptop, RTX 5060 | Runs lip reading, Claude, Cartesia, and the dashboard |
 | Webcam and mic | Film the lips, and hear the partner's question |
 | Bluetooth speaker | Plays the voice loud enough for a noisy room |
@@ -74,10 +74,35 @@ Only the breadboard's left + and − columns are used, and each column is one co
 Check VCC and GND before powering on, since swapping them destroys a board.
 Keep the jumpers short, since longer wires pick up more hum.
 
-## Sample rate
+## Reading and filtering
 
-The Uno reads each of the 6 channels at 1,000 Hz, matching the Berkeley dataset.
-That's 6,000 readings a second, too much for plain text at 115200 baud, so it sends raw bytes at 230400 baud or higher.
+```mermaid
+flowchart LR
+    U[rig/uno<br/>1,000 Hz, raw] -->|USB, 250000 baud| R[rig/reader.py]
+    R -->|raw| D[(Recordings)]
+    R -->|raw| F[rig/filters.py]
+    D -->|raw, in order| F
+    F --> C[Classifier]
+```
+
+- `rig/uno/uno.ino` reads all 6 channels on a fixed 1,000 Hz clock, matching the Berkeley dataset, and sends raw numbers with no filtering.
+  Each 13-byte frame starts with a counter, so the reader can spot dropped frames.
+- `rig/reader.py` turns the frames into samples, and saves raw recordings for training.
+- `rig/filters.py` removes the 60 Hz hum, its 120 and 180 Hz echoes, and drift below 20 Hz.
+  It adds only a few milliseconds of delay, so it runs live.
+- Training data and the live demo both go through the same filter, run in order, so the classifier sees the same signal in both.
+  Never clean training data with an offline filter like `filtfilt`.
+- The hum comes from the room's wiring, not the laptop.
+  It gets through when pad contact is uneven, so firm REF pads still matter, and the filter can't fix a signal that hits 0 or 1023.
+
+```bash
+python3 -m venv rig/.venv && rig/.venv/bin/pip install -r rig/requirements.txt
+rig/.venv/bin/python rig/test_filters.py
+rig/.venv/bin/python rig/reader.py /dev/cu.usbmodem2101 40 recording.npy
+```
+
+Flash `rig/uno` from Arduino IDE, or with `arduino-cli compile --upload -p /dev/cu.usbmodem2101 --fqbn arduino:avr:uno rig/uno`.
+The Serial Plotter can't read this firmware, so for the plotter checks below, flash a sketch that prints `analogRead(A0)` instead.
 
 ## Safety
 
