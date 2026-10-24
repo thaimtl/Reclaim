@@ -378,9 +378,13 @@ class Session:
         recorded across recorder versions or camera sizes says so; each clip's own fields stay the truth."""
         path = os.path.join(self.dir, 'meta.json')
         old = {}
-        if os.path.exists(path):
+        try:
             with open(path, encoding='utf-8') as f:
                 old = json.load(f)
+        except FileNotFoundError:
+            pass
+        except ValueError:          # cut short by a crash: the clips and manifest are fine, start the history again
+            print('note: meta.json was unreadable, rewriting it', flush=True)
         now = datetime.datetime.now().isoformat()
         run = {'started': now, 'recorder_version': VERSION, 'camera': [self.cam.width, self.cam.height]}
         unstyled = sum(1 for e in self.entries.values() if 'expression' not in e)
@@ -397,8 +401,9 @@ class Session:
                 'recorder_version': VERSION, 'platform': platform.platform(),
                 'n_items': len(self.items), 'prompts': SESSIONS[self.session][0],
                 'styles': STYLES.get(self.session, {})}
-        with open(path, 'w', encoding='utf-8') as f:
+        with open(path + '.tmp', 'w', encoding='utf-8') as f:
             json.dump(meta, f, indent=1)
+        os.replace(path + '.tmp', path)
 
     def start(self, item):
         self.current = item
@@ -462,7 +467,14 @@ class Session:
         with open(tmp, 'w', encoding='utf-8') as f:
             for e in sorted(self.entries.values(), key=lambda e: order.get(e['id'], 1e9)):
                 f.write(json.dumps(e) + '\n')
-        os.replace(tmp, self.manifest)
+        for attempt in range(20):   # Windows: a virus scanner or sync tool can hold the file open for a moment
+            try:
+                os.replace(tmp, self.manifest)
+                return
+            except PermissionError:
+                if attempt == 19:
+                    raise
+                time.sleep(0.05)
 
 
 # ------------------------------------------------------------------------------------------------ window

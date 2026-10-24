@@ -110,6 +110,9 @@ def test_record_redo_resume_and_load():
     ids = {r['id'] for r in load_manifest(root)}
     assert len(ids) == 3 and redone in ids  # resume records the next pending clip, which is the one redone
     assert sess2.dir == sess.dir
+    assert len(json.load(open(os.path.join(sess.dir, 'meta.json')))['runs']) == 2
+    open(os.path.join(sess.dir, 'meta.json'), 'w').write('{"sess')     # cut short by a crash
+    record.main(args[:-4] + ['--auto', '0'])                            # still resumes
 
 
 def test_window_draws():

@@ -45,13 +45,14 @@ Only natural-pace sentences get a delivery (demo-pace in session 3), at most one
 - [ ] Austin's laptop on battery with the charger unplugged, and no other cable from wall power on the laptop
 - [ ] The webcam at the height and distance used in the demo, the face lit from the front, nothing bright behind Austin
 - [ ] A chair and a quiet corner, plus water for Austin
+- [ ] `RECLAIM_WORKDIR` points at a local folder, not one synced by OneDrive, Dropbox or iCloud
 
 ## Steps
 
 1. Wipe the pad spots with alcohol and let them dry.
 2. Put the pads on the [marked spots](HARDWARE.md#pad-sites), with each board's REF on bare bone behind the ear.
 3. Run the [signal check](HARDWARE.md#signal-check). Every channel must say OK, so fix any other verdict now, not after recording.
-4. Start the recorder: `rig/.venv/bin/python recorder/record.py --session 1` (Windows: `rig\.venv\Scripts\python recorder\record.py --session 1`). Setup and keys: [recorder/README.md](recorder/README.md). It shows one sentence at a time and refuses to record while the charger is plugged in.
+4. Start the recorder and check the window says camera about 30 fps before the first clip (if it shows about 5, the camera did not switch to MJPG: try `--width 1280 --height 720`): `rig/.venv/bin/python recorder/record.py --session 1` (Windows: `rig\.venv\Scripts\python recorder\record.py --session 1`). Setup and keys: [recorder/README.md](recorder/README.md). It shows one sentence at a time and refuses to record while the charger is plugged in.
 5. For each sentence: read it and the amber delivery line if there is one, press SPACE, stay still for half a second with a relaxed face, mouth the sentence once at the pace shown (natural, fast when marked FAST PACE, slow when marked SLOW PACE) and in the delivery shown (hold the smile, frown or surprise for the whole sentence), stay still for half a second, press SPACE.
 6. If a clip goes wrong, like a stumble, a cough, a laugh or a missed word, or the recorder shows a warning for it, press R to redo it.
 7. Quit with Q at any time: everything saved stays, and the same command resumes where you left off.
