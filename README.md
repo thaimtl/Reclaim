@@ -73,8 +73,12 @@ All code lives in this repo; datasets, checkpoints, results and Python environme
 | `bench/` | Benchmarks and their frozen test splits |
 | `cluster/` | H100/H200 job scripts (PBS), smoke tests, runbook |
 | `camera/` | Camera-only baselines (Auto-AVSR, BRAVEn, LipLearner) |
-| `rig/` | EMG rig: Arduino firmware, serial reader, live hum filter, signal check |
+| `rig/` | EMG rig: Arduino firmware, serial reader, live hum filter, signal check, `emg.raw` publisher |
 | `recorder/` | The recording app: camera + EMG + the session sentences ([recorder/README.md](recorder/README.md)) |
+| `bus/` | The team bus: ZeroMQ + msgpack, one endpoint per producer under `ipc:///tmp/reclaim/` |
+| `fusion/` | Fusion decoder and word locking (`python -m fusion.run`), and the offline scorer (`python -m fusion.evaluate`) |
+| `claude_service/` | The Claude service: predicts Austin's next words and repairs look-alikes, on the bus |
+| `buslog/` | Logs every bus message to `$RECLAIM_WORKDIR/logs/` and replays a session on the replay's clock |
 | `figures/` | The SVR-1 architecture figure and the script that draws it |
 | `tests/` | Smoke and unit tests |
 | `docs/` | Plans and specs, Markdown with PDF copies |
