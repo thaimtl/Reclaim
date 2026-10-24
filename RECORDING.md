@@ -57,7 +57,7 @@ Separately from the sessions, record about 60 s of Austin's real voice, read alo
 1. Wipe the pad spots with alcohol and let them dry.
 2. Put the pads on the [marked spots](HARDWARE.md#pad-sites), with each board's REF on bare bone behind the ear.
 3. Run the [signal check](HARDWARE.md#signal-check). Every channel must say OK, so fix any other verdict now, not after recording.
-4. Start the recorder and check the window says camera about 30 fps before the first clip (if it shows about 5, the camera did not switch to MJPG: try `--width 1280 --height 720`): `rig/.venv/bin/python recorder/record.py --session 1` (Windows: `rig\.venv\Scripts\python recorder\record.py --session 1`). Setup and keys: [recorder/README.md](recorder/README.md). It shows one sentence at a time and refuses to record while the charger is plugged in.
+4. Start the recorder and check the window says camera about 30 fps before the first clip (the terminal also prints `camera 1: 1920x1080, MJPG` and `video: nvenc`; if the fps shows about 5 or 10, the camera did not switch to MJPG): `rig/.venv/bin/python recorder/record.py --session 1` (Windows: `rig\.venv\Scripts\python recorder\record.py --session 1`). Setup and keys: [recorder/README.md](recorder/README.md). It shows one sentence at a time and refuses to record while the charger is plugged in.
 5. For each sentence: read it and the amber delivery line if there is one, press SPACE, stay still for half a second with a relaxed face, mouth the sentence once at the pace shown (natural, fast when marked FAST PACE, slow when marked SLOW PACE) and in the delivery shown (hold the smile, frown or surprise for the whole sentence), stay still for half a second, press SPACE.
 6. If a clip goes wrong, like a stumble, a cough, a laugh or a missed word, or the recorder shows a warning for it, press R to redo it.
 7. Quit with Q at any time: everything saved stays, and the same command resumes where you left off.
@@ -73,7 +73,7 @@ recordings/                  ($RECLAIM_WORKDIR/recordings; not committed to git)
                              clip start and end on the laptop clock, sample and frame counts, warnings
     meta.json                speaker, sample rate, pins and sites (A0 to A3 = sites 3, 2, 6, 1), camera settings
     s1_001.mp4               camera video, unmirrored
-    s1_001_video_ts.npy      laptop clock (time.monotonic) of each video frame
+    s1_001_video_ts.npy      laptop clock (time.perf_counter) of each video frame
     s1_001_emg.npy           raw readings, shape (samples, 4), uint16, unfiltered
     s1_001_emg_ts.npy        laptop clock of each EMG sample
   session_02/

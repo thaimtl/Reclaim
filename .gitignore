@@ -15,3 +15,6 @@ venv*/
 recordings_smoke/
 .cache/
 tmp/
+
+# Screenshots pasted into images/ (Windows names them {GUID}.png)
+images/{*}.png

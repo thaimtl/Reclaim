@@ -15,8 +15,6 @@ huggingface_hub
 gdown
 jiwer>=3
 unidecode
-# Live camera reader (venv-live): team bus, replay/recording, E5 emotion classifier
+# Lip reader (venv-live): team bus and replay
 pyzmq>=26
 msgpack>=1.0
-av>=12
-onnxruntime>=1.20
