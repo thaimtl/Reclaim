@@ -140,6 +140,8 @@ def test_retime_nested_and_untouched_fields():
     raw = {'t0': 2.0, 'fs': 1000, 'samples': np.zeros((10, 4), np.uint16), 'counter': 7}
     _, msg = decode(retime(encode('emg.raw', raw, seq=1, t_pub=2.0), 1.0))
     assert msg['t0'] == 3.0 and msg['fs'] == 1000 and msg['counter'] == 7
+    _, msg = decode(retime(encode('dec.hyp', {'utt_id': 3, 't0': 50.0, 'locked': ['hi']}, seq=2, t_pub=51.0), 5.0))
+    assert msg['t0'] == 55.0 and msg['t_pub'] == 56.0 and msg['locked'] == ['hi']
 
 
 def test_read_raw_skips_bad_records_and_warns(tmp_path, capsys):

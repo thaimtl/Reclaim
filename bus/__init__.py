@@ -27,6 +27,7 @@ import numpy as np
 import zmq
 
 VERSION = 2
+ACCEPTED = (1, 2)  # the call service (call/bus.py) still stamps v=1 on the same envelope
 _DEFAULTS = {
     'emg': 'ipc:///tmp/reclaim/emg',          # emg.raw (rig/publish.py)
     'cam': 'ipc:///tmp/reclaim/cam.tick',     # cam.tick, cam.final, cam.face (live/run.py)
@@ -85,8 +86,8 @@ def decode(frames):
         msg = msgpack.unpackb(frames[1], raw=False)
         if not isinstance(msg, dict):
             raise ValueError('payload is not a map')
-        if msg.get('v') != VERSION:
-            raise ValueError(f"schema version {msg.get('v')!r}, expected {VERSION}")
+        if msg.get('v') not in ACCEPTED:
+            raise ValueError(f"schema version {msg.get('v')!r}, expected one of {ACCEPTED}")
         return bytes(frames[0]).decode(), _in(msg)
     except ValueError:
         raise

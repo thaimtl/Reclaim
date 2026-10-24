@@ -33,6 +33,7 @@ TIME_FIELDS = {
     'cam.tick': ('frame_t', 'seg_start'),
     'cam.face': ('t',),
     'dec.lock': ('words[].t',),
+    'dec.hyp': ('t0',),
     'claude.': ('t',),
     'partner.text': ('t',),
     'timing.': ('t',),
