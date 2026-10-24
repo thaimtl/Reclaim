@@ -115,6 +115,20 @@ def test_record_redo_resume_and_load():
     record.main(args[:-4] + ['--auto', '0'])                            # still resumes
 
 
+def test_codec_fallback():
+    """Without a working ffmpeg the recorder still saves clips, in OpenCV's mp4v, and says which codec it used."""
+    assert record.pick_codec('auto', None) == 'mp4v'
+    assert record.pick_codec('nvenc', os.path.join(tempfile.mkdtemp(), 'no-ffmpeg.exe')) == 'mp4v'
+    root = tempfile.mkdtemp()
+    record.main(['--session', '1', '--camera', 'fake', '--fake-emg', '--allow-charger', '--root', root, '--width', '320',
+                 '--height', '240', '--codec', 'mp4v', '--auto', '1', '--clip-seconds', '1.0'])
+    (r,) = load_manifest(root)
+    assert r['video_codec'] == 'mp4v' and r['warnings'] == []
+    cap = cv2.VideoCapture(r['video'])
+    assert int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) == len(np.load(r['video_ts']))
+    cap.release()
+
+
 def test_window_draws():
     """The screen renders in every state (headless: drawn to an array, not shown)."""
     root = tempfile.mkdtemp()
@@ -142,4 +156,5 @@ if __name__ == '__main__':
     test_items_are_shuffled_the_same_way_every_run()
     test_delivery_styles()
     test_record_redo_resume_and_load()
+    test_codec_fallback()
     print('ok')
