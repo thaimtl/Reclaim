@@ -92,16 +92,19 @@ flowchart TD
 | `emg.raw` | Thai → Austin | every 10 ms | `t0`, `fs` = 1000, `samples` (n × 4, raw 0 to 1023), `counter` |
 | `cam.tick` | Evan → Austin, Frank | every 100 ms | `seg_id`, `seg_start`, `frame_t` (T), `topk_ids` (T × 32), `topk_logp` (T × 32), `blank_logp` (T), `greedy`, `activity` (T), `face_ok`, `emotion` {`label`, `confidence`, `scores`}, `timing_ms` |
 | `cam.final` | Evan → Austin | at segment end | `seg_id`, `nbest` [{`text`, `score`}] |
-| `dec.hyp` | Austin → dashboard | every 100 ms | `utt_id`, `locked` [words], `unlocked` [words], `confidence` per word, `source` per word (camera / EMG / Claude) |
+| `cam.face` | Evan → dashboard | ~12.5 Hz | `t`, `w`, `h`, `face_ok`, `pts` (landmarks), `blend` (52 blendshapes), `pose` (yaw, pitch, roll); see `live/bus_schema.md` |
+| `dec.hyp` | Austin → dashboard | every 100 ms | `utt_id`, `locked` [words, the newest 40], `offset` (index of the first one sent), `unlocked` [words], `confidence` and `source` (camera / EMG / Claude) per word, `raw` (each locked word before Claude's repairs), `spoken` (what the voice said), `t0` (capture time of the utterance's first frame) |
 | `dec.lock` | Austin → Claude, dashboard | on lock | `utt_id`, `words` [{`w`, `conf`, `alts`, `cam`, `emg`, `t`}] |
-| `dec.repeat` | Austin → dashboard | at sentence end | `utt_id`, `reason` (which reader disagreed, confidences) |
+| `dec.repeat` | Austin → dashboard | at sentence end | `utt_id`, `reason` {`reader` (camera / EMG / Claude), `text`, `threshold`, `claude_please_repeat`, `words` [{`index`, `w`, `cam`, `emg`, `claude`, `nbest`, `score`, `alts`}]} |
 | `claude.predict` | Claude → Austin | on judge line, ~2 s | `words` [{`w`, `weight`}], `phrases`, `predictability` (0 to 1), `ttl_s` |
 | `claude.repair` | Claude → Austin, dashboard | on reply | `utt_id`, `edits` [{`index`, `from`, `to`}], `please_repeat` |
-| `voice.say` | Austin → Frank | words leaving the repair window | `utt_id`, `words`, `final`, `pace`, `effort` |
+| `voice.say` | Austin → Frank | words leaving the repair window | `utt_id`, `words`, `final` (always sent once per sentence, with `words` [] if nothing locked), `pace`, `effort` (both relative to Austin's normal: 1.0 until SVR-1 provides them) |
 | `partner.text` | Frank → Claude, dashboard | streaming | `text`, `is_final`, `t` |
 | `timing.*` | everyone → logger | every event | the stage and its duration in ms |
 
 Austin applies Claude's repairs before forwarding words on `voice.say`, so the voice never needs to know about Claude. The logger subscribes to every topic.
+
+The bus code is `bus/`: every message also carries `v` (schema version 2), `seq` (per topic) and `t_pub`. Each producer binds one endpoint, overridable by `RECLAIM_<NAME>_PUB`: `ipc:///tmp/reclaim/emg` (`emg.raw`), `.../cam.tick` (`cam.*`), `.../dec` (`dec.*`, `voice.say`), `.../claude` (`claude.*`), `.../call` (`partner.text`).
 
 ## Order of work
 

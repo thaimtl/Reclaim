@@ -27,7 +27,7 @@ not wait for it.
 
 | When | Milestone | Done when |
 | --- | --- | --- |
-| T-30h to T-24h | Shared bus (`bus/`), decoder + locking v1, logger + replay, `emg.raw` publisher, Claude service on the bus | Unit tests pass with fake publishers; a logged fake session replays |
+| T-30h to T-24h | Shared bus (`bus/`), decoder + locking v1, logger + replay, `emg.raw` publisher, Claude service on the bus (done in code, this PR) | Unit tests pass with fake publishers; a logged fake session replays (done) |
 | T-24h to T-18h | First live call on the laptop: camera → decoder → Claude → Sonic → Twilio | A teammate as the judge hears 5 mouthed sentences; latency in the log |
 | T-18h to T-12h | Sleep in shifts. Replay sessions 1 and 2 through the decoder; fit lock weights and threshold | WER and mouth-to-lock on sessions 1 and 2 beat the hand-set weights |
 | T-12h to T-8h | EMG joins, only if SVR-1 4-ch is ready and helps on replay; dashboard on real topics | WER with EMG ≤ without it on sessions 1 and 2 |
@@ -49,17 +49,17 @@ Claude service, prompt tuning on replayed logs. Agents write code against the co
 | Part | Status | Evidence |
 | --- | --- | --- |
 | Rig reader, `rig/filters.py` | works on the rig, untested here | `rig/reader.py`, `rig/filters.py:15` [code] |
-| `emg.raw` on the bus | being built: `rig/publish.py` | no ZeroMQ in `rig/` before [ran] |
+| `emg.raw` on the bus | built: `rig/publish.py`; tested on fake chunks, not yet on the rig | `tests/test_rig_publish.py` [ran] |
 | SVR-1 preprocessing | **violates CLAUDE.md**: `svr/preprocess.py:40,46` use `filtfilt`, called from `svr/finetune.py:45` | [code] |
 | SVR-1 on 4 channels | no checkpoint here; Gaddy-arch on 4 ch: WER 89 to 95, homophene-10 28 to 36 % (8 ch: 88 %) | `benchmark_results/LEADERBOARD.md` [ran] |
 | `svr/infer.py` | missing; the API is drafted on the team board | [ran] |
 | Camera reader | works on CPU tests; laptop numbers missing | `tests/live` 180 passed [ran]; branch `feat/camera-live`, unmerged |
 | Final pass (beam + LM) | about 1.1 s for a 7.7 s clip on the 5090, even at beam 3 | `live/MEASURED.md` [ran] |
-| Fusion decoder, locking | being built: `fusion/` | nothing produced `dec.*` [ran] |
-| Claude service | draft; moving to the shared bus | `claude_service/` [code] |
+| Fusion decoder, locking v1 (camera only, EMG hook) | built: `fusion/`; 0.3 ms per pass on a 200-frame tick; end to end over real processes with a fake camera | `tests/test_fusion.py` [ran] |
+| Claude service | built on the shared bus; tested with a fake client, not yet against the live API | `tests/smoke_claude_service.py` [ran] |
 | Call: Twilio, Ink, Sonic | works with fakes; outside git | `tests/call` 23 passed [ran] |
 | Dashboard | prototype on sample data; outside git | `demo/dashboard/README.md` [code] |
-| Logger, replay | being built: `buslog/` | none before [ran] |
+| Logger, replay, offline scorer | built: `buslog/`, `fusion/evaluate.py` | `tests/test_buslog.py`, `tests/test_evaluate.py` [ran] |
 | Recorder | merged to main with the delivery styles (#10) | `git log origin/main` [ran] |
 
 Code that must move into the repo (CLAUDE.md: all code lives in this repo): `live/` (already on `feat/camera-live`),
