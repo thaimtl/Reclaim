@@ -21,7 +21,7 @@ Nothing is trained on the pitch or on a script: the judge can ask anything.
 | Person | Owns |
 | --- | --- |
 | Evan | Camera reader: real-time Auto-AVSR every 100 ms, mouthing activity and segments, facial emotion ([EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md)) |
-| Austin | SVR-1 training, live EMG reader, fusion decoder and confidence locking, logging and replay, integration |
+| Austin | SVR-1 training, live EMG reader, the joint search with its language model, confidence locking, logging and replay, integration |
 | Frank | Cartesia (Austin's voice clone, Sonic streaming voice, Ink for the judge), the Twilio call, the captions dashboard |
 | Thai | EMG rig (4 channels, sites 3, 2, 6, 1) and its live filter, the Claude service (predict + repair) |
 
@@ -32,12 +32,12 @@ Nothing is trained on the pitch or on a script: the judge can ask anything.
 3. Add the speaking-or-not output, partial-sentence training, and augmentation for the recorded deliveries (slow, effort, held expression). Code done.
 4. Train on the cluster: `SVR1_4ch` plus the Gaddy-architecture baseline `G4` on the same 4 sites ([cluster/RUNBOOK.md](../cluster/RUNBOOK.md)).
 5. The recording tool: done, `recorder/record.py` (camera + EMG + the session prompts, in `svr/recordings.py`'s format).
-6. Live EMG reader: subscribe to `emg.raw`, filter, run SVR-1 every 100 ms, compute pace and effort. The SVR-1 side is `svr/live.py`; the bus side comes with the decoder.
-7. Fusion decoder: the joint search over camera and EMG probabilities, with look-alike expansion, Claude's predicted words and the gate.
+6. Live EMG reader: subscribe to `emg.raw`, filter, run SVR-1 every 100 ms, compute pace and effort. The SVR-1 side is `svr/live.py`; the bus side comes with the joint search.
+7. The joint search over camera and EMG probabilities, with look-alike expansion, Claude's predicted words, the gate and the language model: our conversational 4-gram plus a cache of the call (`fusion/lm.py`, built by `fusion/build_lm.py`; done).
 8. Confidence locking: compute the lock ingredients per word, train the lock model on sessions 1 and 2, and set the dynamic threshold from Claude's predictability.
 9. "Please repeat" when the final pass still isn't confident, with the reasons in the debug log.
 10. The logger, which subscribes to every topic and writes everything to disk, and a replay tool.
-11. Fine-tune SVR-1 on sessions 1 and 2, and tune the decoder, gate and lock model; test everything on session 3.
+11. Fine-tune SVR-1 on sessions 1 and 2, and tune the joint search, gate and lock model; test everything on session 3.
 
 ### Evan
 
@@ -81,7 +81,7 @@ The wire details, the queue limits and a ready-made subscriber are in [bus/schem
 
 ```mermaid
 flowchart TD
-    T["Thai<br/>EMG stream"] -- "emg.raw" --> A["Austin<br/>EMG reader + decoder + locking"]
+    T["Thai<br/>EMG stream"] -- "emg.raw" --> A["Austin<br/>EMG reader + joint search + locking"]
     E["Evan<br/>camera reader"] -- "cam.tick, cam.final" --> A
     A -- "dec.lock" --> C["Thai<br/>Claude service"]
     C -- "claude.predict, claude.repair" --> A
@@ -121,8 +121,8 @@ The system must work end to end early and get better, not work only at the very 
 | Block | Goal | Evan | Austin | Frank | Thai |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Record + skeleton | E0, E1, E7 recording | Session 1; bus + logger; SVR-1 retarget; cluster runs start | Voice clone; Sonic speaks typed text | Rig for session 1; `emg.raw` live |
-| 2 | Camera → voice, end to end | E2, E4 | Decoder on camera alone; locking v1 → `voice.say` | Streaming words in; Twilio call + Ink | Claude predict on real conversation |
-| 3 | Session 2 + EMG joins | E3 | Session 2; fine-tune SVR-1; EMG into the decoder | Dashboard | Claude repair |
+| 2 | Camera → voice, end to end | E2, E4 | Joint search on camera alone; locking v1 → `voice.say` | Streaming words in; Twilio call + Ink | Claude predict on real conversation |
+| 3 | Session 2 + EMG joins | E3 | Session 2; fine-tune SVR-1; EMG into the joint search | Dashboard | Claude repair |
 | 4 | Learn and tune | E5, E6 | Train the lock model and gate on sessions 1 and 2 | Emotion, pace, volume | Prompt tuning on logs |
 | 5 | Test and rehearse | Replay tests | Session 3 in demo conditions; WER and latency on it | Full calls with a teammate as judge | Demo-room check of light and noise |
 
@@ -150,7 +150,7 @@ Two more recordings, outside the sessions:
 
 1. **Pretraining (cluster):** SVR-1 on Berkeley's data, re-filtered with `rig/filters.py` and retargeted to the rig's 4 sites, with the Gaddy-architecture baseline on the same 4 sites as the fallback and the comparison. Scripts and runbook are in `calhacks2026/cluster/`.
 2. **Fine-tuning:** SVR-1 on sessions 1 and 2. It is small enough for the 5090 or the cluster.
-3. **The decoder's weights, the gate and the lock model:** fitted on sessions 1 and 2.
+3. **The joint search's weights, the gate and the lock model:** fitted on sessions 1 and 2.
 4. **The test:** everything is measured on session 3.
 5. **Auto-AVSR and Claude are not trained.**
 

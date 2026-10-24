@@ -2,7 +2,7 @@
 
 Your job: turn the webcam into a live stream of lip-reading probabilities, a "is he mouthing" signal and a facial-expression tag, every 100 ms, fast enough that words appear on screen within about 0.2 s of Austin mouthing them. You use Auto-AVSR as is: no recording, no training. Everything runs on Austin's laptop (RTX 5060, 8 GB). You can prototype on your MacBook (Lipflow was built for Macs and runs there), but timing and real tests happen only on Austin's laptop.
 
-You do not decide the final words. You publish what the camera sees every 100 ms, and Austin's decoder combines it with EMG and Claude and decides when each word is confident enough to lock. Your part is a small separate program that publishes messages; Austin's decoder, Frank's dashboard and the logger subscribe to them.
+You do not decide the final words. You publish what the camera sees every 100 ms, and Austin's joint search combines it with EMG and Claude and decides when each word is confident enough to lock. Your part is a small separate program that publishes messages; Austin's joint search, Frank's dashboard and the logger subscribe to them.
 
 How it fits: [REALTIME_PIPELINE.md](REALTIME_PIPELINE.md). Message formats shared with everyone: [TEAM_TASKS_AND_INTERFACES.md](TEAM_TASKS_AND_INTERFACES.md#interfaces).
 
@@ -61,7 +61,7 @@ This is the core. Every 100 ms:
 2. Compute the CTC log-probabilities per frame (`model.ctc.log_softmax(enc)`; blank is token 0).
 3. Publish a `cam.tick` message: for every 25 fps frame, the 32 most likely tokens with their log-probabilities, the blank log-probability, the frame's timestamp, plus the greedy text for debugging. Format in [TEAM_TASKS_AND_INTERFACES.md](TEAM_TASKS_AND_INTERFACES.md#interfaces).
 
-Why every frame's probabilities and not just the best sentence: the decoder needs to ask "how well does *this* sentence match the lips?" for sentences the camera did not rank first. That is how EMG and Claude can overrule a look-alike mistake.
+Why every frame's probabilities and not just the best sentence: the joint search needs to ask "how well does *this* sentence match the lips?" for sentences the camera did not rank first. That is how EMG and Claude can overrule a look-alike mistake.
 
 Done when: a terminal shows the greedy text updating while you mouth, each pass's compute time is logged, and a second program can subscribe to `cam.tick` and print it.
 
@@ -71,16 +71,16 @@ Measure first, then cut the biggest cost:
 
 1. fp16 for the whole encoder, `torch.backends.cudnn.benchmark = True`, model loaded once, and a warm-up encode at start-up.
 2. Run the front end once per frame. The encoder starts with a 3D-convolution + ResNet front end that only looks at a frame and its two neighbours on each side. Run it on new frames as they arrive (two frames late, because of the look-ahead), cache the features, and on each tick run only the Conformer on the cached features. Inspect the loaded model (`print(model)`) to find where the front end ends; it is the part before the 12 Conformer blocks.
-3. Cap a segment at about 8 s. If someone talks longer without pausing, start a new segment that keeps the last 2 s as context, and tell the decoder through the segment fields in `cam.tick`.
+3. Cap a segment at about 8 s. If someone talks longer without pausing, start a new segment that keeps the last 2 s as context, and tell the joint search through the segment fields in `cam.tick`.
 4. Run MediaPipe and the GPU work in different threads, so face tracking never waits for the encoder.
 
-Target: under 40 ms per pass at the 95th percentile with an 8 s segment. The whole pass (your camera re-read, SVR-1 and the decoder) has to fit well inside 100 ms, and the GPU is shared, so the camera gets about 40 ms. Put per-pass timings in `cam.tick` as `timing_ms`: number of frames, MediaPipe, front end, Conformer, total. The logger records everything you publish, so every slow pass can be found later.
+Target: under 40 ms per pass at the 95th percentile with an 8 s segment. The whole pass (your camera re-read, SVR-1 and the joint search) has to fit well inside 100 ms, and the GPU is shared, so the camera gets about 40 ms. Put per-pass timings in `cam.tick` as `timing_ms`: number of frames, MediaPipe, front end, Conformer, total. The logger records everything you publish, so every slow pass can be found later.
 
 ### E4. Mouthing activity and segments (about 1 hour)
 
 1. Mouth opening per frame: inner-lip gap (landmarks 13 and 14) divided by face size (distance between the eyes), as in Lipflow's `FaceObs.mouth_open`.
 2. Activity: how much the opening and the lip corners move over the last 300 ms. Publish it per frame (0 to 1).
-3. A segment starts when activity rises, including the 300 ms before (people start moving before it shows), and ends after about 0.5 s of stillness. Austin's decoder also uses EMG to confirm starts and ends, but your segments decide what you re-read.
+3. A segment starts when activity rises, including the 300 ms before (people start moving before it shows), and ends after about 0.5 s of stillness. Austin's joint search also uses EMG to confirm starts and ends, but your segments decide what you re-read.
 
 Done when: segments line up with sentences you mouth, and they don't trigger on blinks, nodding or chewing.
 
@@ -95,7 +95,7 @@ Done when: smiling, raising eyebrows and frowning while mouthing each produce th
 
 ### E6. Final pass at the end of a segment (about 1 hour)
 
-When a segment ends, run Auto-AVSR's own beam search (beam 5, with the subword language model at Lipflow's weight) on the whole segment in a background thread, and publish the 5 best sentences with scores as `cam.final`. Austin's decoder uses it to polish the captions. It must never block the next tick.
+When a segment ends, run Auto-AVSR's own beam search (beam 5, with the subword language model at Lipflow's weight) on the whole segment in a background thread, and publish the 5 best sentences with scores as `cam.final`. Austin's joint search uses it to polish the captions. It must never block the next tick.
 
 ### E7. Replay (about 1 hour)
 
@@ -107,9 +107,9 @@ Recording sessions use the separate recording tool (camera + EMG + prompts, buil
 
 - **Use the model's exact preprocessing:** an aligned 96×96 grey crop, centre crop 88, `/255`, mean 0.421, std 0.165, at 25 fps. A wrong crop or frame rate costs more accuracy than anything else.
 - **Mirroring:** run MediaPipe on the unmirrored frame. Flip only what you show on screen. Lipflow's eye indices assume an unmirrored frame.
-- **Token text:** Auto-AVSR's word pieces mark word starts with "▁" and are uppercase. Send token IDs; Austin's decoder converts them.
+- **Token text:** Auto-AVSR's word pieces mark word starts with "▁" and are uppercase. Send token IDs; Austin's joint search converts them.
 - **Lighting:** light the face from the front; a window behind Austin will ruin the crops. Test in the demo room.
-- **GPU sharing:** SVR-1 and the decoder share the GPU with you. Keep your own memory use reasonable (under about 2 GB) and log it.
+- **GPU sharing:** SVR-1 and the joint search share the GPU with you. Keep your own memory use reasonable (under about 2 GB) and log it.
 - **Never block the capture thread.** A dropped or late frame becomes a gap in the lips the model sees.
 - **First tick slowness:** CUDA kernels compile on first use; warm up with a dummy segment at start-up.
 
