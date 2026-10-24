@@ -7,13 +7,19 @@ predictions always, repairs only when words are under review.
 
 Code, not Claude, enforces the guard rails: an edit must swap one word for one of the alternatives the
 decoder sent, so Claude can never add, drop or reword anything.
+
+Warnings for whoever changes ask():
+- Thinking can't be turned off on claude-opus-5-5 ({"type": "disabled"} is a 400). Keep MAX_TOKENS big, or
+  garbled input spends it all on thinking and the reply has no text.
+- Publish only when stop_reason == "end_turn" and there is a text block. content[0] may be thinking.
+- Append only: trimming old turns misses the cache and can 400 on replayed thinking blocks.
 """
 import json
 import time
 
 MODEL = "claude-opus-5-5"
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
-MAX_TOKENS = 4000
+MAX_TOKENS = 16000  # see the thinking warning above
 PREDICT_EVERY_S = 2.0  # while Austin is mouthing
 PREDICT_TTL_S = 4.0
 MAX_UTTS = 8           # utterances kept for late locks and reviews
