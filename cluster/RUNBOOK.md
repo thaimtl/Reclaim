@@ -23,7 +23,7 @@ Two runs, one GPU each:
 
 ## 1. The working copy (code and data from the bucket, no git)
 
-The code comes from the bucket's `repo/` folder: a snapshot of the Reclaim repo that Austin uploaded, this runbook included. Data comes from `data/`.
+The code comes from the bucket's `repo/` folder: a snapshot of the Reclaim repo, this runbook included, since the cluster can't reach GitHub. It is uploaded only with `cluster/upload_snapshot.sh`, from a clean checkout of a pushed commit. `cluster/VERSION` holds that commit (`git rev-parse HEAD`), `cluster/setup.sh` prints it, and the night report records it. Data comes from `data/`.
 
 ```bash
 cd <project root>
@@ -111,6 +111,7 @@ Done when all of these hold:
 Do the same for `SVR1_4ch_artic` if it is running, but don't wait past the main run's end to start fixing it.
 
 Finish `checkpoints/NIGHT_REPORT.md` with:
+- the code version (`cluster/VERSION`);
 - the best epoch and its dev WER and homophene-10;
 - whether the run stopped early;
 - GPU-hours and the attention kernel used;

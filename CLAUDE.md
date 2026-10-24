@@ -19,6 +19,7 @@ Decisions already made, so don't re-litigate them without new evidence:
 - Recording: three sessions of varied sentences with camera + EMG, recorded with `recorder/record.py`, following RECORDING.md (prompts in docs/recording/). Run the signal check (.claude/skills/signal-check) every time pads go on.
 
 All code lives in this repo, never only in a working directory: datasets, checkpoints and environments stay outside git, and code finds them through `RECLAIM_WORKDIR` (README, "Code and data").
+One exception: the cluster can't reach GitHub, so its copy of the code comes from a snapshot in the bucket (`repo/`). Upload it only with `cluster/upload_snapshot.sh`, from a clean checkout of a pushed commit; it stamps the commit into `cluster/VERSION`.
 Never commit API keys or sponsor codes.
 Diagrams are Mermaid in Markdown.
 Read `sponsors/*.md` before any pitch, demo, or sponsor-facing work.

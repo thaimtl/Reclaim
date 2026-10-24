@@ -2,7 +2,7 @@
 # Set up or update the working copy on a cluster (PBS), from the private bucket only (no git needed):
 #   hf sync hf://buckets/austinkomachi/Austin_CH/repo <working copy>    # the code first: this script is part of it
 #   bash <working copy>/cluster/setup.sh
-# Code: the bucket's repo/ (a snapshot of the Reclaim repo uploaded from Austin's machine). Data: data/ (the Berkeley
+# Code: the bucket's repo/, a snapshot of a pushed commit uploaded with cluster/upload_snapshot.sh (cluster/VERSION). Data: data/ (the Berkeley
 # tarball, the causal cache + scale statistics, the lexicon) and Gaddy's checkpoints. Builds venv-svr if missing (venv-camera
 # only with WITH_CAMERA=1). Rerunning is safe: sync only adds and updates, never deletes.
 # Never sync the bucket's calhacks2026/ folder here: it is a full snapshot of Austin's machine, environments included.
@@ -13,7 +13,7 @@ B=hf://buckets/austinkomachi/Austin_CH
 . cluster/env.sh  # from here on, caches, tmp and the HF token stay inside the working copy
 HF=$(command -v hf || true); [ -n "$HF" ] || HF=venv-svr/bin/hf
 "$HF" sync $B/repo .
-echo "code: $(cat cluster/VERSION 2>/dev/null || echo 'snapshot from the bucket')"
+echo "code: $(cat cluster/VERSION 2>/dev/null || echo 'unknown: snapshot not stamped (upload with cluster/upload_snapshot.sh)')"
 
 # Data (sync only adds and updates; never pass --delete)
 "$HF" sync $B/data ./data

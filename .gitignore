@@ -18,3 +18,4 @@ tmp/
 
 # Screenshots pasted into images/ (Windows names them {GUID}.png)
 images/{*}.png
+cluster/VERSION
