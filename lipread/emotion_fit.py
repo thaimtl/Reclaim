@@ -1,0 +1,257 @@
+"""Fit the expression head on the speaker's recorded sessions and print held-out scores.
+
+    venv-live/bin/python -m lipread.emotion_fit                                         # writes data/emotion/head.npz
+    venv-live/bin/python -m lipread.emotion_fit --sessions session_01 --test session_02
+"""
+import argparse
+import itertools
+import json
+import os
+import sys
+import time
+from collections import Counter
+
+import numpy as np
+
+import lipread
+from lipread.emotion import BASELINE_S
+from lipread.expression import HEAD_PATH, MODEL_SHA256, N_FEATURES, Head
+
+LABELS = ('neutral', 'happy', 'sad', 'surprised')
+TRUTH = {'smile': 'happy', 'frown': 'sad', 'surprised': 'surprised'}
+REST = {'Smile': 'happy', 'Raise your eyebrows': 'surprised'}
+PROCESS = (1280, 720)
+GRID = list(itertools.product((0.4, 0.5, 0.6, 0.7), (0.5, 0.8), (0.3, 0.5, 1.0)))   # margin, hold_s, tau_s
+FEATURE_DIR = os.path.join(lipread.WORK, 'data', 'emotion')
+CACHE_VERSION = 3
+
+
+def truth(row):
+    if row.get('cue'):
+        return REST.get(row['cue'], 'neutral')
+    return TRUTH.get(row.get('expression') or 'neutral', 'neutral')
+
+
+def session_rows(root, session):
+    with open(os.path.join(root, session, 'manifest.jsonl')) as f:
+        rows = [json.loads(line) for line in f if line.strip()]
+    return sorted(rows, key=lambda r: r['clip_t0'])
+
+
+def extract(root, session, cache=FEATURE_DIR):
+    """Per clip (id, truth, is_rest, t (T,), feats (T, 60) with NaN rows where no face), cached per session."""
+    path = os.path.join(cache, f'features_{session}.npz')
+    rows = session_rows(root, session)
+    if os.path.exists(path):
+        z = np.load(path, allow_pickle=False)
+        same = (int(z['version']) if 'version' in z else 0) == CACHE_VERSION and str(z['model']) == MODEL_SHA256 \
+            and tuple(z['process']) == PROCESS and list(z['ids']) == [r['id'] for r in rows]
+        if same:
+            return [(r['id'], truth(r), bool(r.get('cue')), z[f't_{r["id"]}'], z[f'f_{r["id"]}']) for r in rows]
+    import cv2
+    from lipread.crop import BlendTracker
+    from lipread.run import fit
+    from lipread.types import Frame
+    from lipread.expression import ExpressionNet
+    net = ExpressionNet(threads=os.cpu_count() or 2)
+    # one tracker per session, as live
+    tracker = BlendTracker(os.path.join(lipread.LIPFLOW_MODELS, 'face_landmarker.task'))
+    out, store, t0 = [], {}, time.time()
+    for n, r in enumerate(rows):
+        ts = np.load(os.path.join(root, session, r['video_ts'])).astype(np.float64).reshape(-1)
+        cap = cv2.VideoCapture(os.path.join(root, session, r['video']))
+        feats = []
+        while len(feats) < len(ts):
+            ok, img = cap.read()
+            if not ok:
+                break
+            img = fit(Frame(t=ts[len(feats)], image=img, index=len(feats)), PROCESS).image    # as the crop thread
+            obs = tracker.detect(img, int(round(ts[len(feats)] * 1000)))
+            lg = None if obs is None or obs.blend is None else net.logits(img, obs.pts)
+            feats.append(np.full(N_FEATURES, np.nan, np.float32) if lg is None else np.concatenate([lg, obs.blend]))
+        cap.release()
+        t, f = ts[:len(feats)], np.array(feats, np.float32).reshape(-1, N_FEATURES)
+        out.append((r['id'], truth(r), bool(r.get('cue')), t, f))
+        store[f't_{r["id"]}'], store[f'f_{r["id"]}'] = t, f
+        if n % 25 == 24:
+            print(f'  {session}: {n + 1}/{len(rows)} clips, {time.time() - t0:.0f} s', flush=True)
+    tracker.close()
+    os.makedirs(cache, exist_ok=True)
+    np.savez(path, version=CACHE_VERSION, model=MODEL_SHA256, process=np.array(PROCESS),
+             ids=np.array([r['id'] for r in rows]), **store)
+    return out
+
+
+def baseline(clips):
+    """Mean features over the first BASELINE_S of face frames, as live."""
+    xs, t_first = [], None
+    for _, _, _, t, f in clips:
+        for ti, x in zip(t, f):
+            if np.isnan(x[0]):
+                continue
+            t_first = ti if t_first is None else t_first
+            xs.append(x)
+            if ti - t_first >= BASELINE_S:
+                return np.mean(xs, 0), ti
+    raise ValueError('no 3 s of face in the session')
+
+
+def fit_head(X, y, C=1.0):
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.preprocessing import StandardScaler
+    sc = StandardScaler().fit(X)
+    m = LogisticRegression(C=C, max_iter=3000, class_weight='balanced').fit(sc.transform(X), y)
+    classes = list(m.classes_)
+    coef = np.zeros((len(LABELS), X.shape[1]), np.float32)
+    intercept = np.full(len(LABELS), -20.0, np.float32)     # a label this fold never saw: never predicted
+    for i, c in enumerate(LABELS):
+        if c in classes:
+            j = classes.index(c)
+            if len(classes) > 2:
+                coef[i], intercept[i] = m.coef_[j], m.intercept_[j]
+            else:            # binary: sigmoid(w x + b) == softmax over +-(w x + b) / 2
+                sign = 0.5 if j == 1 else -0.5
+                coef[i], intercept[i] = sign * m.coef_[0], sign * m.intercept_[0]
+    return Head(LABELS, sc.mean_, sc.scale_, coef, intercept, 0.5, 0.5, 0.3)
+
+
+def training_frames(clips, base):
+    """Frames after the first third of each clip, once the expression is held."""
+    X, y = [], []
+    for _, lab, _, t, f in clips:
+        f = f[len(f) // 3:]
+        f = f[~np.isnan(f).any(1)] - base
+        X.append(f)
+        y += [lab] * len(f)
+    return np.vstack(X), np.array(y)
+
+
+def replay(clips, probs, t_start, margin, hold_s, tau_s, hz=None):
+    """Published labels per frame from the live NetTagger.step, fed at EmotionWorker.NET_HZ."""
+    from lipread.emotion import EmotionWorker, NetTagger
+    hz = hz or EmotionWorker.NET_HZ
+    head = Head(LABELS, np.zeros(N_FEATURES), np.ones(N_FEATURES), np.zeros((len(LABELS), N_FEATURES)),
+                np.zeros(len(LABELS)), margin, hold_s, tau_s)
+    tagger = NetTagger(net=None, head=head)
+    label, last, res = 'neutral', None, []
+    for (_, _, _, t, _), p in zip(clips, probs):
+        labs = []
+        for ti, pi in zip(t, p):
+            if ti > t_start and (last is None or ti - last >= 1.0 / hz - 1e-9):
+                last = ti
+                label = tagger.step(ti, None if np.isnan(pi[0]) else pi).label
+            labs.append(label)
+        res.append(labs)
+    return res
+
+
+def score(clips, res):
+    """{label: accuracy on sentences}, fresh flicker share, carry-over share, rest-clip accuracy."""
+    acc, fresh, carry, n_neutral, prev = {}, 0, 0, 0, 'neutral'
+    for lab in LABELS:
+        got = [Counter(r[len(r) // 2:]).most_common(1)[0][0] == lab for (_, tr, rest, _, _), r in zip(clips, res)
+               if tr == lab and not rest and r]
+        acc[lab] = float(np.mean(got)) if got else float('nan')
+    for (_, tr, rest, _, _), r in zip(clips, res):
+        if tr == 'neutral' and not rest and r:
+            n_neutral += 1
+            if any(x != 'neutral' for x in r):
+                # carry-over: starts on the previous expression, then stays neutral
+                held = r[0] != 'neutral' and prev != 'neutral' and 'neutral' in r
+                if held and all(x == 'neutral' for x in r[r.index('neutral'):]):
+                    carry += 1
+                else:
+                    fresh += 1
+        prev = tr
+    rest_ok = [Counter(r[len(r) // 2:]).most_common(1)[0][0] == tr for (_, tr, rest, _, _), r in zip(clips, res)
+               if rest and r]
+    return acc, fresh / max(1, n_neutral), carry / max(1, n_neutral), float(np.mean(rest_ok)) if rest_ok else 0.0
+
+
+def held_out_probs(sessions):
+    """Per session, per clip: (T, 4) probabilities from a 5-fold model that never saw the clip."""
+    from sklearn.model_selection import StratifiedGroupKFold
+    flat = [(si, ci) for si, (clips, base, _) in enumerate(sessions) for ci in range(len(clips))]
+    y = np.array([sessions[si][0][ci][1] for si, ci in flat])
+    probs = [[None] * len(c) for c, _, _ in sessions]
+    folds = StratifiedGroupKFold(5, shuffle=True, random_state=0).split(flat, y, groups=np.arange(len(flat)))
+    for train, test in folds:
+        X, Y = [], []
+        for i in train:
+            si, ci = flat[i]
+            x, yy = training_frames([sessions[si][0][ci]], sessions[si][1])
+            X.append(x)
+            Y.append(yy)
+        head = fit_head(np.vstack(X), np.concatenate(Y))
+        for i in test:
+            si, ci = flat[i]
+            probs[si][ci] = predict(head, sessions[si][0][ci][4], sessions[si][1])
+    return probs
+
+
+def predict(head, feats, base):
+    p = np.full((len(feats), len(LABELS)), np.nan, np.float32)
+    ok = ~np.isnan(feats).any(1)
+    if ok.any():
+        p[ok] = head.predict(feats[ok] - base)
+    return p
+
+
+def summary(acc, fresh, carry, rest):
+    return (' '.join(f'{k} {v:.0%}' for k, v in acc.items()) +
+            f'; neutral sentences: {fresh:.0%} new wrong label, {carry:.0%} carry-over; rest clips {rest:.0%}')
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    ap.add_argument('--root', default=os.path.join(lipread.WORK, 'recordings'))
+    ap.add_argument('--sessions', help='comma list (default: every session_0* under --root except --test)')
+    ap.add_argument('--test', help='a session scored with the head fitted on --sessions, never fitted on')
+    ap.add_argument('--out', default=HEAD_PATH)
+    args = ap.parse_args(argv)
+    names = args.sessions.split(',') if args.sessions else sorted(
+        d for d in os.listdir(args.root) if d.startswith('session_') and d != args.test and
+        os.path.exists(os.path.join(args.root, d, 'manifest.jsonl')))
+    if not names:
+        sys.exit(f'no sessions with manifest.jsonl under {args.root}')
+    sessions = []
+    for s in names:
+        clips = extract(args.root, s)
+        base, t_start = baseline(clips)
+        sessions.append((clips, base, t_start))
+        print(f'{s}: {len(clips)} clips, {Counter(c[1] for c in clips if not c[2])} sentences')
+    missing = set(LABELS) - {c[1] for clips, _, _ in sessions for c in clips}
+    if missing:
+        sys.exit(f'no {sorted(missing)} clips in {names}; the head needs every label in {LABELS}')
+    probs = held_out_probs(sessions)
+    best = None
+    for margin, hold_s, tau_s in GRID:
+        res = [replay(c, p, ts, margin, hold_s, tau_s) for (c, _, ts), p in zip(sessions, probs)]
+        scored = [score(c, r) for (c, _, _), r in zip(sessions, res)]
+        acc = {k: float(np.nanmean([s[0][k] for s in scored])) if any(not np.isnan(s[0][k]) for s in scored)
+               else float('nan') for k in LABELS}
+        fresh, carry, rest = (float(np.mean([s[i] for s in scored])) for i in (1, 2, 3))
+        objective = float(np.nanmean(list(acc.values()))) - 2 * fresh    # labels with no sentences are left out
+        if best is None or objective > best[0]:
+            best = (objective, (margin, hold_s, tau_s), acc, fresh, carry, rest)
+    _, (margin, hold_s, tau_s), acc, fresh, carry, rest = best
+    held = f'held-out clips ({",".join(names)}): {summary(acc, fresh, carry, rest)}'
+    print(f'smoothing margin {margin}, hold {hold_s} s, tau {tau_s} s\n{held}')
+    X, Y = zip(*(training_frames(c, b) for c, b, _ in sessions))
+    head = fit_head(np.vstack(X), np.concatenate(Y))
+    head.margin, head.hold_s, head.tau_s = margin, hold_s, tau_s
+    info = held
+    if args.test:
+        clips = extract(args.root, args.test)
+        base, t_start = baseline(clips)
+        res = replay(clips, [predict(head, c[4], base) for c in clips], t_start, margin, hold_s, tau_s)
+        test = f'{args.test} (never fitted on): {summary(*score(clips, res))}'
+        print(test)
+        info += f' | {test}'
+    head.info = info
+    head.save(args.out)
+    print(f'wrote {args.out}')
+
+
+if __name__ == '__main__':
+    main()

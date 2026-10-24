@@ -236,7 +236,7 @@ def test_sample_newsreader_mostly_neutral(sample_video, face_model):
 
 
 def test_worker_is_the_tagger_and_never_raises():
-    w, ref = EmotionWorker(), EmotionTagger()
+    w, ref = EmotionWorker(net=None), EmotionTagger()
     assert w.current() == RESTING
     blend = np.zeros(52, np.float32)
     for i in range(120):
