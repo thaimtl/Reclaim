@@ -83,7 +83,7 @@ flowchart LR
 
 - `rig/uno/uno.ino` reads A0 to A3 on a fixed 1,000 Hz clock, matching the Berkeley dataset, and sends raw numbers with no filtering.
   Each 9-byte frame starts with a counter, so the reader can spot dropped frames.
-- `rig/reader.py` turns the frames into samples, and saves raw recordings for training.
+- `rig/reader.py` turns the frames into samples, and saves raw recordings.
 - `rig/filters.py` removes the 60 Hz hum, its 120 and 180 Hz echoes, and drift below 20 Hz.
   It adds only a few milliseconds of delay, so it runs live.
 - Training data and the live demo both go through the same filter, run in order, so the classifier sees the same signal in both.
@@ -91,17 +91,37 @@ flowchart LR
 - The hum comes from the room's wiring, not the laptop.
   It gets through when pad contact is uneven, so firm REF pads still matter, and the filter can't fix a signal that hits 0 or 1023.
 
+## Signal check
+
+Run this after wiring and every time pads go on, before any real recording.
+It records rest, "pa pa pa", "ta ta ta", and "I'm thirsty" with spoken cues, then gives each channel a verdict.
+It doesn't collect training data, see [RECORDING.md](RECORDING.md) for that.
+
+macOS:
+
 ```bash
 python3 -m venv rig/.venv && rig/.venv/bin/pip install -r rig/requirements.txt
 rig/.venv/bin/python rig/test_filters.py
-rig/.venv/bin/python rig/session.py recording.npz
-rig/.venv/bin/python rig/check.py recording.npz
+rig/.venv/bin/python rig/signal_check.py check.npz
+rig/.venv/bin/python rig/signal_report.py check.npz
 ```
 
-`rig/session.py` speaks each step out loud and saves raw data with step labels, and `rig/check.py` gives each channel a verdict.
-Claude sessions follow [.claude/skills/emg-session/SKILL.md](.claude/skills/emg-session/SKILL.md) to run and read a session.
+Windows, in PowerShell:
+
+```powershell
+py -m venv rig\.venv
+rig\.venv\Scripts\pip install -r rig\requirements.txt
+rig\.venv\Scripts\python rig\test_filters.py
+rig\.venv\Scripts\python rig\signal_check.py check.npz
+rig\.venv\Scripts\python rig\signal_report.py check.npz
+```
+
+`rig/signal_check.py` finds the Uno by itself, or takes the port as a second argument: `/dev/cu.usbmodem…` on macOS, `COM3` or similar on Windows.
+It speaks the cues with `say` on macOS and the built-in speech engine on Windows.
+Claude sessions follow [.claude/skills/signal-check/SKILL.md](.claude/skills/signal-check/SKILL.md) to run and read it.
 
 Flash `rig/uno` from Arduino IDE, or with `arduino-cli compile --upload -p <port> --fqbn arduino:avr:uno rig/uno`.
+On Windows, a clone Uno with a CH340 chip needs the CH340 driver before it shows up as a COM port.
 The Serial Plotter can't read this firmware, so for the plotter checks below, flash a sketch that prints `analogRead(A0)` instead.
 
 ## Safety
@@ -120,5 +140,5 @@ The Serial Plotter can't read this firmware, so for the plotter checks below, fl
 2. **Forearm test** with 1 board on A0: clenching the fist should make clear bursts in the serial plotter.
 3. **Chin check** with 1 board on site 3: press the tongue hard against the roof of the mouth, then swallow.
    No bursts means a soldering or wiring problem, not pad placement.
-4. **Wire all 4 boards**, flash `rig/uno`, and run `rig/session.py` then `rig/check.py`.
+4. **Wire all 4 boards**, flash `rig/uno`, and run the [signal check](#signal-check).
    Every channel should say OK.

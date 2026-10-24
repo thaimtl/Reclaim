@@ -17,6 +17,11 @@ def say(text):
     print(f"\n>>> {text.upper()}")
     if shutil.which("say"):
         subprocess.Popen(["say", text])
+    elif sys.platform == "win32":
+        # ponytail: PowerShell speech starts about 1 s late, keep one speech process open if cue timing matters
+        quoted = text.replace("'", "''")
+        speak = f"Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('{quoted}')"
+        subprocess.Popen(["powershell", "-NoProfile", "-Command", speak])
 
 
 def find_port():
@@ -59,7 +64,7 @@ def main(out, port=None):
     stream.close()
     np.savez(out, raw=np.concatenate(raws), step=np.array(labels))
     say("done")
-    print(f"Saved {out}. Check it with: python rig/check.py {out}")
+    print(f"Saved {out}. Report it with: python rig/signal_report.py {out}")
 
 
 if __name__ == "__main__":

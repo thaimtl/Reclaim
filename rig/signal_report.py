@@ -18,7 +18,7 @@ def segments(step):
     return [(step[a], max(a, SETTLE), b) for a, b in zip(edges, edges[1:]) if b - max(a, SETTLE) >= WIN]
 
 
-def main(path, show_windows=False):
+def main(path, detail=False):
     d = np.load(path)
     raw, step = d["raw"].astype(float), d["step"]
     y = EmgFilter()(raw)
@@ -46,11 +46,11 @@ def main(path, show_windows=False):
         print(f"A{c}  {clipped[c]:6.1f}%  {hum[c]:4.0f}  {rest[c]:4.1f}  "
               + "  ".join(f"{r[c]:9.1f}x" for _, r in tasks) + f"  {verdict}")
 
-    if show_windows:
+    if detail:
         for s, a, b in segs:
             for i, lv in enumerate(window_levels(y, a, b)):
                 print(f"{(a + i * WIN) / 1000:6.2f}s {s[:10]:<10} " + " ".join(f"{v:4.1f} {'#' * min(10, int(v)):<10}" for v in lv))
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], "--windows" in sys.argv)
+    main(sys.argv[1], "--detail" in sys.argv)
