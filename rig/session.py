@@ -39,6 +39,7 @@ def main(out, port=None):
     port = port or find_port()
     input(f"Uno on {port}. Pads on and relaxed? Press Enter to start. ")
     stream, live = frames(port), EmgFilter()
+    next(stream)
     for n in ("3", "2", "1"):
         say(n)
         run_for(stream, 1)

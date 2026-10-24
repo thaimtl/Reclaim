@@ -23,8 +23,10 @@ def main(path, show_windows=False):
     raw, step = d["raw"].astype(float), d["step"]
     y = EmgFilter()(raw)
     segs = segments(step)
+    if not any(s == "rest" for s, _, _ in segs):
+        sys.exit("The recording needs at least one rest step.")
     rest_raw = np.vstack([raw[a:b] for s, a, b in segs if s == "rest"])
-    rest = np.median(np.vstack([window_levels(y, a, b) for s, a, b in segs if s == "rest"]), 0)
+    rest = np.maximum(np.median(np.vstack([window_levels(y, a, b) for s, a, b in segs if s == "rest"]), 0), 1e-3)
     tasks = [(s, np.percentile(window_levels(y, a, b), 90, 0) / rest) for s, a, b in segs if s != "rest"]
     clipped = ((raw <= 2) | (raw >= 1021)).mean(0) * 100
     hum = rest_raw.std(0)
