@@ -24,6 +24,7 @@ venv-live/bin/python -m lipread.run --cam 0                       # webcam
 venv-live/bin/python -m lipread.run --cam 0 --camera-settings     # Windows: lock exposure and focus in the dialog
 venv-live/bin/python -m lipread.run --replay third_party/lipflow/samples/2016-03-12.mov --start 15 --end 37 --realtime
 venv-live/bin/python -m lipread.run --replay s1_001               # a recording id (recordings/ labels.csv)
+venv-live/bin/python -m lipread.run --replay-session session_01 --realtime --recorder-clock   # a whole session
 venv-live/bin/python -m bus.listen                                # second terminal: validates and prints every message
 venv-live/bin/python -m bus.stub                                  # fake cam.tick / cam.final, no camera or GPU
 venv-live/bin/python -m lipread.bench.tick_bench                  # tick p50/p95 at 2/4/8 s, fp32 vs fp16

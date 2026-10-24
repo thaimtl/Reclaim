@@ -15,7 +15,7 @@ import lipread
 from bus import now, decode, encode, validate
 from lipread.endpoint import Segmenter
 from lipread.model import LiveModel, Reading
-from lipread.run import End, Runner, crop_thread, due_after, fit, make_source, parse_args, rebased, serve
+from lipread.run import End, Runner, crop_thread, due_after, fit, make_source, parse_args, rebased, serve, shifted
 from bus import TIMING_KEYS, TOPK
 from lipread.types import FPS, Crop, Frame
 
@@ -252,6 +252,13 @@ def test_rebased_moves_replay_times_onto_the_bus_clock():
     assert abs(out[0].t - t0) < 0.5
     assert np.diff([f.t for f in out]) == pytest.approx([1 / FPS] * 2)
 
+
+
+def test_recorder_clock_keeps_the_recordings_times():
+    fs = [Frame(t=i / FPS, image=None, index=i) for i in range(3)]       # ReplaySource: ts[i] - ts[0]
+    assert [f.t for f in shifted(fs, 5000.0)] == pytest.approx([5000.0 + i / FPS for i in range(3)])
+    assert parse_args(['--replay', 'x.mp4', '--recorder-clock']).recorder_clock
+    assert not parse_args(['--replay', 'x.mp4']).recorder_clock
 
 @needs_weights
 @needs_cuda
