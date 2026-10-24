@@ -1,10 +1,12 @@
 """SVR-1 against Gaddy and Klein's model on our 4 electrode sites (Berkeley test set), from the benchmark summaries.
 
-    venv-svr/bin/python figures/make_results_figure.py   ->  figures/svr1_vs_gaddy_4ch.{pdf,png}
+    venv-svr/bin/python figures/make_results_figure.py   ->  figures/svr1_vs_gaddy_4ch.{pdf,png} (bar chart)
+                                                             figures/svr1_vs_gaddy_4ch_table.{pdf,png} (every result)
 
 Reads $RECLAIM_WORKDIR/benchmark_results/<model>_gpu/summary.json (bench.score). Every model is tested on sites 1, 2,
 3, 6 (input slots 0, 1, 2, 5); the Gaddy-architecture models were trained on all 8 sites, SVR-1 on these 4.
-Errors are greedy decoding without a language model (the model's own output). Palette: the first four categorical
+The bar chart's errors are greedy decoding without a language model (the model's own output); the table adds the
+errors with Gaddy & Klein's language model (their 5-gram and beam-search weights, tuned for their model, not refit). Palette: the first four categorical
 slots of the data-viz reference palette, validated (CVD and normal-vision separation) in the order the bars sit;
 every bar carries its value, since two of the hues are below 3:1 contrast on the surface.
 """
@@ -36,6 +38,17 @@ CHOICES = [('phrase_id_openvocab', 'Right sentence\namong 10', 10), ('homophene_
            ('homophene_50', 'Among 50 lip\nlook-alikes', 2), ('nearduplicate_10', 'Among 10 near-\nduplicates', 10)]
 
 
+TABLE = [  # (key, header group, header, lower is better)
+    ('open_vocab.greedy.wer', 'Words wrong (WER)', 'no LM', True), ('open_vocab.beam_lm.wer', 'Words wrong (WER)', 'with LM', True),
+    ('open_vocab.greedy.cer', 'Letters wrong (CER)', 'no LM', True), ('open_vocab.beam_lm.cer', 'Letters wrong (CER)', 'with LM', True),
+    ('phrase_id_openvocab', 'True sentence picked among', '10 sentences', False),
+    ('phrase_id_closedvocab', 'True sentence picked among', '10 (closed set)', False),
+    ('homophene_10', 'True sentence picked among', '10 look-alikes', False),
+    ('homophene_50', 'True sentence picked among', '50 look-alikes', False),
+    ('nearduplicate_10', 'True sentence picked among', '10 near-dups', False),
+]
+
+
 def load():
     out = {}
     for folder, *_ in MODELS:
@@ -43,8 +56,71 @@ def load():
             b = json.load(f)['benchmarks']
         m = {f'{k}.{e}': 100 * b[f'{k}__4ch']['metrics'][d][e] for k, d, e, _ in ERRORS}
         m.update({k: 100 * b[f'{k}__4ch']['metrics']['top1_accuracy'] for k, _, _ in CHOICES})
+        m['phrase_id_closedvocab'] = 100 * b['phrase_id_closedvocab__4ch']['metrics']['top1_accuracy']
+        for d in ('greedy', 'beam_lm'):
+            for e in ('wer', 'cer'):
+                m[f'open_vocab.{d}.{e}'] = 100 * b['open_vocab__4ch']['metrics'][d][e]
         out[folder] = m
     return out
+
+
+def table(data):
+    """Every result in one table: rows = models, columns = TABLE; the best value of each column in bold."""
+    names = ["Gaddy & Klein's released model", 'Gaddy architecture, our retrain', 'SVR-1 (ours)',
+             'SVR-1 + articulator targets (ours)']
+    sites = ['8', '8', '4', '4']
+    best = {k: (min if low else max)(data[f][k] for f, *_ in MODELS) for k, _, _, low in TABLE}
+    fig = plt.figure(figsize=(15.5, 4.6))
+    fig.patch.set_facecolor(SURFACE)
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.set_xlim(0, 155)
+    ax.set_ylim(46, 0)
+    ax.axis('off')
+    x_name, x_sites, x0, cw = 1.5, 37.5, 44.5, 12.2
+    xs = [x0 + i * cw + (1.6 if i >= 2 else 0) + (3.2 if i >= 4 else 0) for i in range(len(TABLE))]
+    ax.text(x_name, 2.5, 'SVR-1 vs Gaddy & Klein on our 4 electrode sites: every result', fontsize=14.5,
+            fontweight='bold', color=INK, va='center')
+    ax.text(x_name, 6.3, 'Berkeley silent-speech test set (99 sentences), tested on sites 1, 2, 3, 6. Lower is better '
+            'for errors, higher for picking the true sentence (chance 10%; 2% to 5% among 50). Best in bold.',
+            fontsize=10, color=INK_2, va='center')
+    groups = {}
+    for x, (_, g, _, _) in zip(xs, TABLE):
+        groups.setdefault(g, []).append(x)
+    for g, gx in groups.items():
+        ax.text((gx[0] + gx[-1]) / 2, 11.5, g, ha='center', va='center', fontsize=10.5, color=INK, fontweight='bold')
+        ax.plot([gx[0] - cw / 2 + 0.8, gx[-1] + cw / 2 - 0.8], [13.2, 13.2], color=INK_2, lw=0.8)
+    ax.text(x_name, 15.8, 'Model', fontsize=10.5, color=INK, fontweight='bold', va='center')
+    ax.text(x_sites, 15.8, 'Trained\non sites', fontsize=10, color=INK, fontweight='bold', va='center', ha='center',
+            linespacing=1.0)
+    for x, (_, _, h, _) in zip(xs, TABLE):
+        ax.text(x, 15.8, h, ha='center', va='center', fontsize=10, color=INK)
+    ax.plot([0.8, 154.2], [18.6, 18.6], color=INK, lw=1.2)
+    for r, ((folder, _, colour), name, st) in enumerate(zip(MODELS, names, sites)):
+        y = 22.3 + r * 5.6
+        if r % 2 == 1:
+            ax.add_patch(plt.Rectangle((0.8, y - 2.8), 153.4, 5.6, color='#f1f0ec', zorder=0, lw=0))
+        ax.add_patch(plt.Rectangle((x_name, y - 1.1), 1.8, 2.2, color=colour, zorder=2, lw=0))
+        ax.text(x_name + 2.8, y, name, fontsize=10.5, color=INK, va='center',
+                fontweight='bold' if 'ours' in name else 'normal')
+        ax.text(x_sites, y, st, fontsize=10.5, color=INK, va='center', ha='center')
+        for x, (k, _, _, _) in zip(xs, TABLE):
+            v = data[folder][k]
+            ax.text(x, y, f'{v:.1f}%', ha='center', va='center', fontsize=10.5, color=INK,
+                    fontweight='bold' if abs(v - best[k]) < 1e-9 else 'normal')
+    ax.plot([0.8, 154.2], [22.3 + 3.5 * 5.6, 22.3 + 3.5 * 5.6], color=INK, lw=1.2)
+    ax.text(x_name, 44.0, 'LM = Gaddy & Klein\'s 5-gram language model with their beam-search weights, tuned for their '
+            'model and not refit for SVR-1 (it drops words from SVR-1\'s output, hence "with LM" can be worse than '
+            '"no LM"). The Gaddy-architecture models were trained on all 8 sites; SVR-1 on these 4.',
+            fontsize=9, color=INK_2, va='center')
+    for ext in ('pdf', 'png'):
+        fig.savefig(os.path.join(HERE, f'svr1_vs_gaddy_4ch_table.{ext}'), dpi=200, facecolor=SURFACE,
+                    bbox_inches='tight')
+    print('| Model | Trained on sites | ' + ' | '.join(f'{g.split(" (")[0]} {h}' for _, g, h, _ in TABLE) + ' |')
+    print('|' + ' --- |' * (2 + len(TABLE)))
+    for (folder, *_), name, st in zip(MODELS, names, sites):
+        print(f'| {name} | {st} | ' + ' | '.join(
+            (f'**{data[folder][k]:.1f}%**' if abs(data[folder][k] - best[k]) < 1e-9 else f'{data[folder][k]:.1f}%')
+            for k, *_ in TABLE) + ' |')
 
 
 def bars(ax, groups, data, keys):
@@ -89,12 +165,8 @@ def main():
     for ext in ('pdf', 'png'):
         fig.savefig(os.path.join(HERE, f'svr1_vs_gaddy_4ch.{ext}'), dpi=200, bbox_inches='tight',
                     facecolor=SURFACE)
-    print('| Model | ' + ' | '.join(g.replace('\n', ' ') for *_, g in ERRORS) + ' | '
-          + ' | '.join(g.replace('\n', ' ') for _, g, _ in CHOICES) + ' |')
-    print('|' + ' --- |' * (1 + len(ERRORS) + len(CHOICES)))
-    for folder, label, _ in MODELS:
-        vals = [data[folder][f'{k}.{e}'] for k, _, e, _ in ERRORS] + [data[folder][k] for k, *_ in CHOICES]
-        print(f"| {label.splitlines()[0]} | " + ' | '.join(f'{v:.1f}%' for v in vals) + ' |')
+    plt.close(fig)
+    table(data)
 
 
 if __name__ == '__main__':
