@@ -4,10 +4,9 @@ The rig is a short chain, and each part does one job before passing its output o
 
 ```mermaid
 flowchart LR
-    P[Pads on the face<br/>6 channels] -->|snap cables| A[6 BioAmp EXG Pill<br/>amplifiers]
-    A -->|OUT to A0-A5| U[Arduino Uno]
-    U -->|USB| M[Thai's Mac<br/>on battery]
-    M -->|hotspot| L[Austin's laptop<br/>plugged in]
+    P[Pads on the face<br/>4 channels] -->|snap cables| A[4 BioAmp EXG Pill<br/>amplifiers]
+    A -->|OUT to A0-A3| U[Arduino Uno]
+    U -->|USB| L[Austin's laptop<br/>on battery]
     W[Webcam and mic] --> L
     L -->|Bluetooth| S[Speaker]
 ```
@@ -17,22 +16,23 @@ flowchart LR
 | Part | What it does |
 |---|---|
 | Gel pads | Pick up tiny electrical pulses from the face muscles, 3 per channel: IN+, IN−, and REF |
-| BioAmp EXG Pill, 6 boards | Boost each channel about 1,000x and cancel the hum shared by all pads |
-| Breadboard | Shares the Uno's 5V and ground with all 6 boards |
+| BioAmp EXG Pill, 4 boards | Boost each channel about 1,000x and cancel the hum shared by all pads |
+| Breadboard | Shares the Uno's 5V and ground with all 4 boards |
 | Arduino Uno | Reads each board 1,000 times a second and sends the numbers over USB |
-| Thai's Mac | Reads the Uno, filters out hum with `rig/filters.py`, and runs the quick phrases classifier |
-| Austin's laptop, RTX 5060 | Runs lip reading, Claude, Cartesia, and the dashboard |
+| Austin's laptop, RTX 5060 | Reads the Uno, filters out hum, records, trains, and runs the classifier, lip reading, Claude, Cartesia, and the dashboard |
 | Webcam and mic | Film the lips, and hear the partner's question |
 | Bluetooth speaker | Plays the voice loud enough for a noisy room |
 
-The BioAmp is built for 5V boards like the Uno, so its output plugs straight in, and the Uno runs off the Mac's USB with no separate battery.
+The BioAmp is built for 5V boards like the Uno, so its output plugs straight in, and the Uno runs off the laptop's USB with no separate battery.
 
 ## Pad sites
 
-The 4 core sites are the best 4-electrode set from [Gaddy and Klein, 2020](https://aclanthology.org/2020.emnlp-main.445.pdf), so our signals look like the Berkeley data we pre-train on.
-The 2 extras go on once the core 4 are clean, and they double as spares if a core board fails.
+The 4 sites are the best 4-electrode set from [Gaddy and Klein, 2020](https://aclanthology.org/2020.emnlp-main.445.pdf), so our signals look like the Berkeley data we pre-train on.
+A0 to A3 are the paper's sites 3, 2, 6, and 1, in that order.
+We tried 2 extra sites on the jaw and back of the cheek, but there wasn't room for clean contact on Austin's face, and hair behind the ear kept their REF pads loose.
+In the paper, the best 4 got 76.8% of words wrong on open speech against 68.0% for all 8, and nobody has measured the gap for 10 phrases.
 
-![Pad placement: six electrode pairs around the chin, mouth, and right jaw, plus three reference pads behind each ear](images/pad-placement.png)
+![Pad placement: four electrode pairs around the chin and mouth, plus two reference pads behind each ear](images/pad-placement.png)
 
 | Pin | Site in the paper | Where | Reads |
 |---|---|---|---|
@@ -40,8 +40,6 @@ The 2 extras go on once the core 4 are clean, and they double as spares if a cor
 | A1 | 2 | Left corner of the chin | Lower lip and jaw |
 | A2 | 6 | Right cheek, just below the mouth | Lower lip |
 | A3 | 1 | Left cheek, just above the mouth | Upper lip |
-| A4 | 5 | Right side of the jaw, midway | Jaw, extra |
-| A5 | 8 | Back of the right cheek, 4 cm in front of the ear | Back of the cheek, extra |
 
 The chin channel matters most.
 The muscles that move the tongue sit just above the skin under the chin, so the pad reads the tongue, which no camera can see.
@@ -49,7 +47,7 @@ You can feel it with two fingers under your chin while saying "ta ta ta", then "
 
 - IN+ and IN− go about 2 cm apart on the same muscle, since the amplifier measures the difference between them.
 - REF is the zero point, on bone with no muscle on top, so it picks up only the hum for the amplifier to subtract.
-  Each board has its own REF pad, 3 behind each ear.
+  Each board has its own REF pad on bone, away from hair: A0 and A2 behind the right ear, A1 and A3 behind the left.
 - No pad goes on the throat, since patients lose the voice box.
 - Wipe each spot with alcohol, and mark it with a skin marker so pads go back in the same place every session.
 - Run every cable back behind the ears, so the webcam can still see the lips.
@@ -58,7 +56,6 @@ You can feel it with two fingers under your chin while saying "ta ta ta", then "
 
 ![Wiring: the Uno's 5V and GND go to the breadboard's left + and − columns, each BioAmp takes VCC and GND from those columns, and each OUT goes to its own analog pin](images/wiring.png)
 
-The diagram shows all 6 boards, with A4 and A5 as the 2 extras.
 Only the breadboard's left + and − columns are used, and each column is one connected strip, so any hole in it works.
 
 | From | To | Wire |
@@ -67,9 +64,9 @@ Only the breadboard's left + and − columns are used, and each column is one co
 | Uno GND | Breadboard − column | Male-to-male jumper |
 | Each board's VCC | Breadboard + column | Male-to-female jumper |
 | Each board's GND | Breadboard − column | Male-to-female jumper |
-| Each board's OUT | Its pin, A0 to A5 | Male-to-female jumper |
+| Each board's OUT | Its pin, A0 to A3 | Male-to-female jumper |
 | Each board's JST connector | Its electrode cable | Cable from the kit |
-| Uno USB | Thai's Mac | USB-C to USB-B cable |
+| Uno USB | Austin's laptop | USB-C to USB-B cable |
 
 Check VCC and GND before powering on, since swapping them destroys a board.
 Keep the jumpers short, since longer wires pick up more hum.
@@ -85,9 +82,9 @@ flowchart LR
     F --> C[Classifier]
 ```
 
-- `rig/uno/uno.ino` reads all 6 channels on a fixed 1,000 Hz clock, matching the Berkeley dataset, and sends raw numbers with no filtering.
-  Each 13-byte frame starts with a counter, so the reader can spot dropped frames.
-- `rig/reader.py` turns the frames into samples, and saves raw recordings for training.
+- `rig/uno/uno.ino` reads A0 to A3 on a fixed 1,000 Hz clock, matching the Berkeley dataset, and sends raw numbers with no filtering.
+  Each 9-byte frame starts with a counter, so the reader can spot dropped frames.
+- `rig/reader.py` turns the frames into samples, and saves raw recordings.
 - `rig/filters.py` removes the 60 Hz hum, its 120 and 180 Hz echoes, and drift below 20 Hz.
   It adds only a few milliseconds of delay, so it runs live.
 - Training data and the live demo both go through the same filter, run in order, so the classifier sees the same signal in both.
@@ -95,22 +92,45 @@ flowchart LR
 - The hum comes from the room's wiring, not the laptop.
   It gets through when pad contact is uneven, so firm REF pads still matter, and the filter can't fix a signal that hits 0 or 1023.
 
+## Signal check
+
+Run this after wiring and every time pads go on, before any real recording.
+It records rest, "pa pa pa", "ta ta ta", and "I'm thirsty" with spoken cues, then gives each channel a verdict.
+It doesn't collect training data, see [RECORDING.md](RECORDING.md) for that.
+
+macOS:
+
 ```bash
 python3 -m venv rig/.venv && rig/.venv/bin/pip install -r rig/requirements.txt
 rig/.venv/bin/python rig/test_filters.py
-rig/.venv/bin/python rig/reader.py /dev/cu.usbmodem2101 40 recording.npy
+rig/.venv/bin/python rig/signal_check.py check.npz
+rig/.venv/bin/python rig/signal_report.py check.npz
 ```
 
-Flash `rig/uno` from Arduino IDE, or with `arduino-cli compile --upload -p /dev/cu.usbmodem2101 --fqbn arduino:avr:uno rig/uno`.
+Windows, in PowerShell:
+
+```powershell
+py -m venv rig\.venv
+rig\.venv\Scripts\pip install -r rig\requirements.txt
+rig\.venv\Scripts\python rig\test_filters.py
+rig\.venv\Scripts\python rig\signal_check.py check.npz
+rig\.venv\Scripts\python rig\signal_report.py check.npz
+```
+
+`rig/signal_check.py` finds the Uno by itself, or takes the port as a second argument: `/dev/cu.usbmodem…` on macOS, `COM3` or similar on Windows.
+It speaks the cues with `say` on macOS and the built-in speech engine on Windows.
+Claude sessions follow [.claude/skills/signal-check/SKILL.md](.claude/skills/signal-check/SKILL.md) to run and read it.
+
+Flash `rig/uno` from Arduino IDE, or with `arduino-cli compile --upload -p <port> --fqbn arduino:avr:uno rig/uno`.
+On Windows, a clone Uno with a CH340 chip needs the CH340 driver before it shows up as a COM port.
 The Serial Plotter can't read this firmware, so for the plotter checks below, flash a sketch that prints `analogRead(A0)` instead.
 
 ## Safety
 
-- The pads connect Austin's face to Thai's Mac through the Uno, so that Mac stays off its charger whenever pads are on skin.
-  To charge it with the pads on, unplug the Uno first.
+- The pads connect Austin's face to his laptop through the Uno, so the laptop stays off its charger whenever pads are on skin.
+  To charge it, unplug the Uno first, or put a USB isolator like the ADuM4160 between the laptop and the Uno.
   The [BioAmp docs](https://docs.upsidedownlabs.tech/hardware/bioamp/bioamp-exg-pill/index.html) also warn that a charger adds noise.
-- Austin's laptop never touches the rig, so it can charge.
-- The two laptops talk over a phone hotspot, never a cable, since a cable would connect the charging laptop to the pads.
+- No other cable from wall power touches the laptop while pads are on, like a monitor or a powered hub.
 - Voices are only cloned with the person's permission.
 - This is a prototype, not a medical device.
 
@@ -121,5 +141,5 @@ The Serial Plotter can't read this firmware, so for the plotter checks below, fl
 2. **Forearm test** with 1 board on A0: clenching the fist should make clear bursts in the serial plotter.
 3. **Chin check** with 1 board on site 3: press the tongue hard against the roof of the mouth, then swallow.
    No bursts means a soldering or wiring problem, not pad placement.
-4. **Wire the 4 core boards**, and check that every channel bursts when mouthing a phrase.
-5. **Add the 2 extras** on A4 and A5 once the core 4 are clean.
+4. **Wire all 4 boards**, flash `rig/uno`, and run the [signal check](#signal-check).
+   Every channel should say OK.

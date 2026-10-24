@@ -17,7 +17,7 @@ Most rely on an electrolarynx, a handheld buzzer that sounds robotic and needs a
 |---|---|---|
 | Priority | Main goal | Stretch goal |
 | You do | Mouth any sentence | Mouth one of 10 set phrases |
-| Sensor | Webcam | 6 face electrode channels, no camera |
+| Sensor | Webcam | 4 face electrode channels (A0 to A3 are the paper's sites 3, 2, 6, 1), no camera |
 | Reads it | Auto-AVSR lip reading, then Claude fixes mistakes | Our classifier, then Jev picks using the conversation |
 | Voice | Cartesia, live in a cloned voice | 10 pre-made Cartesia clips |
 
@@ -40,7 +40,7 @@ If it isn't sure, the screen says "Please repeat" instead of guessing.
 
 ```mermaid
 flowchart LR
-    P[6 pad pairs] --> A[6 BioAmp<br/>amplifiers]
+    P[4 pad pairs] --> A[4 BioAmp<br/>amplifiers]
     A --> U[Arduino Uno]
     U --> C[Classifier<br/>top 3 phrases]
     C --> J{Jev<br/>context check}
@@ -78,7 +78,7 @@ Two minutes, live, at our table.
 
 - This is a prototype, not a medical device.
 - Lip reading gets about 1 in 5 words wrong even on normal speaking video, and silent mouthing is harder.
-- Quick phrases is trained per person, from about 30 minutes of recordings.
+- Quick phrases is trained per person, from 3 recording sessions, see [RECORDING.md](RECORDING.md).
 - Auto-AVSR reads a whole sentence at a time, so the voice waits until the speaker finishes.
   Evan owns making it stream, so words come out while the speaker is still mouthing.
 

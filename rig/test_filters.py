@@ -3,7 +3,7 @@ import numpy as np
 from filters import FS, EmgFilter
 
 
-def synth(drift=1.0, seconds=4, channels=6, seed=0):
+def synth(drift=1.0, seconds=4, channels=4, seed=0):
     rng = np.random.default_rng(seed)
     t = np.arange(seconds * FS)[:, None] / FS
     phase = rng.uniform(0, 2 * np.pi, channels)
