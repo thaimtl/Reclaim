@@ -6,7 +6,6 @@ The envelope (VERSION, t_pub = time.perf_counter()) is bus/__init__.py's; tests/
 is plain msgpack on purpose: cam.tick's numpy maps stay raw bytes, never converted, so reading its emotion at 10 Hz
 costs almost nothing.
 """
-import os
 import time
 
 import msgpack
@@ -43,9 +42,11 @@ class Publisher:
         self.sock = self.ctx.socket(zmq.PUB)
         self.sock.setsockopt(zmq.SNDHWM, 100)
         self.sock.setsockopt(zmq.LINGER, 200)
-        if addr.startswith('ipc://'):           # the socket file's folder must exist before bind
-            os.makedirs(os.path.dirname(addr[len('ipc://'):]) or '.', exist_ok=True)
-        self.sock.bind(addr)
+        try:
+            self.sock.bind(addr)
+        except zmq.ZMQError:
+            self.sock.close()       # an open socket would block the context's term() at exit
+            raise
         self.addr = addr
         self.seq = {}
 

@@ -357,13 +357,6 @@ def test_defaults_match_the_team_bus():
     assert all(a.startswith('tcp://127.0.0.1:') for a in (config.DEFAULT_DEC_PUB, config.DEFAULT_CALL_PUB))
 
 
-async def test_ipc_publisher_creates_its_folder(tmp_path):
-    addr = f'ipc://{tmp_path}/sub/dir/call'
-    p = bus.Publisher(addr, zmq.asyncio.Context())
-    assert os.path.isdir(f'{tmp_path}/sub/dir')
-    p.close()
-
-
 # --- review fixes -------------------------------------------------------------------------------------------------
 class SlowCtx(FakeCtx):
     """Audio arrives later than the push (as from Sonic), in two pieces."""
