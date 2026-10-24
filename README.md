@@ -79,7 +79,8 @@ Two minutes, live, at our table.
 - This is a prototype, not a medical device.
 - Lip reading gets about 1 in 5 words wrong even on normal speaking video, and silent mouthing is harder.
 - Quick phrases is trained per person, from about 30 minutes of recordings.
-- The voice waits for the end of each sentence, so there's a short pause before it speaks.
+- Auto-AVSR reads a whole sentence at a time, so the voice waits until the speaker finishes.
+  Evan owns making it stream, so words come out while the speaker is still mouthing.
 
 ## Built on
 
@@ -88,4 +89,4 @@ Two minutes, live, at our table.
 
 ## Team
 
-Thai (hardware), Austin (ML, and the speaker in the demo), Frank (voice AI), and Evan (app and dashboard).
+Thai (hardware), Austin (ML, and the speaker in the demo), Frank (voice AI), and Evan (app, dashboard, and streaming the lip reading).
