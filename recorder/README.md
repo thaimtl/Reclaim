@@ -47,11 +47,11 @@ Flash the Uno with `rig/uno/uno.ino`. In Arduino IDE: open the file, pick the bo
     | H | Show or hide the key help |
     | Q or ESC | Quit. Everything saved so far stays; run the same command to resume |
 
-    Press SPACE, stay still for half a second, mouth the sentence once (mouth open, no sound) at the pace shown, stay still half a second, press SPACE. Rest clips show a cue instead of a sentence (swallow, nod, smile...): do it during the clip.
+    Press SPACE, stay still for half a second, mouth the sentence once (mouth open, no sound) at the pace shown, stay still half a second, press SPACE. Some sentences show a delivery in amber above the sentence: slow, smile, frown, surprised, soft or emphatic; hold it for the whole sentence. Rest clips show a cue instead of a sentence (swallow, nod, smile...): do it during the clip.
 
 The window shows the mirrored camera with an oval where the mouth should sit, the 4 EMG levels (red means the channel hits 0 or 1023: press the pads or REF down), the camera's frame rate, dropped EMG frames, progress, and warnings: charger plugged in, EMG silent, camera stopped. After each clip it shows the clip's own warnings, such as short EMG or a flat channel; redo the clip if one appears.
 
-Order: about 260 clips per training session in a fixed shuffled order, with sentences at natural pace, sentences at a faster pace (marked FAST PACE), and 10 rest clips mixed in. Session 3 is the test set, at demo pace.
+Order: about 260 clips per training session in a fixed shuffled order, with sentences at natural pace, sentences at a faster pace (marked FAST PACE), and 10 rest clips mixed in. Session 3 is the test set, at demo pace. 90 natural-pace sentences per training session (20 in session 3) carry a delivery: the table is in [RECORDING.md](../RECORDING.md#what-a-session-is).
 
 ## What it saves
 
@@ -59,11 +59,11 @@ Under `$RECLAIM_WORKDIR/recordings/session_0N/`, or `recordings/` in the repo if
 
 | File | Contents |
 | --- | --- |
-| `<id>.mp4` | Camera video, unmirrored, at the camera's resolution (default 1280×720) |
+| `<id>.mp4` | Camera video, unmirrored, at the camera's resolution (default 1920×1080, the live camera reader's capture size; it shrinks frames to 1280×720 itself) |
 | `<id>_video_ts.npy` | Laptop-clock time (`time.monotonic()`) of every video frame |
 | `<id>_emg.npy` | Raw Uno readings, shape (samples, 4), uint16, unfiltered; columns A0 to A3 = sites 3, 2, 6, 1 |
 | `<id>_emg_ts.npy` | Laptop-clock time of every EMG sample |
-| `manifest.jsonl` | One line per clip: id, set (C training, E test, B rest), prompt, pace, file names, clip start and end, sample and frame counts, warnings |
+| `manifest.jsonl` | One line per clip: id, set (C training, E test, B rest), prompt, pace (natural, fast, slow, demo, rest), expression (neutral, smile, frown, surprised; null for rest), effort (normal, soft, emphatic; null for rest), file names, clip start and end, sample and frame counts, warnings |
 | `meta.json` | The session: speaker, sample rate, pins and sites, camera settings, recorder version |
 
 The EMG is saved raw on purpose: training runs `rig/filters.py` over each clip in order, the same filter as the live system.
@@ -82,7 +82,7 @@ rig/.venv/bin/python recorder/record.py --session 1 --camera fake --fake-emg --a
 
 ## Notes for changing it (people and Claude)
 
-- **Prompts:** sentences come from `docs/recording/session{1,2}.txt` and `session3_test.txt` (`id<TAB>sentence`), made by `docs/recording/make_prompts.py`. Sentences numbered 201 and up in sessions 1 and 2 are FAST PACE (`FAST_FROM`); the rest cues are `REST_CUES`. The shuffle is seeded by the session number, so a resumed session keeps its order.
+- **Prompts:** sentences come from `docs/recording/session{1,2}.txt` and `session3_test.txt` (`id<TAB>sentence`), made by `docs/recording/make_prompts.py`. Sentences numbered 201 and up in sessions 1 and 2 are FAST PACE (`FAST_FROM`); the rest cues are `REST_CUES`. Deliveries come from `STYLES` (counts per session) and `STYLE_CUES` (the amber line), assigned by `assign_styles` with its own seed. The shuffle is seeded by the session number, so a resumed session keeps its order and its deliveries.
 - **The file format is a contract** with `svr/recordings.py` (`load_manifest`, `load_emg`). Change both together, and tell the other sessions on the team board.
 - **EMG input** goes through `rig/reader.py` (`frames(port, stats)`), Thai's reader for the `rig/uno` firmware. Channel count, pins and sites live in `rig/` and in `CHANNELS` and `SITES` here.
 - **Threads:** the camera grabs and stamps frames; a writer thread encodes MP4 so a slow disk never stalls capture (a full queue drops and counts a frame); the EMG thread reads the Uno. The window and keys run in the main thread (OpenCV).

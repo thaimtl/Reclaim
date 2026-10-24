@@ -43,8 +43,33 @@ def test_items_are_shuffled_the_same_way_every_run():
     a, b = record.load_items(1), record.load_items(1)
     assert [i['id'] for i in a] == [i['id'] for i in b]
     assert len(a) == 260 and sum(i['set'] == 'B' for i in a) == 10
-    assert {i['pace'] for i in a} == {'natural', 'fast', 'rest'}
+    assert {i['pace'] for i in a} == {'natural', 'fast', 'slow', 'rest'}
     assert all(i['set'] == 'E' for i in record.load_items(3) if i['pace'] != 'rest')
+
+
+def test_delivery_styles():
+    """Each session gets its STYLES on a fixed set of natural- (or demo-) pace sentences, one style per sentence."""
+    from collections import Counter
+    for session in (1, 2, 3):
+        items = record.load_items(session)
+        styled = [i for i in items if i.get('style')]
+        assert Counter(i['style'] for i in styled) == Counter(record.STYLES[session])
+        assert [i['id'] for i in styled] == [i['id'] for i in record.load_items(session) if i.get('style')]
+        for i in items:
+            if i['pace'] == 'rest':
+                assert i['expression'] is None and i['effort'] is None and not i.get('style')
+                continue
+            assert i['expression'] in ('neutral',) + record.EXPRESSIONS and i['effort'] in ('normal',) + record.EFFORTS
+            assert (i['pace'] == 'slow') == (i.get('style') == 'slow')
+            assert sum([i['pace'] == 'slow', i['expression'] != 'neutral', i['effort'] != 'normal']) <= 1
+            if i['pace'] == 'fast':
+                assert not i.get('style'), 'fast sentences stay neutral'
+    s1 = {i['id'] for i in record.load_items(1) if i.get('style')}
+    s2 = {i['id'] for i in record.load_items(2) if i.get('style')}
+    assert s1 != s2 and all(i.split('_')[0] == 's1' for i in s1)
+    assert set(record.STYLE_CUES) >= {s for st in record.STYLES.values() for s in st}
+    assert sum(1 for i in record.load_items(1) if i['pace'] == 'natural' and i['expression'] == 'neutral'
+               and i['effort'] == 'normal') == 130
 
 
 def test_record_redo_resume_and_load():
@@ -67,6 +92,7 @@ def test_record_redo_resume_and_load():
         assert int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) == len(vts)
         cap.release()
         assert r['warnings'] == [], r['warnings']
+        assert 'expression' in r and 'effort' in r     # delivery style saved with the clip
     redone = sess.last_id
     sess.redo(redone)
     assert len(load_manifest(root)) == 2
@@ -83,6 +109,9 @@ def test_window_draws():
     sess = record.main(['--session', '2', '--camera', 'fake', '--fake-emg', '--allow-charger', '--root', root,
                         '--width', '320', '--height', '240', '--auto', '0'])
     item = sess.pending()[0]
+    styled = next(i for i in sess.pending() if i.get('style'))
+    img = record.draw(sess, sess.cam, sess.emg, type('T', (), {'error': None})(), 'idle', styled, True, '', False, False)
+    cv2.imwrite(os.path.join(root, 'screen_styled.png'), img)
     for state in ('idle', 'done'):
         img = record.draw(sess, sess.cam, sess.emg, type('T', (), {'error': None})(), state, item, True, 'msg',
                           charger=True, real_emg=True)
@@ -98,5 +127,6 @@ if __name__ == '__main__':
     test_clock_fit_handles_jitter_and_drift()
     test_dropped_frames_keep_the_sample_count()
     test_items_are_shuffled_the_same_way_every_run()
+    test_delivery_styles()
     test_record_redo_resume_and_load()
     print('ok')

@@ -4,7 +4,8 @@
     python recorder/record.py --session 1 --camera 1 --port COM4
     python recorder/record.py --session 1 --camera fake --fake-emg --allow-charger   # no hardware, to try it
 
-A window shows the camera, the sentence to mouth, live EMG bars and warnings. Keys (click the window first):
+A window shows the camera, the sentence to mouth and how to mouth it, live EMG bars and warnings. Keys (click the
+window first):
     SPACE  start the clip / stop the clip        R  redo the last clip       S  skip this prompt
     H      show or hide help                     Q or ESC  quit (progress is saved; rerun to resume)
 
@@ -37,13 +38,30 @@ REPO = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(REPO, 'rig'))
 from filters import EmgFilter  # noqa: E402  (rig/filters.py, Thai's live filter)
 
-VERSION = 1
+VERSION = 2  # 2: delivery styles (slow pace, facial expression, effort) on some sentences
 FS = 1000
 CHANNELS = 4
 SITES = [3, 2, 6, 1]  # Gaddy and Klein sites on rig pins A0, A1, A2, A3
 PROMPTS = os.path.join(REPO, 'docs', 'recording')
 SESSIONS = {1: ('session1.txt', 'C'), 2: ('session2.txt', 'C'), 3: ('session3_test.txt', 'E')}
 FAST_FROM = 201  # sentences 201+ of sessions 1 and 2 are mouthed faster than natural
+# Delivery styles for the expressive voice (README: the voice follows pace, effort and facial expression). The demo has
+# Austin smile or frown while he mouths, which changes the EMG (site 1 sits near the smile muscles), and speak slowly,
+# softly or emphatically, which sets the voice's speed and volume; neutral natural-pace mouthing alone wouldn't cover
+# that. Each style goes to a fixed, seeded set of natural-pace sentences (demo-pace in session 3), never two at once.
+STYLES = {1: {'slow': 20, 'smile': 10, 'frown': 10, 'surprised': 10, 'soft': 10, 'emphatic': 10},
+          2: {'slow': 20, 'smile': 10, 'frown': 10, 'surprised': 10, 'soft': 10, 'emphatic': 10},
+          3: {'smile': 10, 'frown': 10}}
+EXPRESSIONS = ('smile', 'frown', 'surprised')
+EFFORTS = ('soft', 'emphatic')
+STYLE_CUES = {  # what the window tells Austin, in the instruction line above the sentence
+    'slow': 'SLOW: mouth it slowly and clearly, about half your natural speed',
+    'smile': 'SMILE while you mouth it: a real smile, held the whole sentence',
+    'frown': 'FROWN while you mouth it: look upset or annoyed, held the whole sentence',
+    'surprised': 'SURPRISED while you mouth it: brows up, eyes wide, held the whole sentence',
+    'soft': 'SOFT: small, relaxed movements, as if whispering',
+    'emphatic': 'EMPHATIC: big, firm movements, as if speaking up to be heard',
+}
 REST_CUES = ['Still face, relaxed', 'Swallow once', 'Nod your head', 'Look left, then back', 'Look right, then back',
              'Smile', 'Raise your eyebrows', 'Take a slow breath', 'Lick your lips', 'Small cough']
 ARDUINO_VIDS = {0x2341, 0x2A03, 0x1A86}
@@ -51,8 +69,35 @@ WIN = 'Reclaim recorder'
 
 
 # ------------------------------------------------------------------------------------------------ prompts
+def assign_styles(items, session):
+    """Give STYLES[session] to a seeded sample of the natural- or demo-pace sentences, one style per sentence.
+    Sets pace ('slow'), expression (neutral / smile / frown / surprised) and effort (normal / soft / emphatic)."""
+    eligible = sorted(it['id'] for it in items if it['pace'] in ('natural', 'demo'))
+    want = STYLES.get(session, {})
+    if sum(want.values()) > len(eligible):
+        raise ValueError(f'session {session}: {sum(want.values())} styled sentences, only {len(eligible)} eligible')
+    picks = random.Random(f'reclaim-style-{session}').sample(eligible, sum(want.values()))
+    style_of, i = {}, 0
+    for style, n in want.items():
+        for uid in picks[i:i + n]:
+            style_of[uid] = style
+        i += n
+    for it in items:
+        if it['pace'] == 'rest':
+            it['expression'] = it['effort'] = None
+            continue
+        style = style_of.get(it['id'])
+        if style == 'slow':
+            it['pace'] = 'slow'
+        it['expression'] = style if style in EXPRESSIONS else 'neutral'
+        it['effort'] = style if style in EFFORTS else 'normal'
+        it['style'] = style
+    return items
+
+
 def load_items(session):
-    """The session's clips in a fixed shuffled order: sentences (natural or fast pace) and 10 rest clips."""
+    """The session's clips in a fixed shuffled order: sentences (natural, fast or slow pace, some with an expression or
+    an effort to hold) and 10 rest clips."""
     fname, set_ = SESSIONS[session]
     items = []
     with open(os.path.join(PROMPTS, fname), encoding='utf-8') as f:
@@ -64,6 +109,7 @@ def load_items(session):
                 items.append({'id': uid, 'set': set_, 'prompt': text.strip(), 'pace': pace})
     for k, cue in enumerate(REST_CUES, 1):
         items.append({'id': f's{session}_rest_{k:02d}', 'set': 'B', 'prompt': '', 'pace': 'rest', 'cue': cue})
+    assign_styles(items, session)
     random.Random(f'reclaim-session-{session}').shuffle(items)
     return items
 
@@ -332,7 +378,8 @@ class Session:
                            'mirrored': False},
                 'clock': 'time.monotonic() on this laptop, shared by camera and EMG',
                 'recorder_version': VERSION, 'platform': platform.platform(),
-                'n_items': len(self.items), 'prompts': SESSIONS[self.session][0]}
+                'n_items': len(self.items), 'prompts': SESSIONS[self.session][0],
+                'styles': STYLES.get(self.session, {})}
         with open(os.path.join(self.dir, 'meta.json'), 'w', encoding='utf-8') as f:
             json.dump(meta, f, indent=1)
 
@@ -369,7 +416,8 @@ class Session:
         if self.writer.dropped:
             warnings.append(f'{self.writer.dropped} video frames dropped')
         entry = {'id': uid, 'session': f'session_{self.session:02d}', 'set': item['set'], 'prompt': item['prompt'],
-                 'pace': item['pace'], 'cue': item.get('cue'), 'target_wpm': None, 'mouth': 'open', 'voiced': False,
+                 'pace': item['pace'], 'expression': item.get('expression'), 'effort': item.get('effort'),
+                 'cue': item.get('cue'), 'target_wpm': None, 'mouth': 'open', 'voiced': False,
                  'emg': f'{uid}_emg.npy', 'emg_ts': f'{uid}_emg_ts.npy', 'video': f'{uid}.mp4',
                  'video_ts': f'{uid}_video_ts.npy', 't_start': None, 't_end': None,
                  'clip_t0': self.t_start, 'clip_t1': t_end, 'duration_s': round(dur, 3),
@@ -459,11 +507,18 @@ def draw(sess, cam, emg, emg_thread, state, item, help_on, msg, charger, real_em
     if state == 'done':
         put(canvas, 'Session complete. Press Q to quit.', (30, y0 + 30), 1.1, (120, 230, 140), 3)
     elif item is not None:
-        tag = {'natural': 'NATURAL PACE', 'fast': 'FAST PACE', 'demo': 'DEMO PACE', 'rest': 'REST CLIP'}[item['pace']]
-        put(canvas, f"{item['id']}  |  {tag}", (30, y0), 0.65, (180, 200, 255))
+        tag = {'natural': 'NATURAL PACE', 'fast': 'FAST PACE', 'slow': 'SLOW PACE', 'demo': 'DEMO PACE',
+               'rest': 'REST CLIP'}[item['pace']]
+        style = item.get('style')
+        put(canvas, f"{item['id']}  |  {tag}" + (f"  |  {style.upper()}" if style else ''), (30, y0), 0.65,
+            (180, 200, 255))
+        top = y0 + 55
+        if style:   # the delivery instruction, in amber above the sentence
+            put(canvas, STYLE_CUES[style], (30, y0 + 38), 0.75, (60, 200, 255), 2)
+            top += 36
         text = item['prompt'] or item['cue']
         for i, line in enumerate(textwrap.wrap(text, 42)[:3]):
-            put(canvas, line, (30, y0 + 55 + i * 52), 1.45, (255, 255, 255), 3)
+            put(canvas, line, (30, top + i * 52), 1.45, (255, 255, 255), 3)
         status = (f'RECORDING  {time.monotonic() - sess.t_start:4.1f} s   (SPACE to stop)' if state == 'rec'
                   else 'SPACE to start, mouth it once, SPACE to stop')
         put(canvas, status, (30, H - 25), 0.8, (60, 60, 230) if state == 'rec' else (200, 200, 200))
@@ -494,8 +549,10 @@ def parse(argv=None):
     p.add_argument('--root', default=os.path.join(os.environ.get('RECLAIM_WORKDIR', REPO), 'recordings'))
     p.add_argument('--speaker', default='austin')
     p.add_argument('--camera', default='0', help='camera index, a video file, or "fake"')
-    p.add_argument('--width', type=int, default=1280)
-    p.add_argument('--height', type=int, default=720)
+    # the live camera reader captures the C920 at 1920x1080 and shrinks to 1280x720 itself (live/run.py --size,
+    # --process-size): record the same capture, so replayed sessions match the live demo
+    p.add_argument('--width', type=int, default=1920)
+    p.add_argument('--height', type=int, default=1080)
     p.add_argument('--fps', type=float, default=30)
     p.add_argument('--port', default=None, help='Uno serial port; found automatically if omitted')
     p.add_argument('--fake-emg', action='store_true', help='synthetic EMG, no Uno')

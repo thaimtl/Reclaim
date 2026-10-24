@@ -21,7 +21,9 @@ Manifest fields:
     voiced      true when read aloud (set F)
     emg         path of the EMG array, relative to the session folder
     emg_ts      path of the per-sample EMG times, relative (null for older recordings)
-    pace        natural | fast | demo | rest (recorder/record.py)
+    pace        natural | fast | slow | demo | rest (recorder/record.py)
+    expression  neutral | smile | frown | surprised, held while mouthing (null for rest clips and older recordings)
+    effort      normal | soft | emphatic (null for rest clips and older recordings)
     video       path of the video, relative to the session folder (null if none)
     video_ts    path of per-frame timestamps, relative (null: assume constant fps from the file)
     t_start     speech onset in seconds from the start of the clip (null: whole clip)
