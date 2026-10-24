@@ -13,4 +13,5 @@ Decisions already made, so don't re-litigate them without new evidence:
 
 Never commit API keys or sponsor codes.
 Diagrams are Mermaid in Markdown.
+Read `sponsors/*.md` before any pitch, demo, or sponsor-facing work.
 Every change goes through a PR. Pushing straight to main is blocked.
