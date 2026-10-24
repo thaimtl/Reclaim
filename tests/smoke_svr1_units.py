@@ -230,6 +230,8 @@ def pipeline_checks():
         check('live frame times end near the last sample', abs(o['frame_t'][-1] - 102.999) < 0.02, f"{o['frame_t'][-1]:.3f}")
         check('live segments open on camera activity and close after 0.5 s',
               any(x['in_segment'] for x in outs) and any(x['segment_ended'] for x in outs))
+        first = next(x for x in outs if x['segment_started'])
+        check('the read where a segment starts reports it at once', first['in_segment'] and first['seg_start'] is not None)
         s = live.verify(['hello world', 'yellow word'])
         check('live verify scores candidates', s.shape == (2,) and np.isfinite(s).all())
 

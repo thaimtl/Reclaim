@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PBS wrapper for the camera-chain smoke test (camera.smoke on Lipflow's sample video) on one GPU.
 #   qsub cluster/camera_smoke_job.sh
-#PBS -N cam_smoke
+#PBS -N Austin-Train
 #PBS -q development
 #PBS -l select=1:ncpus=8:mem=64gb:ngpus=1:vntype=gpu
 #PBS -l place=free

@@ -23,6 +23,10 @@ time masking, channel dropout (--channel-dropout p, 8-slot pretraining only), an
 (RECORDING.md; --no-delivery): slow speech down to 0.5x, effort (all channels x0.5-2 before the soft clip), and a held
 smile / frown / surprise (tonic muscle noise, strongest on the cheek slots).
 
+Model selection: after every epoch the EMA model is scored on Berkeley's dev set (greedy WER). model.pt holds the best
+epoch so far, model_last.pt the latest. Early stopping: the run ends when dev WER has not improved for --patience
+epochs, never before --min-epochs (--patience 0: run every epoch).
+
 Batches: one utterance per row, padded; the padded size (rows x longest model-input length, 689 Hz) stays under
 --micro-batch-samples, the knob cluster/smoke.sh tunes for VRAM. Everything random in a batch derives from
 (seed, epoch, batch index), so a resumed run reproduces the uninterrupted one. Checkpointing, resume, SIGTERM and
@@ -66,7 +70,7 @@ RATE_CENTER, RATE_SCALE = 2.34, 0.37  # log letters/s over Berkeley train (mean,
 LOSS_WEIGHTS = {'letter': lambda a: 1.0, 'phone': lambda a: a.w_phone, 'artic': lambda a: a.w_artic,
                 'rate': lambda a: a.w_rate, 'speak': lambda a: a.w_speak, 'judge': lambda a: a.w_judge}
 RESUME_KEYS = ('keep_channels', 'micro_batch_samples', 'grad_accum', 'lr', 'epochs', 'seed', 'model', 'preprocess')
-KEEP_4CH = '0,1,2,5'  # Gaddy sites 1, 2, 3, 6 = rig pins A3, A1, A0, A2 (RIG_TO_SLOT in svr.finetune)
+KEEP_4CH = '0,1,2,5'  # Gaddy sites 1, 2, 3, 6 = rig pins A3, A1, A0, A2 (RIG_TO_SLOT in svr.preprocess)
 SLOW_MIN = 0.5        # slowest speed factor (Austin's SLOW delivery is about half speed)
 PADDED_GROWTH = 1.25  # speed < 1 may grow a micro-batch's padded size at most this much (= all rows at 0.8x)
 # held expression: tonic noise amplitude per slot, relative to the channel's spread. Slot 0 (site 1, cheek above the
@@ -435,6 +439,8 @@ def parse_args(argv=None):
     p.add_argument('--ckpt-minutes', type=float, default=15.0)
     p.add_argument('--monitor-seconds', type=float, default=15.0)
     p.add_argument('--eval-limit', type=int, default=None)
+    p.add_argument('--patience', type=int, default=20, help='epochs without a better dev WER before stopping (0: off)')
+    p.add_argument('--min-epochs', type=int, default=60, help='never stop early before this many epochs')
     p.add_argument('--align-limit', type=int, default=None, help='align only this many utterances (tiny runs)')
     p.add_argument('--max-micro-batches-per-epoch', type=int, default=None)
     p.add_argument('--crash-at-step', type=int, default=None)
@@ -522,6 +528,7 @@ def main(argv=None):
 
     config = {k: getattr(args, k) for k in RESUME_KEYS}
     epoch, micro_in_epoch, micro_idx, opt_step, gpu_seconds, align_epoch = 0, 0, 0, 0, 0.0, -1
+    best_wer, best_epoch = math.inf, 0
     state, state_path = load_checkpoint(ckpt_dir)
     if state is not None:
         if state['config'] != config:
@@ -533,6 +540,7 @@ def main(argv=None):
                                                       state['opt_step'])
         gpu_seconds = state['gpu_seconds']
         align_epoch = state.get('align_epoch', -1)
+        best_wer, best_epoch = state.get('best_wer', math.inf), state.get('best_epoch', 0)
         if state.get('align') is not None:
             train.align = state['align']
         torch.set_rng_state(state['torch_rng'])
@@ -553,7 +561,7 @@ def main(argv=None):
                 'config': config, 'epoch': epoch, 'micro_in_epoch': micro_in_epoch, 'micro_idx': micro_idx,
                 'opt_step': opt_step, 'gpu_seconds': gpu_seconds, 'torch_rng': torch.get_rng_state(),
                 'cuda_rng': torch.cuda.get_rng_state() if cuda else None, 'epoch_losses': epoch_losses, 'align_epoch': align_epoch,
-                'align': train.align if align_epoch >= 0 else None}
+                'align': train.align if align_epoch >= 0 else None, 'best_wer': best_wer, 'best_epoch': best_epoch}
 
     model.train()
     last_ckpt = time.time()
@@ -637,17 +645,29 @@ def main(argv=None):
         record['eval_seconds'] = time.time() - t_eval
         record['gpu_hours_total'] = gpu_seconds / 3600
         record['epoch_wall_seconds'] = time.time() - t_epoch
+        export = {'config': ema.config_dict(), 'model': ema.state_dict(), 'keep_channels': keep,
+                  'preprocess': args.preprocess, 'scale_target': scale_target, 'epoch': epoch + 1,
+                  'dev_wer_greedy': record['dev_wer_greedy']}
+        atomic_save(export, os.path.join(out_dir, 'model_last.pt'))
+        if record['dev_wer_greedy'] < best_wer:  # model.pt = the best epoch so far (what fine-tuning starts from)
+            best_wer, best_epoch = record['dev_wer_greedy'], epoch + 1
+            atomic_save(export, os.path.join(out_dir, 'model.pt'))
+        record.update(best_dev_wer_greedy=best_wer, best_epoch=best_epoch)
         log_line(os.path.join(out_dir, 'log.jsonl'), record)
-        atomic_save({'config': ema.config_dict(), 'model': ema.state_dict(), 'keep_channels': keep,
-                     'preprocess': args.preprocess, 'scale_target': scale_target}, os.path.join(out_dir, 'model.pt'))
         epoch += 1
         micro_in_epoch, epoch_losses = 0, []
         save_checkpoint(ckpt_dir, snapshot(epoch_losses))
         last_ckpt = time.time()
         if stop['flag']:
             sys.exit(EXIT_INTERRUPTED)
+        if args.patience and epoch >= args.min_epochs and epoch - best_epoch >= args.patience:
+            print(f'early stop after epoch {epoch}: no better dev WER since epoch {best_epoch} '
+                  f'({100 * best_wer:.1f}%)', flush=True)
+            break
     with open(os.path.join(out_dir, 'DONE'), 'w') as f:
-        f.write(json.dumps({'epochs': epoch, 'opt_step': opt_step, 'gpu_hours': gpu_seconds / 3600}) + '\n')
+        f.write(json.dumps({'epochs': epoch, 'opt_step': opt_step, 'gpu_hours': gpu_seconds / 3600,
+                            'best_epoch': best_epoch, 'best_dev_wer_greedy': best_wer,
+                            'early_stopped': epoch < args.epochs}) + '\n')
     print('training complete', flush=True)
 
 

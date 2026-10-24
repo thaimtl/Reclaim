@@ -17,7 +17,7 @@ rate z-score, `pace` and `effort` in voice.say's units (1.0 = Austin's normal; d
     pace    exp(0.37 * rate z-score) / the calibration's median: relative speaking rate
     effort  RMS of the scaled signal over the last 100 ms / the session's speaking median: relative muscle effort
 Segments start when the speaking probability (or the camera's mouth activity) rises, 300 ms earlier, and end after
-0.5 s with neither.
+0.5 s with neither; the read where one starts says so (segment_started) and the read where one ends too (segment_ended).
 """
 import time
 
@@ -59,7 +59,8 @@ class LiveSVR1:
         self.gain = np.asarray(gains.get(session, gains[sorted(gains)[-1]]), np.float32) if gains else None
         refs = state.get('effort_ref') or {}
         self.effort_ref = float(refs.get(session, refs[sorted(refs)[-1]])) if refs else None
-        self.pace_ref = 1.0
+        paces = state.get('pace_ref') or {}  # Austin's normal pace; 1.0 = Berkeley's average speaker without it
+        self.pace_ref = float(paces.get(session, paces[sorted(paces)[-1]])) if paces else 1.0
         self.cmask = torch.zeros(8, device=self.device)
         self.cmask[KEEP] = 1
         self.filter = rig_filters.EmgFilter()
@@ -122,7 +123,7 @@ class LiveSVR1:
     def _forward(self, x):
         n = len(x) // SAMPLES_PER_FRAME
         xt = torch.from_numpy(np.ascontiguousarray(x[:n * SAMPLES_PER_FRAME]))[None].to(self.device)
-        with torch.autocast('cuda', dtype=torch.float16, enabled=self.device == 'cuda'):
+        with torch.autocast('cuda', dtype=torch.float16, enabled=str(self.device).startswith('cuda')):
             return self.model(xt, torch.tensor([n], device=self.device), self.cmask)
 
     def read(self, camera_active=False):
@@ -151,7 +152,7 @@ class LiveSVR1:
         now_t = self.time_of(self.n)
         recent = speak[-EFFORT_FRAMES:]
         active = bool(recent.mean() > self.thr) or camera_active
-        ended = False
+        ended = started = False
         if not in_seg and active:  # speech started: open a segment 300 ms before the run of speaking frames
             run = len(speak)
             while run > 0 and speak[run - 1] > self.thr:
@@ -161,14 +162,17 @@ class LiveSVR1:
             self.seg_start = t_on - self.pre_roll
             self.win_start = max(start, self.clock[0] + int(round((self.seg_start - self.clock[1]) * EMG_RATE)))
             self.last_active = now_t
+            started = True
         elif in_seg:
             if active:
                 self.last_active = now_t
             elif now_t - self.last_active >= self.end_silence:
                 ended = True
                 self.seg_start = self.win_start = None
-        return {'seg_id': self.seg_id, 'in_segment': in_seg and not ended, 'segment_ended': ended,
-                'seg_start': self.seg_start if in_seg else None, 'frame_t': frame_t,
+        # on the read where speech starts, the segment is reported at once (this read covered the idle window;
+        # frame_t says where each frame falls); the next read covers the segment from seg_start
+        return {'seg_id': self.seg_id, 'in_segment': (in_seg and not ended) or started, 'segment_started': started,
+                'segment_ended': ended, 'seg_start': self.seg_start if (in_seg or started) else None, 'frame_t': frame_t,
                 'letter_logp': out['letter_logp'][0].float().cpu().numpy(),
                 'phone_logp': out['phone_logp'][0].float().cpu().numpy(),
                 'speak_prob': speak, 'rate_z': z, 'pace': float(np.exp(RATE_SCALE * z)) / self.pace_ref,

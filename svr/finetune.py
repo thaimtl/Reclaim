@@ -9,7 +9,8 @@ Data: recorder/record.py's format (svr/recordings.py, RECORDING.md). Each clip's
 A0..A3 = Gaddy sites 3, 2, 6, 1) go through rig/filters.py in order, into model slots [2, 1, 5, 0], are resampled to
 689.06 Hz, multiplied by the session's gain (Berkeley's spread / this session's robust spread, per slot) and soft
 clipped: the same path as pretraining and the live loop (svr.preprocess, svr.live). Splits:
-    test    set E (session 3, demo pace, 10 smile + 10 frown)                     never trained on
+    test    set E (session 3, demo pace, 10 smile + 10 frown)                     never trained on; its session gain
+            comes from its first ~60 s of clips only, like the demo-day calibration minute
     dev     a seeded 10% of the last training session's sentences                early stopping (EMA weights)
     train   everything else in --train-sessions: set C sentences, and set B rest clips as speaking negatives
 Clips whose recorder warnings say a channel was flat or pinned, or the EMG was short, are skipped (--keep-warned).
@@ -124,6 +125,32 @@ def effort_refs(data):
             on[int(0.5 * FRAME_RATE):max(0, len(rms) - int(0.5 * FRAME_RATE))] = True
         by_session.setdefault(r['session'], []).append(rms[on])
     return {s: float(np.median(np.concatenate(v))) for s, v in by_session.items() if sum(map(len, v))}
+
+
+def pace_refs(model, data, cmask, device):
+    """{session: median exp(0.37 x rate z-score) over plain natural-pace clips}: voice.say's pace = 1.0 (svr.live)."""
+    from svr.live import RATE_SCALE
+    plain = [k for k, r in enumerate(data.r) if data.clean[k] and r.get('pace') == 'natural'
+             and r.get('expression') in (None, 'neutral') and r.get('effort') in (None, 'normal')]
+    if not plain:
+        return {}
+    sub = copy.copy(data)
+    sub.inputs, sub.r = [data.inputs[k] for k in plain], [data.r[k] for k in plain]
+    by_session = {}
+    for k, (o, _) in zip(plain, forward_all(model, sub, cmask, device)):
+        by_session.setdefault(data.r[k]['session'], []).append(math.exp(RATE_SCALE * float(o['rate'][0])))
+    return {s: float(np.median(v)) for s, v in by_session.items()}
+
+
+def calibration_minute(records, unscaled, seconds=60.0):
+    """The first ~`seconds` of sentence clips of each session, in recording order: what a held-out session's gain is
+    computed from, like the minute of calibration before the demo."""
+    out, total = [], {}
+    for r in sorted(records, key=lambda r: (r['session'], r.get('clip_t0') or 0)):
+        if r.get('prompt') and total.get(r['session'], 0.0) < seconds:
+            out.append(r)
+            total[r['session']] = total.get(r['session'], 0.0) + len(unscaled[r['id']]) / 689.06
+    return out
 
 
 def make_splits(records, train_sessions, seed):
@@ -377,7 +404,10 @@ def main(argv=None):
         target = scale_stats()['target']
     used = train_r + dev_r + test_r
     unscaled = {r['id']: rig_unscaled(np.load(r['emg'])) for r in used}
-    gains = session_gains(unscaled, used, target)
+    held_out = [r for r in test_r if r['session'] not in train_sessions]
+    gains = session_gains(unscaled, train_r + dev_r + calibration_minute(held_out, unscaled), target)
+    for r in test_r:  # a test clip from a training session (unusual) uses that session's gain
+        gains.setdefault(r['session'], gains[sorted(gains)[-1]])
     print('session gains:', {s: [round(float(g[c]), 3) for c in KEEP] for s, g in gains.items()}, flush=True)
     train, dev, test = WearerData(train_r, unscaled, gains), WearerData(dev_r, unscaled, gains), \
         WearerData(test_r, unscaled, gains)
@@ -412,7 +442,7 @@ def main(argv=None):
     parts = score_parts(SimpleNamespace(no_phone=args.no_phone, no_verifier=False, no_judge=args.no_judge))
     best, best_state, step = math.inf, copy.deepcopy(ema.state_dict()), 0
     with open(os.path.join(out_dir, 'config.json'), 'w') as f:
-        json.dump(dict(vars(args), n_train=len(train), n_dev=len(dev), n_test=len(test), steps=n_steps,
+        json.dump(dict(vars(args), preprocess='causal', n_train=len(train), n_dev=len(dev), n_test=len(test), steps=n_steps,
                        session_gains={s: g.tolist() for s, g in gains.items()}), f, indent=1)
     model.train()
     for epoch in range(epochs):
@@ -461,6 +491,7 @@ def main(argv=None):
         torch.save({'config': ema.config_dict(), 'model': ema.state_dict(), 'keep_channels': KEEP,
                     'preprocess': 'causal', 'scale_target': list(map(float, target)), 'rig_to_slot': RIG_TO_SLOT,
                     'session_gains': {s: g.tolist() for s, g in gains.items()}, 'effort_ref': effort_refs(train),
+                    'pace_ref': pace_refs(ema, train, cmask, device),
                     'default_session': max(r['session'] for r in train_r) if train_r else None},
                    os.path.join(out_dir, 'model.pt'))
     else:

@@ -230,7 +230,9 @@ def main(argv=None):
     # ---- resume ----
     state, state_path = load_checkpoint(ckpt_dir)
     if state is not None:
-        mismatched = {k: (state['config'].get(k), config[k]) for k in RESUME_KEYS if state['config'].get(k) != config[k]}
+        saved = dict(state['config'])
+        saved.setdefault('preprocess', 'gaddy')  # checkpoints from before --preprocess were all Gaddy's pipeline
+        mismatched = {k: (saved.get(k), config[k]) for k in RESUME_KEYS if saved.get(k) != config[k]}
         if mismatched:
             sys.exit(f'refusing to resume from {state_path}: config differs {mismatched}')
         model.load_state_dict(state['model'])

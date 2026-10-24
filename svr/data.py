@@ -81,7 +81,8 @@ def build_cache(entries, processes=None, preprocess='gaddy'):
     todo = [(s, i, preprocess) for s, i, _ in entries if not os.path.exists(cache_path(s, i, preprocess))]
     if todo:
         print(f'preprocessing {len(todo)} recordings ({preprocess}) into {CACHE_ROOTS[preprocess]}', flush=True)
-        with mp.Pool(processes or max(1, (os.cpu_count() or 2) - 2)) as pool:
+        cpus = len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else (os.cpu_count() or 2)
+        with mp.Pool(processes or max(1, cpus - 1)) as pool:
             for n, _ in enumerate(pool.imap_unordered(_preprocess_one, todo, chunksize=16), 1):
                 if n % 1000 == 0:
                     print(f'  preprocessed {n}/{len(todo)}', flush=True)

@@ -10,6 +10,7 @@
 # Exits non-zero on any failure. Takes ~15 minutes.
 set -uo pipefail
 cd "$(dirname "$0")/.."
+. cluster/env.sh
 NAME=$1; shift
 PY=${PY:-venv-svr/bin/python}; [ -x "$PY" ] || PY=venv/bin/python  # venv: cluster copies set up before venv-svr
 OUT=checkpoints/_smoke_cluster

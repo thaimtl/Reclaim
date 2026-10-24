@@ -1,26 +1,24 @@
 #!/usr/bin/env bash
-# One-time setup of a working copy on a cluster (PBS). Run on a login or interactive node:
-#   bash setup.sh /path/to/calhacks2026 [branch, default main]
-# The working copy is a git checkout of the Reclaim repo (the code) with the data beside it in git-ignored folders:
-# the Berkeley dataset, Gaddy's checkpoints and data/ from the private bucket. Builds venv-svr (and venv-camera).
-# Rerunning it is safe; it also updates the code of an existing copy to the branch (data folders are untouched).
+# Set up or update the working copy on a cluster (PBS), from the private bucket only (no git needed):
+#   hf sync hf://buckets/austinkomachi/Austin_CH/repo <working copy>    # the code first: this script is part of it
+#   bash <working copy>/cluster/setup.sh
+# Code: the bucket's repo/ (a snapshot of the Reclaim repo uploaded from Austin's machine). Data: data/ (the Berkeley
+# tarball, the causal cache + scale statistics, the lexicon) and Gaddy's checkpoints. Builds venv-svr if missing (venv-camera
+# only with WITH_CAMERA=1). Rerunning is safe: sync only adds and updates, never deletes.
+# Never sync the bucket's calhacks2026/ folder here: it is a full snapshot of Austin's machine, environments included.
 set -euo pipefail
-WORK=${1:-$PWD/calhacks2026}
-BRANCH=${2:-main}
-REPO=https://github.com/thaimtl/Reclaim.git
+cd "$(dirname "$0")/.."
+WORK=$PWD
 B=hf://buckets/austinkomachi/Austin_CH
-mkdir -p "$WORK" && cd "$WORK"
-
-# Code. An older copy synced from the bucket has no .git: its code files are replaced by the repo's.
-if [ ! -d .git ]; then git init -q && git remote add origin "$REPO"; fi
-git fetch -q origin "$BRANCH"
-git checkout -q -f -B "$BRANCH" "origin/$BRANCH"
-echo "code: $(git log --oneline -1)"
+. cluster/env.sh  # from here on, caches, tmp and the HF token stay inside the working copy
+HF=$(command -v hf || true); [ -n "$HF" ] || HF=venv-svr/bin/hf
+"$HF" sync $B/repo .
+echo "code: $(cat cluster/VERSION 2>/dev/null || echo 'snapshot from the bucket')"
 
 # Data (sync only adds and updates; never pass --delete)
-hf sync $B/data ./data
+"$HF" sync $B/data ./data
 mkdir -p baseline_gaddy/checkpoints silent_speech
-hf sync $B/checkpoints/gaddy baseline_gaddy/checkpoints
+"$HF" sync $B/checkpoints/gaddy baseline_gaddy/checkpoints
 [ -d silent_speech/emg_data ] || tar -C silent_speech -xzf data/emg_data.tar.gz
 
 # Python 3.12 + the exact package set of the working environment (torch 2.11, CUDA 13 build).
@@ -41,8 +39,9 @@ fi
 PY=venv-svr/bin/python; [ -x "$PY" ] || PY=venv/bin/python
 $PY -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
 
-# Camera baselines: separate environment (MediaPipe needs numpy<2), then all their weights
-if [ ! -x venv-camera/bin/python ]; then
+# Camera baselines (optional, WITH_CAMERA=1): separate environment (MediaPipe needs numpy<2), then their weights.
+# Skipped by default: SVR-1 doesn't need them, and some weights come from Google Drive, which can fail (404, quota).
+if [ "${WITH_CAMERA:-0}" = "1" ] && [ ! -x venv-camera/bin/python ]; then
   if command -v uv > /dev/null; then
     uv venv --python 3.11 venv-camera && uv pip install --python venv-camera/bin/python -r requirements-camera.txt
   else

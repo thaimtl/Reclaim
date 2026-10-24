@@ -77,7 +77,7 @@ flowchart TD
 
 **Pace and effort for the voice.** `voice.say` carries both as relative numbers, 1.0 = Austin's normal, so the voice side never needs to know about EMG:
 
-- `pace = exp(0.37 · z) / pace_ref`: z is the rate head's output (the z-score of log letters per second, so `exp(0.37 · z)` is the speaking rate relative to Berkeley's average), and `pace_ref` is its median over the calibration minute.
+- `pace = exp(0.37 · z) / pace_ref`: z is the rate head's output (the z-score of log letters per second, so `exp(0.37 · z)` is the speaking rate relative to Berkeley's average), and `pace_ref` is its median over Austin's plain natural-pace clips (saved by fine-tuning, refreshed by the calibration minute).
 - `effort = RMS over the last 100 ms / effort_ref`: `effort_ref` is the median of that RMS over the session's speaking frames (from fine-tuning, refreshed by calibration).
 
 Effort is sent with every message, not once per sentence, so the voice can stress single words. Frank maps pace to Cartesia speed 0.6 to 1.5 and effort to volume 0.5 to 2.0. Sonic ignores `generation_config` changes inside a context but honours inline `<speed>`, `<volume>` and `<emotion>` tags, which is how a change reaches the middle of a sentence.
@@ -131,7 +131,7 @@ The same alignments give the speaking targets.
 - EMA of weights 0.999, with a warm-up of `min(0.999, (1 + step) / (10 + step))`.
 - bf16.
 - Batches: one utterance per row, sorted within chunks of 1,024 and filled to 112,000 padded samples (about 97% real signal, about 405 steps per epoch).
-- 150 epochs, about 61,000 steps.
+- 150 epochs, about 61,000 steps (Gaddy and Klein: 200 epochs of larger steps, about 50,000). After every epoch the EMA model is scored on Berkeley's dev set (greedy WER): `model.pt` keeps the best epoch, `model_last.pt` the latest. Early stopping ends the run after 20 epochs without a better dev WER, never before epoch 60.
 
 ### Stages
 
@@ -139,7 +139,7 @@ The same alignments give the speaking targets.
 | --- | --- | --- | --- |
 | 0. Targets | Berkeley (19 h, 1 speaker) | nothing | Re-filter and re-cache with `rig/filters.py`; SPARC articulators; phonemes; scale statistics |
 | 1. Pretrain | Berkeley, slots 0, 1, 2, 5 | everything | Main run `SVR1_4ch`; optional 8-slot run with channel dropout, then 50 epochs on the 4 slots (`--init-from`). Cluster: H100/H200 |
-| 2. Fine-tune | Austin, sessions 1 and 2 | everything, lr 1e-4, 40 epochs, EMA 0.998 | Rest clips as negatives for speaking (and all-blank letter targets); camera N-best negatives for the judge; 10% of session 2 held out for early stopping; clips with a recorder warning (flat or pinned channel, short EMG) skipped; no hardware simulation (it is the real rig); the deliveries are real data here, and results are broken down by pace, expression and effort |
+| 2. Fine-tune | Austin, sessions 1 and 2 | everything, lr 1e-4, 40 epochs, EMA 0.998 | Rest clips as negatives for speaking (and all-blank letter targets); camera N-best negatives for the judge; 10% of session 2 held out for early stopping; clips with a recorder warning (flat or pinned channel, short EMG) skipped; session 3's scale factors come from its first ~60 s of clips only, like the demo-day calibration minute; no hardware simulation (it is the real rig); the deliveries are real data here, and results are broken down by pace, expression and effort |
 | 3. Calibrate | ~1 min before the demo | adapter only, 50 steps | Also recomputes the scale factors s_c |
 
 The comparison baseline is Gaddy and Klein's architecture retrained on the same 4 slots with their recipe (`G4`), on the Berkeley benchmarks and on Austin's session 3.

@@ -13,3 +13,5 @@ baseline_gaddy/
 third_party/
 venv*/
 recordings_smoke/
+.cache/
+tmp/
