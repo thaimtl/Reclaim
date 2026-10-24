@@ -7,12 +7,15 @@
     final.close(timeout=3.0)                    # finish what is queued within the timeout, drop the rest
 
 One worker thread hands the segments over one after another to a spawned process (RemoteBeam): the beam runs there on
-the CPU (4 torch threads, nice 10) with a LipReader whose encoder is deleted (decoder + CTC head + LM); only the
+the CPU (4 torch threads, lower priority) with a LipReader whose encoder is deleted (decoder + CTC head + LM); only the
 encoder output crosses. No VRAM, no second CUDA context, and no GIL shared with the tick loop. A beam in a thread of
 this process was measured and dropped (CHANGELOG E6, 5090, noisy shared box): it took the tick (LiveModel.read) from
 p50 15 / p95 27 ms to 52 / 69 ms (GIL: the tick is launch-bound Python); in the CPU process, 13 / 24 -> 18 / 32.
 Beam (the search itself) still runs in-process for the process child and as the GPU reference in the tests.
 Beam + LM on the CPU process: about 0.5 / 0.8 / 1.5 s for 2 / 4 / 8 s segments (GPU thread alone 0.35 / 0.65 / 1.35).
+
+The child ignores Ctrl+C (the parent sends it the last segment, then stops it), and a child that dies (OOM, crash)
+is started again on the next segment.
 
 Queue policy: one beam running, at most max_pending (2) waiting. A segment closing while that is full drops the
 OLDEST waiting one (logged, seg_id in .dropped): the newest segment is what is on screen, an older one already has its
@@ -26,6 +29,8 @@ import logging
 import multiprocessing as mp
 import os
 import queue
+import signal
+import sys
 import threading
 import time
 
@@ -33,8 +38,7 @@ import numpy as np
 import torch
 
 import lipread  # noqa: F401  (puts Lipflow on sys.path)
-from bus import now, bus_text
-from bus import CamFinal
+from bus import CamFinal, bus_text, now
 
 log = logging.getLogger('lipread.final')
 BEAM, NBEST = 5, 5
@@ -104,12 +108,24 @@ def load_lm(odim):
     return lm.eval()
 
 
+def lower_priority(nice):
+    """This process below the tick loop: nice on POSIX, BELOW_NORMAL_PRIORITY_CLASS on Windows."""
+    if not nice:
+        return
+    if hasattr(os, 'nice'):
+        os.nice(nice)
+    elif sys.platform == 'win32':
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetPriorityClass(kernel32.GetCurrentProcess(), 0x4000)
+
+
 def _child(jobs, results, kw, device, threads, nice):
     """RemoteBeam's process: a LipReader without its encoder (decoder + CTC head + LM, on device) beams the encoder
     outputs it is sent. jobs: enc (T, D) float32, None stops -> results (nbest or error text, beam_ms)."""
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
     torch.set_num_threads(threads)
-    if nice:
-        os.nice(nice)
+    lower_priority(nice)
     from lipflow.vsr import LipReader
     reader = LipReader(device=device, use_lm=kw['lm_weight'] > 0, lm_weight=kw['lm_weight'],
                        ctc_weight=kw['ctc_weight'], personal=False)
@@ -133,21 +149,42 @@ def _child(jobs, results, kw, device, threads, nice):
 class RemoteBeam:
     """Beam's interface, the search run in a spawned process (no GIL shared with the tick loop). Only the encoder output
     crosses (T x 768 float32, 0.6 MB at 8 s); rois without enc are encoded here first with model (the shared LiveModel).
-    device 'cpu' (default): no VRAM and no CUDA context; measured about as fast as the GPU at threads=4."""
+    device 'cpu' (default): no VRAM and no CUDA context; measured about as fast as the GPU at threads=4.
+    target: the child's function (tests swap in a fake one)."""
 
     def __init__(self, model=None, beam_size=BEAM, nbest=NBEST, lm_weight=LM_WEIGHT, ctc_weight=CTC_WEIGHT,
-                 device='cpu', threads=4, nice=10, start_timeout=120):
+                 device='cpu', threads=4, nice=10, start_timeout=120, target=_child):
         self.model = model
-        ctx = mp.get_context('spawn')
-        self.jobs, self.results = ctx.Queue(), ctx.Queue()
+        self.ctx = mp.get_context('spawn')
         kw = dict(beam_size=beam_size, nbest=nbest, lm_weight=lm_weight, ctc_weight=ctc_weight)
-        self.proc = ctx.Process(target=_child, args=(self.jobs, self.results, kw, device, threads, nice), daemon=True,
-                                name='final-beam')
+        self.args = (kw, device, threads, nice)
+        self.device, self.threads, self.start_timeout, self.target = device, threads, start_timeout, target
+        self.proc = None
+        self.restarts = 0
+        self._start()
+
+    def _start(self):
+        """Spawn the child and wait for 'ready'; fails fast if it dies while loading."""
+        self.jobs, self.results = self.ctx.Queue(), self.ctx.Queue()
+        self.proc = self.ctx.Process(target=self.target, args=(self.jobs, self.results, *self.args), daemon=True,
+                                     name='final-beam')
         self.proc.start()
-        ready, self.child_mib = self.results.get(timeout=start_timeout)
+        t_end = now() + self.start_timeout
+        while True:
+            try:
+                ready, self.child_mib = self.results.get(timeout=1.0)
+                break
+            except queue.Empty:
+                if not self.proc.is_alive():
+                    raise RuntimeError(f'final-pass process died while starting (exit code {self.proc.exitcode})') \
+                        from None
+                if now() > t_end:
+                    self._stop(0.0)
+                    raise RuntimeError(f'final-pass process not ready after {self.start_timeout} s') from None
         if ready != 'ready':
             raise RuntimeError('final-pass process did not start')
-        log.info('final-pass process ready (%s, %d threads, GPU memory %.0f MiB)', device, threads, self.child_mib)
+        log.info('final-pass process ready (%s, %d threads, GPU memory %.0f MiB)', self.device, self.threads,
+                 self.child_mib)
 
     def __call__(self, rois=None, enc=None):
         if enc is None:
@@ -158,6 +195,11 @@ class RemoteBeam:
             enc = self.model.encode(rois)
         if isinstance(enc, torch.Tensor):
             enc = enc.float().cpu().numpy()
+        if not self.proc.is_alive():
+            log.warning('final-pass process had died (exit code %s): starting it again', self.proc.exitcode)
+            self._stop(0.0)
+            self.restarts += 1
+            self._start()
         self.jobs.put(enc)
         while True:
             try:
@@ -170,12 +212,21 @@ class RemoteBeam:
             raise RuntimeError(out)
         return out
 
-    def close(self, timeout=2.0):
-        self.jobs.put(None)
-        self.proc.join(timeout)
+    def _stop(self, timeout):
+        """Stop the child without ever blocking on a queue it no longer reads."""
+        self.jobs.cancel_join_thread()
+        if self.proc.is_alive():
+            try:
+                self.jobs.put_nowait(None)
+            except (OSError, ValueError, queue.Full):
+                pass
+            self.proc.join(timeout)
         if self.proc.is_alive():
             self.proc.terminate()
             self.proc.join(1.0)
+
+    def close(self, timeout=2.0):
+        self._stop(timeout)
 
 
 class FinalPass:

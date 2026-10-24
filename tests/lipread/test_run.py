@@ -353,10 +353,10 @@ def test_size_flags_reach_the_camera(monkeypatch):
     monkeypatch.setattr(lipread.source, 'CameraSource', lambda cam, **kw: got.update(cam=cam, **kw) or 'cam')
     args = parse_args([])
     assert args.size == (1920, 1080) and args.process_size == (1280, 720)
-    assert make_source(args) == 'cam' and got == {'cam': 0, 'width': 1920, 'height': 1080}
-    args = parse_args(['--cam', '2', '--size', '1280x720', '--process-size', '0'])
+    assert make_source(args) == 'cam' and got == {'cam': 0, 'width': 1920, 'height': 1080, 'settings': False}
+    args = parse_args(['--cam', '2', '--size', '1280x720', '--process-size', '0', '--camera-settings'])
     make_source(args)
-    assert got == {'cam': 2, 'width': 1280, 'height': 720} and args.process_size is None
+    assert got == {'cam': 2, 'width': 1280, 'height': 720, 'settings': True} and args.process_size is None
     with pytest.raises(SystemExit):
         parse_args(['--size', '1280'])
 
@@ -406,3 +406,27 @@ def test_a_failed_read_in_a_backlog_loses_no_crop():
         r.on_crops([(c, 1.0) for c in cs[49:]])
     seg = r.segmenter.segment
     assert seg.seg_id == 2 and [c.t for c in seg.crops] == [c.t for c in cs[25:]]
+
+
+def test_a_failed_last_read_still_reaches_the_final_pass():
+    final = FakeFinal()
+    model = FakeModel()
+    r = Runner(model, [].append, Segmenter(never_end=True), final=final)
+    for c in crops(19):
+        r.on_crops([(c, 1.0)])
+    model.fail = {len(model.calls)}
+    with pytest.raises(RuntimeError):
+        r.finish()
+    assert [(s, T, enc) for s, T, enc in final.got] == [(1, 19, None)]
+    assert r.segmenter.segment is None
+
+
+def test_crop_times_reset_while_no_segment_is_open():
+    r = Runner(FakeModel(), [].append, Segmenter())
+    for c in crops(50):
+        r.on_crops([(c, 7.0)])
+    assert r.segmenter.segment is None and r.crop_ms == []
+
+
+def test_stream_segments_flag_starts():
+    assert Segmenter.stream().never_end and parse_args(['--segments', 'stream']).segments == 'stream'

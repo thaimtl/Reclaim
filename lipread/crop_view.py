@@ -7,6 +7,7 @@ crop ms per frame and the top blendshapes. A window when there is a display, els
 """
 import argparse
 import os
+import sys
 from collections import deque
 
 import cv2
@@ -14,6 +15,7 @@ import numpy as np
 
 import lipread
 from lipread.crop import BLEND_NAMES, DEFAULT_SMOOTHING, SMOOTHING, LiveCropper
+from lipread.run import fit
 from lipread.source import CameraSource, ReplaySource
 from lipread.types import FPS
 
@@ -38,11 +40,13 @@ def panel(frame, crop, ms):
     return out
 
 
-def paired(src, cropper):
-    """(frame, crop) for every frame of src. The cropper returns one crop per frame, in order and k frames late, so a
-    FIFO pairs them (frame times repeat when the 25 fps grid repeats a frame of a slower video or camera)."""
+def paired(src, cropper, process_size=(1280, 720)):
+    """(frame, crop) for every frame of src, shrunk to process_size first as lipread.run does. The cropper returns one
+    crop per frame, in order and k frames late, so a FIFO pairs them (frame times repeat when the 25 fps grid repeats a
+    frame of a slower video or camera)."""
     pending = deque()
     for frame in src.frames():
+        frame = fit(frame, process_size)
         pending.append(frame)
         for crop in cropper.push(frame):
             yield pending.popleft(), crop
@@ -63,8 +67,10 @@ def main(argv=None):
     src = (ReplaySource(args.replay, args.start, args.end, realtime=args.out is None) if args.replay
            else CameraSource(args.cam))
     cropper = LiveCropper(os.path.join(lipread.LIPFLOW_MODELS, 'face_landmarker.task'), **SMOOTHING[args.smooth])
-    show = args.out is None and bool(os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'))
-    out_path = args.out or (None if show else os.path.join(lipread.WORK, 'runs', 'live', 'crop_view.mp4'))
+    has_display = sys.platform in ('win32', 'darwin') or bool(os.environ.get('DISPLAY') or
+                                                              os.environ.get('WAYLAND_DISPLAY'))
+    show = args.out is None and has_display
+    out_path = args.out or (None if show else os.path.join(lipread.WORK, 'runs', 'lipread', 'crop_view.mp4'))
     writer, ms = None, []
     try:
         for frame, crop in paired(src, cropper):

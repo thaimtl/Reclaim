@@ -15,9 +15,11 @@ Segments, with hysteresis: activity >= start_thr opens a candidate; it becomes a
 still_thr for min_active_s (a twitch or a two-frame glitch shorter than that is rejected), and the segment includes
 the preroll_s of crops before the rise (only crops after the previous segment's last one: back-to-back segments
 never share a crop). It ends after still_s of activity < still_thr (lost face counts as still).
-At cap_s it is closed and a new segment (next seg_id) opens with the last carry_s of crops. All durations become
+At cap_s it is closed and a new segment (next seg_id) opens with the last carry_s of crops, unless the mouth is
+already still at that moment: then the segment just ends, so a pause near the cap never re-reads (and re-voices) the
+carried words. All durations become
 frame counts at FPS = 25 (one Crop per model frame); time comes only from crop.t, so replays are deterministic.
-never_end=True (run.py --segments stream: debugging, replays of continuous speech): the first crop opens a segment
+Segmenter.stream() (run.py --segments stream: debugging, replays of continuous speech): the first crop opens a segment
 and stillness never ends it; only the cap (and flush) closes it.
 
     seg = Segmenter()
@@ -120,6 +122,11 @@ class Segmenter:
         self.face_lost = 0
         self.reset()
 
+    @classmethod
+    def stream(cls, **kw):
+        """One segment always open: capped every cap_s, never ended by stillness."""
+        return cls(never_end=True, **kw)
+
     def reset(self):
         """Forget activity history, the pre-roll buffer and any open segment (no event)."""
         self.act.reset()
@@ -146,6 +153,8 @@ class Segmenter:
         if self.quiet >= self.n_still and not self.never_end:
             return [self._end(crop.t)]
         if len(seg.crops) >= self.n_cap:
+            if self.quiet and not self.never_end:
+                return [self._end(crop.t)]
             new = Segment(self._new_id(), seg.crops[-self.n_carry:], seg.activity[-self.n_carry:])
             log.info('segment %d capped at %.2f (%.2f s); segment %d carries %d frames', seg.seg_id, crop.t,
                      seg.duration_s, new.seg_id, self.n_carry)

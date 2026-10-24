@@ -129,6 +129,7 @@ class Runner:
     def tick_if_due(self, backlog=0):
         seg = self.segmenter.segment
         if seg is None:
+            self.crop_ms.clear()
             return []
         done = len(seg.crops) - self.unread(seg)
         return [self.tick(seg, backlog)] if len(seg.crops) >= due_after(done, self.tick_ms) else []
@@ -144,17 +145,23 @@ class Runner:
         return self.closed(events) + self.tick_if_due(backlog=len(items) - 1)
 
     def closed(self, events):
-        """'cap' / 'end': one last read of the whole closed segment, then the final beam pass (E6) in the background."""
-        out = []
+        """'cap' / 'end': one last read of the whole closed segment, then the final beam pass (E6) in the background.
+        A failed last read still sends the segment to the final pass (which then re-encodes), then raises."""
+        out, err = [], None
         for ev, seg in events:
             if ev == START:
                 continue
             if self.unread(seg) > 0:
-                out.append(self.tick(seg))
+                try:
+                    out.append(self.tick(seg))
+                except Exception as e:  # noqa: BLE001
+                    err = err or e
             if self.final is not None and seg.crops:
                 sid, T, enc = self.last_enc
                 self.final.submit(seg.seg_id, np.stack([c.roi96 for c in seg.crops]),
                                   enc if (sid, T) == (seg.seg_id, len(seg.crops)) else None)
+        if err is not None:
+            raise err
         return out
 
     def finish(self):
@@ -360,6 +367,8 @@ def parse_args(argv=None):
     ap.add_argument('--end', type=float, default=None)
     ap.add_argument('--realtime', action='store_true', help='replay at real speed (default: as fast as possible)')
     ap.add_argument('--cam', type=int, default=0)
+    ap.add_argument('--camera-settings', action='store_true',
+                    help="open the webcam driver's settings dialog at start (Windows: lock exposure and focus there)")
     ap.add_argument('--size', type=size_arg, default=(1920, 1080), metavar='WxH', help='webcam capture size')
     ap.add_argument('--process-size', type=lambda s: None if s == '0' else size_arg(s), default=(1280, 720),
                     metavar='WxH',
@@ -388,7 +397,7 @@ def make_source(args):
     if args.replay:
         return ReplaySource(args.replay, args.start, args.end, realtime=args.realtime)
     w, h = args.size
-    return CameraSource(args.cam, width=w, height=h)
+    return CameraSource(args.cam, width=w, height=h, settings=args.camera_settings)
 
 
 def main(argv=None):
@@ -399,66 +408,73 @@ def main(argv=None):
     import torch
 
     pub = Publisher(args.pub)
-    final, box = None, {}
-    if not args.no_final:
-        from lipread.final import FinalPass
-        starter = threading.Thread(target=lambda: box.update(final=FinalPass(None, pub.send)), name='final-start')
-        starter.start()
-    model = LiveModel(half=args.half)
-    log.info('model ready (warm-up %.1f s)', model.warmup_s)
-    if not args.no_final:
-        starter.join()
-        final = box.get('final')
-        if final is None:
-            log.error('final pass failed to start: running without cam.final')
-        else:
-            final.beam.model = model
-            log.info('final pass ready (beam 5 + LM, background process)')
     live_mode = args.replay is None or args.realtime
-    source = make_source(args)
-    cropper = LiveCropper(os.path.join(lipread.LIPFLOW_MODELS, 'face_landmarker.task'), pose=not args.no_pose,
-                          **SMOOTHING[args.smooth])
-    segmenter = Segmenter() if args.segments == 'auto' else Segmenter.stream()
-    emotion = None
-    if not args.no_emotion:
-        from lipread.emotion_net import EmotionWorker
-        emotion = EmotionWorker(classifier=args.emotion_classifier)
-    runner = Runner(model, pub.send, segmenter, emotion.current if emotion else None, tick_ms=args.tick_ms,
-                    final=final, fe_cache=not args.no_fe_cache)
-    q, stop = queue.Queue(), threading.Event()
-    face_pub = None if args.no_face else (lambda m: pub.send(m, block=False))
-    th = threading.Thread(target=crop_thread, args=(source, cropper, q, stop, emotion, bool(args.replay),
-                                                    args.process_size, face_pub), name='crop', daemon=True)
-    logf = open(args.log, 'w') if args.log else None
-
-    def report(stats):
-        for s in stats:
-            if logf:
-                logf.write(json.dumps(asdict(s)) + '\n')
-            if not args.quiet:
-                print(f'seg {s.seg:3d} T {s.T:3d} fe {s.frontend_ms:5.1f} cf {s.conformer_ms:5.1f} '
-                      f'total {s.total_ms:5.1f} ms' + (f' lag {s.lag_ms:5.0f} ms' if live_mode else '')
-                      + (f' backlog {s.backlog}' if s.backlog else '') + f'  {s.greedy}', flush=True)
-
-    th.start()
-    log.info('publishing cam.tick on %s every %d ms', pub.addr, args.tick_ms)
+    final = emotion = th = logf = None
+    runner = Runner(None, pub.send, None)
+    stop = threading.Event()
     code = 1
     try:
-        code = serve(runner, q, live_mode, report)
-    except KeyboardInterrupt:
-        log.info('Ctrl+C: last read of the open segment, then stop')
-        stop.set()
+        box = {}
+        if not args.no_final:
+            from lipread.final import FinalPass
+            starter = threading.Thread(target=lambda: box.update(final=FinalPass(None, pub.send)), name='final-start',
+                                       daemon=True)
+            starter.start()
+        model = LiveModel(half=args.half)
+        log.info('model ready (warm-up %.1f s)', model.warmup_s)
+        if not args.no_final:
+            starter.join()
+            final = box.get('final')
+            if final is None:
+                log.error('final pass failed to start: running without cam.final')
+            else:
+                final.beam.model = model
+                log.info('final pass ready (beam 5 + LM, background process)')
+        source = make_source(args)
+        cropper = LiveCropper(os.path.join(lipread.LIPFLOW_MODELS, 'face_landmarker.task'), pose=not args.no_pose,
+                              **SMOOTHING[args.smooth])
+        segmenter = Segmenter() if args.segments == 'auto' else Segmenter.stream()
+        if not args.no_emotion:
+            from lipread.emotion_net import EmotionWorker
+            emotion = EmotionWorker(classifier=args.emotion_classifier)
+        runner = Runner(model, pub.send, segmenter, emotion.current if emotion else None, tick_ms=args.tick_ms,
+                        final=final, fe_cache=not args.no_fe_cache)
+        q = queue.Queue()
+        face_pub = None if args.no_face else (lambda m: pub.send(m, block=False))
+        th = threading.Thread(target=crop_thread, args=(source, cropper, q, stop, emotion, bool(args.replay),
+                                                        args.process_size, face_pub), name='crop', daemon=True)
+        logf = open(args.log, 'w') if args.log else None
+
+        def report(stats):
+            for s in stats:
+                if logf:
+                    logf.write(json.dumps(asdict(s)) + '\n')
+                if not args.quiet:
+                    print(f'seg {s.seg:3d} T {s.T:3d} fe {s.frontend_ms:5.1f} cf {s.conformer_ms:5.1f} '
+                          f'total {s.total_ms:5.1f} ms' + (f' lag {s.lag_ms:5.0f} ms' if live_mode else '')
+                          + (f' backlog {s.backlog}' if s.backlog else '') + f'  {s.greedy}', flush=True)
+
+        th.start()
+        log.info('publishing cam.tick on %s every %d ms', pub.addr, args.tick_ms)
         try:
-            report(runner.finish())
-            code = 0
-        except Exception:  # noqa: BLE001
-            log.exception('last read failed')
+            code = serve(runner, q, live_mode, report)
+        except KeyboardInterrupt:
+            log.info('Ctrl+C: last read of the open segment, then stop')
+            stop.set()
+            try:
+                report(runner.finish())
+                code = 0
+            except Exception:  # noqa: BLE001
+                log.exception('last read failed')
+    except KeyboardInterrupt:
+        log.info('Ctrl+C during start-up')
     finally:
         stop.set()
-        th.join(timeout=JOIN_S)
-        if th.is_alive():
-            log.error('crop thread still running after %.0f s (source stuck?): exiting without closing it', JOIN_S)
-            code = code or 1
+        if th is not None:
+            th.join(timeout=JOIN_S)
+            if th.is_alive():
+                log.error('crop thread still running after %.0f s (source stuck?): exiting without closing it', JOIN_S)
+                code = code or 1
         if emotion:
             emotion.close()
         if final is not None:

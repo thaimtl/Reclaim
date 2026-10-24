@@ -11,9 +11,8 @@ import numpy as np
 import pytest
 
 import lipread
-from bus import decode, encode, validate
-from lipread.final import FinalPass
-from bus import CamFinal
+from bus import CamFinal, decode, encode, validate
+from lipread.final import FinalPass, RemoteBeam
 
 from .conftest import needs_cuda, needs_sample, needs_weights
 
@@ -104,7 +103,6 @@ def test_close_finishes_or_drops_and_refuses_new_work():
     t0 = time.perf_counter()
     done = fp.close(timeout=0.45)
     assert time.perf_counter() - t0 < 0.6
-    assert not done or fp.dropped
     assert 3 in fp.dropped and not fp.submit(4, rois(4))
     fp.thread.join(1.0)
     assert not fp.thread.is_alive()
@@ -148,6 +146,39 @@ def check_sample_nbest(nbest):
     truth = Counter(lipread.SAMPLE_TEXT.split())
     hit = sum((truth & Counter(texts[0].split())).values())
     assert hit >= 15, (hit, texts[0])
+
+
+def test_a_child_that_dies_while_loading_fails_fast():
+    from tests.lipread import fake_children
+    t0 = time.perf_counter()
+    with pytest.raises(RuntimeError, match='died while starting'):
+        RemoteBeam(target=fake_children.dies_on_start, start_timeout=60)
+    assert time.perf_counter() - t0 < 15
+
+
+def test_a_child_that_dies_is_started_again_on_the_next_segment():
+    from tests.lipread import fake_children
+    beam = RemoteBeam(target=fake_children.echo)
+    try:
+        assert beam(enc=np.zeros((5, 4), np.float32)) == (('HI', -1.0),)
+        with pytest.raises(RuntimeError, match='died'):
+            beam(enc=np.zeros((0, 4), np.float32))
+        assert beam(enc=np.zeros((5, 4), np.float32)) == (('HI', -1.0),) and beam.restarts == 1
+    finally:
+        beam.close()
+    assert not beam.proc.is_alive()
+
+
+def test_close_with_a_big_job_queued_for_a_dead_child_does_not_hang():
+    from tests.lipread import fake_children
+    beam = RemoteBeam(target=fake_children.echo)
+    with pytest.raises(RuntimeError):
+        beam(enc=np.zeros((0, 4), np.float32))
+    beam.jobs.put(np.zeros((200, 768), np.float32))
+    t0 = time.perf_counter()
+    beam.close()
+    assert time.perf_counter() - t0 < 5 and not beam.proc.is_alive()
+
 
 
 @needs_weights

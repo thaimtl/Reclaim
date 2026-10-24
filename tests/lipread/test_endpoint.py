@@ -163,6 +163,19 @@ def test_cap_and_carry_over(rng):
     assert ended.crops[50].t - capped.crops[-1].t == pytest.approx(1 / FPS)
 
 
+def test_cap_during_the_closing_pause_ends_instead_of_carrying(rng):
+    """Without this, the carried 2 s would open a segment that ends a few frames later: read and voiced twice."""
+    crops = still(25, rng) + talk(60, start=25) + still(40, rng, start=85)
+    probe = Segmenter()
+    (_, k0, _), (_, k1, ended) = run(probe, crops)[0]
+    assert (k0, k1) == (START, END)
+    n_cap = len(ended.crops) - probe.n_still + 3
+    seg = Segmenter(cap_s=n_cap / FPS, carry_s=0.4)
+    events = run(seg, crops)[0]
+    assert [(k, s.seg_id) for _, k, s in events] == [(START, 1), (END, 1)]
+    assert len(events[1][2].crops) == n_cap and seg.segment is None
+
+
 def test_cap_segment_is_current_after_cap(rng):
     seg = Segmenter(cap_s=2.0, carry_s=0.4)
     seen = []
@@ -237,7 +250,7 @@ def test_back_to_back_segments_share_no_crop(rng, pause):
 
 
 def test_never_end_opens_on_the_first_crop_and_only_caps():
-    seg = Segmenter(never_end=True, cap_s=4.0, carry_s=1.0)
+    seg = Segmenter.stream(cap_s=4.0, carry_s=1.0)
     events = []
     for i in range(130):
         events += [(k, s.seg_id) for k, s in seg.push(crop(i, face_ok=i < 60))]
