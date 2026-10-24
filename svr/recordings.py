@@ -2,12 +2,14 @@
 
 Pure json + numpy so both the main venv and the camera venv can import it.
 
-Layout (the recorder writes this; adapt here if the teammates' recorder differs):
+Layout (written by recorder/record.py, the Reclaim recorder; session folders are named session_01, session_02, ...):
 
     recordings/<session>/manifest.jsonl          one JSON object per utterance
-    recordings/<session>/<id>_emg.npy            float32 (samples, 6), 1000 Hz, channels = Gaddy sites 1..6
+    recordings/<session>/<id>_emg.npy            (samples, 4), 1000 Hz, raw unfiltered Uno readings (uint16, 0-1023),
+                                                 columns = rig pins A0..A3 = Gaddy sites 3, 2, 6, 1
+    recordings/<session>/<id>_emg_ts.npy         float64 (samples,): time.monotonic() of each EMG sample
     recordings/<session>/<id>.mp4                webcam video of the same utterance
-    recordings/<session>/<id>_video_ts.npy       optional: per-frame timestamps (s) on the shared clock
+    recordings/<session>/<id>_video_ts.npy       per-frame timestamps (s), time.monotonic(), the same clock as the EMG
 
 Manifest fields:
     id          unique utterance id, e.g. "s1_C_0042"
@@ -18,6 +20,10 @@ Manifest fields:
     mouth       "open" or "closed"
     voiced      true when read aloud (set F)
     emg         path of the EMG array, relative to the session folder
+    emg_ts      path of the per-sample EMG times, relative (null for older recordings)
+    pace        natural | fast | slow | demo | rest (recorder/record.py)
+    expression  neutral | smile | frown | surprised, held while mouthing (null for rest clips and older recordings)
+    effort      normal | soft | emphatic (null for rest clips and older recordings)
     video       path of the video, relative to the session folder (null if none)
     video_ts    path of per-frame timestamps, relative (null: assume constant fps from the file)
     t_start     speech onset in seconds from the start of the clip (null: whole clip)
@@ -54,7 +60,7 @@ def load_manifest(root=RECORDINGS, sets=None, sessions=None, mouth=None):
                 if mouth and r.get('mouth') != mouth:
                     continue
                 base = os.path.join(root, session)
-                for key in ('emg', 'video', 'video_ts', 'audio'):
+                for key in ('emg', 'emg_ts', 'video', 'video_ts', 'audio'):
                     if r.get(key):
                         r[key] = os.path.join(base, r[key])
                 r.setdefault('session', session)
