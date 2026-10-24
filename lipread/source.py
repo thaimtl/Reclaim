@@ -8,12 +8,12 @@ fast as possible. A recording with per-frame capture times (<id>_video_ts.npy, <
 video, or a manifest's video_ts) is replayed on those times instead; --replay also takes a recording id (looked up in
 recordings/*/manifest.jsonl or recordings/labels.csv). See ReplaySource.
 
-CameraSource: MJPEG, buffer 1, DirectShow on Windows and V4L2 on Linux. 50 or 60 fps only where V4L2 lists them
+CameraSource: MJPEG asked for at open, buffer 1, DirectShow on Windows and V4L2 on Linux. 50 or 60 fps only where V4L2 lists them
 (every other frame kept at 50), else 30, resampled to 25 by grab timestamp (only kept frames are decoded). The first
 second of grabs is measured: a driver that reports a rate it doesn't deliver is caught there, and under 28 fps logs a
 warning (auto exposure slowing the camera in dim light). Asked-for size or MJPG not granted: logged as an error.
-Manual exposure, autofocus off where the driver allows; settings=True opens the driver's own dialog (Windows), the
-reliable way to lock exposure there. Grab times from bus.now(); a capture thread hands frames over through a size-1
+Linux: manual exposure and autofocus off (v4l2-ctl). Windows and macOS: auto exposure on (lock_controls);
+settings=True opens the driver's own dialog (Windows) to lock exposure and focus by hand. Grab times from bus.now(); a capture thread hands frames over through a size-1
 drop-oldest queue. A stalled or unplugged camera is reopened a few times, then the stream ends with `error` set.
 
     venv-live/bin/python -m lipread.source --replay third_party/lipflow/samples/2016-03-12.mov --start 20.4 --end 28.1
@@ -287,7 +287,9 @@ LOCKS = [('auto_exposure', 1), ('exposure_auto', 1), ('exposure_dynamic_framerat
 
 
 def lock_controls(device, cap=None, exposure=None):
-    """Manual exposure, autofocus off. v4l2-ctl where present, else OpenCV properties. Returns what was set."""
+    """Linux (v4l2-ctl): manual exposure, autofocus off. Elsewhere through OpenCV: auto exposure on, unless an exposure
+    is given, since a manual exposure another program left in the camera can make it open nearly black. Returns what
+    was set."""
     have = v4l2_controls(device)
     sets = [(k, v) for k, v in LOCKS if k in have]
     if exposure is not None:
@@ -299,16 +301,15 @@ def lock_controls(device, cap=None, exposure=None):
         return {k: after.get(k) for k, _ in sets}
     done = {}
     if cap is not None:
-        manual = (0.25, 1) if sys.platform == 'win32' else (1, 0.25)
-        done['auto_exposure'] = cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, manual[0]) or \
-            cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, manual[1])
-        done['autofocus'] = cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
-        if exposure is not None:
+        if exposure is None:
+            done['auto_exposure'] = cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
+        else:
+            done['auto_exposure'] = cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
             done['exposure'] = cap.set(cv2.CAP_PROP_EXPOSURE, exposure)
     return done
 
 
-BACKENDS = {'linux': cv2.CAP_V4L2, 'win32': cv2.CAP_DSHOW}
+BACKENDS = {'linux': cv2.CAP_V4L2, 'win32': cv2.CAP_DSHOW, 'darwin': cv2.CAP_AVFOUNDATION}
 
 
 def keep_every(cam_fps):
@@ -364,15 +365,20 @@ class CameraSource:
         self._thread.start()
 
     def _open(self):
-        """A configured VideoCapture (MJPEG, size, buffer 1), or None when the device does not open."""
+        """A configured VideoCapture (MJPEG, size, buffer 1), or None when the device does not open. MJPEG and the
+        size are asked for at open: set afterwards, DirectShow keeps the uncompressed mode (5 fps at 1080p on a C920)."""
         backend = BACKENDS.get(sys.platform, cv2.CAP_ANY)
-        cap = cv2.VideoCapture(self.device, backend)
+        params = [cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'), cv2.CAP_PROP_FRAME_WIDTH, self.width,
+                  cv2.CAP_PROP_FRAME_HEIGHT, self.height, cv2.CAP_PROP_FPS, 30]
+        cap = cv2.VideoCapture(self.device, backend, params)
         if not cap.isOpened():
             cap.release()
-            return None
-        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+            cap = cv2.VideoCapture(self.device, backend)
+            if not cap.isOpened():
+                cap.release()
+                return None
+            for prop, value in zip(params[::2], params[1::2]):
+                cap.set(prop, value)
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         return cap
 
@@ -384,7 +390,7 @@ class CameraSource:
             self.cap.set(cv2.CAP_PROP_FPS, r)
             got = self.cap.get(cv2.CAP_PROP_FPS)
             if fps or abs(got - r) < 1 or r == 30:
-                return got or r
+                return got if got > 0 else r
         return 30.0
 
     def _reopen(self):

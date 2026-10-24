@@ -305,6 +305,26 @@ def test_unlisted_rates_are_not_trusted_and_the_real_rate_is_measured(monkeypatc
     assert len(ts) / (ts[-1] - ts[0]) == pytest.approx(FPS, abs=2.0)
 
 
+def test_mjpg_and_size_are_asked_for_at_open(monkeypatch):
+    import lipread.source as source
+    opened = []
+
+    class OpenCap(FakeCap):
+        offered = (30,)
+
+        def __init__(self, *a):
+            opened.append(a)
+            super().__init__(*a)
+
+    monkeypatch.setattr(source.cv2, 'VideoCapture', OpenCap)
+    monkeypatch.setattr(source, 'v4l2_fps', lambda *a: [])
+    monkeypatch.setattr(source, 'lock_controls', lambda *a: {})
+    source.CameraSource(0).close()
+    params = dict(zip(opened[0][2][::2], opened[0][2][1::2]))
+    assert params[cv2.CAP_PROP_FOURCC] == cv2.VideoWriter_fourcc(*'MJPG')
+    assert (params[cv2.CAP_PROP_FRAME_WIDTH], params[cv2.CAP_PROP_FRAME_HEIGHT]) == (1920, 1080)
+
+
 def test_wrong_size_or_format_is_logged(monkeypatch, caplog):
     import lipread.source as source
 

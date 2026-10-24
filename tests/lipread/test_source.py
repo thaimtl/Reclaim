@@ -105,7 +105,7 @@ def test_camera_unplug_ends_the_stream(stall_cam):
     src.close()
     assert 0 < len(got) <= 10 and wall < 2.0
     assert src.error and 'lost' in src.error and src.reopens == 0 and src.grab_failures > 0
-    assert StallCap.opened == 3
+    assert StallCap.opened == 1 + 2 * 2
     assert StallCap.races == 0
 
 
