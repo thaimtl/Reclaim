@@ -78,14 +78,14 @@ def test_burst_one_segment_with_preroll_and_end(rng):
     events, acts = run(seg, crops)
     assert [(k, s.seg_id) for _, k, s in events] == [(START, 1), (END, 1)]
     rise = int(np.argmax(acts >= seg.start_thr))
-    assert 25 <= rise <= 27                                  # motion starts at frame 25 (median-3 adds a frame)
+    assert 25 <= rise <= 27
     (i_start, _, s), (i_end, _, closed) = events
-    assert i_start == rise + seg.n_min - 1                   # confirmed after min_active_s
-    assert s is closed and closed.crops[0] is crops[rise - 8]   # 300 ms pre-roll
+    assert i_start == rise + seg.n_min - 1
+    assert s is closed and closed.crops[0] is crops[rise - 8]
     assert closed.crops[-1] is crops[i_end] and len(closed.crops) == len(closed.activity)
     last_active = int(np.nonzero(acts >= seg.still_thr)[0].max())
-    assert i_end == last_active + 13                         # 0.5 s of stillness
-    assert 0.5 <= (i_end - 74) / FPS <= 0.5 + 0.3 + 0.1      # after the last lip motion: still_s + the window
+    assert i_end == last_active + 13
+    assert 0.5 <= (i_end - 74) / FPS <= 0.5 + 0.3 + 0.1
     assert seg.segment is None and seg.activity < seg.still_thr
 
 
@@ -120,7 +120,7 @@ def test_blink_no_segment(rng):
 
 def test_single_frame_jitter_no_segment(rng):
     crops = still(150, rng)
-    for i in (30, 70, 110):                                  # one landmark glitch: lips "open" for one frame
+    for i in (30, 70, 110):
         crops[i] = crop(i, gap=0.35, width=0.7)
     seg = Segmenter()
     events, acts = run(seg, crops)
@@ -132,7 +132,7 @@ def test_two_frame_glitch_rejected_by_min_active(rng):
     crops[40], crops[41] = crop(40, gap=0.35), crop(41, gap=0.35)
     seg = Segmenter()
     events, acts = run(seg, crops)
-    assert acts.max() >= seg.start_thr                       # the window holds it ~9 frames, under min_active_s
+    assert acts.max() >= seg.start_thr
     assert events == [] and seg.rejected == 1
 
 
@@ -143,9 +143,9 @@ def test_face_lost_mid_segment(rng):
     events, acts = run(seg, crops)
     assert [(k, s.seg_id) for _, k, s in events] == [(START, 1), (END, 1), (START, 2), (END, 2)]
     assert (acts[50:75] == 0).all()
-    assert events[1][0] == 50 + 12                           # lost face counts as still: ends 13 frames in
+    assert events[1][0] == 50 + 12
     assert not events[1][2].crops[-1].face_ok
-    assert events[2][2].crops[0].t >= crops[75 - 8].t        # no false rise from the lost face itself
+    assert events[2][2].crops[0].t >= crops[75 - 8].t
     assert seg.face_lost == 25
 
 
@@ -159,7 +159,7 @@ def test_cap_and_carry_over(rng):
     assert new is ended and new.seg_id == 2
     assert all(a is b for a, b in zip(ended.crops[:50], capped.crops[-50:]))
     assert ended.activity[:50] == capped.activity[-50:]
-    assert ended.crops[50] is crops[i_cap + 1]               # no frame lost or repeated after the carry-over
+    assert ended.crops[50] is crops[i_cap + 1]
     assert ended.crops[50].t - capped.crops[-1].t == pytest.approx(1 / FPS)
 
 
@@ -186,7 +186,7 @@ def test_flush(rng):
 
 def test_activity_zero_without_landmarks():
     act = Activity()
-    assert act.push(Crop(t=0.0, roi96=ROI, mouth_open=0.0, face_ok=True)) == 0.0   # face_ok but no mouth_pts
+    assert act.push(Crop(t=0.0, roi96=ROI, mouth_open=0.0, face_ok=True)) == 0.0
     assert act.push(crop(1, face_ok=False)) == 0.0
 
 
@@ -239,8 +239,8 @@ def test_back_to_back_segments_share_no_crop(rng, pause):
 def test_never_end_opens_on_the_first_crop_and_only_caps():
     seg = Segmenter(never_end=True, cap_s=4.0, carry_s=1.0)
     events = []
-    for i in range(130):                                     # a still face, then no face at all: never ends
+    for i in range(130):
         events += [(k, s.seg_id) for k, s in seg.push(crop(i, face_ok=i < 60))]
     assert events == [(START, 1), (CAP, 1), (START, 2)]
-    assert len(seg.segment.crops) == 130 - 100 + 25          # 1 s carried over at the 4 s cap
+    assert len(seg.segment.crops) == 130 - 100 + 25
     assert [(k, s.seg_id) for k, s in seg.flush()] == [(END, 2)]

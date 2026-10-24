@@ -24,7 +24,7 @@ from .conftest import needs_cuda, needs_sample, needs_weights
 class FakeModel:
     def __init__(self, fail=()):
         self.calls = []
-        self.fail = set(fail)       # call numbers (0-based) that raise
+        self.fail = set(fail)
 
     def read(self, rois, keep_enc=False, cache=None):
         T = len(rois)
@@ -47,7 +47,7 @@ def run(cs, tick_ms=100, model=None):
     sent = []
     r = Runner(model or FakeModel(), sent.append, Segmenter(never_end=True), tick_ms=tick_ms)
     stats = [s for c in cs for s in r.on_crops([(c, 5.0)])]
-    assert [s.T for s in stats] == [len(t.frame_t) for t in sent]   # on_crops returns what it sent
+    assert [s.T for s in stats] == [len(t.frame_t) for t in sent]
     return r, sent
 
 
@@ -86,7 +86,6 @@ def test_timing_ms_filled():
         assert tm['total'] <= r.stats[0].total_ms + 1e3
         topic, msg = decode(encode(t))
         assert validate(topic, msg)['timing_ms']['T'] == tm['T']
-    # mediapipe: mean over the frames since the last tick only
     r = Runner(FakeModel(), [].append, Segmenter(never_end=True))
     cs = crops(5)
     for c, ms in zip(cs, (1.0, 2.0, 3.0, 10.0, 20.0)):
@@ -95,14 +94,12 @@ def test_timing_ms_filled():
 
 
 def test_cap_carries_2s_with_the_same_frame_times():
-    # a 12.5 fps source: every capture time twice (frames 149 and 150 share one), so frame 150 (the first carried
-    # frame) is a repeated frame whose model time is capture + 40 ms in both segments
     times = [100 + ((i + 1) // 2) * 0.08 for i in range(230)]
     r, sent = run(crops(230, times=times))
     seg1 = [t for t in sent if t.seg_id == 1]
     seg2 = [t for t in sent if t.seg_id == 2]
     assert len(seg1[-1].frame_t) == 200
-    assert len(seg2[0].frame_t) == 50       # the new segment starts with the last 2 s, read at once
+    assert len(seg2[0].frame_t) == 50
     assert np.array_equal(seg2[0].frame_t[:50], seg1[-1].frame_t[150:])
     assert seg2[0].frame_t[0] == times[150] + 0.04
     assert seg2[0].seg_start == seg2[0].frame_t[0]
@@ -117,7 +114,6 @@ def test_frame_times_strictly_increase_over_repeated_frames():
     ft = sent[-1].frame_t
     assert ft.tolist() == pytest.approx([1.0, 1.04, 1.08, 1.12, 1.2])
     assert np.all(np.diff(ft) > 0)
-    # each crop is stamped once: the times a tick reads are the ones an earlier tick read
     assert np.array_equal(sent[0].frame_t, ft[:3])
 
 
@@ -152,7 +148,7 @@ def make_runner(model=None):
 def test_serve_clean_end_and_thread_death():
     r, sent = make_runner()
     assert serve(r, q_of([(c, 1.0) for c in crops(7)] + [End()]), live_mode=False) == 0
-    assert [len(t.frame_t) for t in sent] == [3, 5, 7]          # last read at the end
+    assert [len(t.frame_t) for t in sent] == [3, 5, 7]
     r, sent = make_runner()
     code = serve(r, q_of([(c, 1.0) for c in crops(7)] + [End(RuntimeError('boom'))]), live_mode=False)
     assert code == 1 and [len(t.frame_t) for t in sent] == [3, 5, 7] and r.segmenter.segment is None
@@ -161,7 +157,7 @@ def test_serve_clean_end_and_thread_death():
 def test_serve_skips_a_failed_tick_and_gives_up_after_10_in_a_row():
     r, sent = make_runner(FakeModel(fail={0}))
     assert serve(r, q_of([(c, 1.0) for c in crops(7)] + [End()]), live_mode=False) == 0
-    assert [len(t.frame_t) for t in sent] == [4, 5, 7]          # the failed tick at 3 is retried on the next crop
+    assert [len(t.frame_t) for t in sent] == [4, 5, 7]
     r, sent = make_runner(FakeModel(fail={'all'}))
     assert serve(r, q_of([(c, 1.0) for c in crops(40)] + [End()]), live_mode=False) == 1
     assert len(r.model.calls) == 10 and not sent
@@ -179,7 +175,7 @@ def test_serve_ends_the_segment_on_a_camera_stall():
 
     def later():
         time.sleep(0.3)
-        assert r.segmenter.segment is None              # ended by the stall, before the camera came back
+        assert r.segmenter.segment is None
         for c in crops(3, t0=200.0):
             q.put((c, 1.0))
         q.put(End())
@@ -245,7 +241,7 @@ def test_crop_thread_stops_on_stop():
     th.join(5)
     assert not th.is_alive() and src.closed_by == 'crop'
     items = [q.get_nowait() for _ in range(q.qsize())]
-    assert items[-1] == End() and abs(items[0][0].t - time.monotonic()) < 5     # rebased onto monotonic
+    assert items[-1] == End() and abs(items[0][0].t - time.monotonic()) < 5
 
 
 def test_rebased_moves_replay_times_onto_monotonic():
@@ -278,11 +274,11 @@ def test_real_model_on_the_sample(sample_video, face_model):
         tm = t.timing_ms
         assert tm['T'] == len(t.frame_t) and tm['frontend'] > 0 and tm['conformer'] > 0
         assert tm['frontend'] + tm['conformer'] + tm['ctc'] <= tm['total'] + 0.5
-    assert len(sent[-1].frame_t) == 192                     # the whole clip, read once more at the end
+    assert len(sent[-1].frame_t) == 192
     words = set(sent[-1].greedy.split())
     assert {'BORN', 'NEW', 'YORK', 'CHICAGO', 'GRADUATED', 'SMITH', 'COLLEGE'} <= words, sent[-1].greedy
     steps = np.diff([len(t.frame_t) for t in sent])
-    assert set(steps[:-1].tolist()) == {2, 3}                # one tick per 100 ms (2.5 frames)
+    assert set(steps[:-1].tolist()) == {2, 3}
     print(f'\n{len(sent)} ticks, last: {sent[-1].greedy}')
 
 
@@ -307,7 +303,6 @@ def test_cap_and_end_go_to_the_final_pass_reusing_the_last_read():
     for c in crops(230):
         r.on_crops([(c, 5.0)])
     r.finish()
-    # the capped segment (200 frames, its last read reused) and the continuation closed at the end
     assert [(s, T) for s, T, _ in final.got] == [(1, 200), (2, 80)]
     assert final.got[0][2] == ('enc', 200) and final.got[1][2] == ('enc', 80)
 
@@ -405,8 +400,8 @@ def test_a_failed_read_in_a_backlog_loses_no_crop():
     cs = crops(54)
     for c in cs[:49]:
         r.on_crops([(c, 1.0)])
-    model.fail = {len(model.calls)}                          # the capped segment's last read raises
+    model.fail = {len(model.calls)}
     with pytest.raises(RuntimeError):
-        r.on_crops([(c, 1.0) for c in cs[49:]])              # the cap is the first crop of this backlog
+        r.on_crops([(c, 1.0) for c in cs[49:]])
     seg = r.segmenter.segment
     assert seg.seg_id == 2 and [c.t for c in seg.crops] == [c.t for c in cs[25:]]

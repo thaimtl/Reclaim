@@ -38,7 +38,7 @@ from live.types import CamFinal
 
 log = logging.getLogger('live.final')
 BEAM, NBEST = 5, 5
-LM_WEIGHT, CTC_WEIGHT = 0.3, 0.1   # Lipflow LipReader defaults
+LM_WEIGHT, CTC_WEIGHT = 0.3, 0.1
 MAX_PENDING = 2
 
 
@@ -54,7 +54,7 @@ class Beam:
         from espnet.nets.scorers.length_bonus import LengthBonus
         m = model_or_reader
         self.reader = getattr(m, 'reader', m)
-        self.encode = m.encode       # LiveModel.encode: encoder dtype; LipReader.encode: fp32 (None: enc only)
+        self.encode = m.encode
         self.nbest = nbest
         r = self.reader
         odim = len(r.token_list)
@@ -79,7 +79,6 @@ class Beam:
         elif len(enc) == 0:
             return (('', 0.0),)
         enc = torch.as_tensor(enc).to(self.reader.device, torch.float32)
-        # as LipReader.beam_search: forget the decoder's cached encoder-memory projections of the last segment
         for module in self.beam.full_scorers['decoder'].modules():
             if hasattr(module, '_mem_kv'):
                 del module._mem_kv
@@ -110,16 +109,16 @@ def _child(jobs, results, kw, device, threads, nice):
     outputs it is sent. jobs: enc (T, D) float32, None stops -> results (nbest or error text, beam_ms)."""
     torch.set_num_threads(threads)
     if nice:
-        os.nice(nice)                           # the tick loop and the crop thread come first
+        os.nice(nice)
     from lipflow.vsr import LipReader
     reader = LipReader(device=device, use_lm=kw['lm_weight'] > 0, lm_weight=kw['lm_weight'],
                        ctc_weight=kw['ctc_weight'], personal=False)
-    del reader.model.encoder                    # the parent's LiveModel encodes
+    del reader.model.encoder
     if reader.device.type == 'cuda':
         torch.cuda.empty_cache()
     beam = Beam(reader, **kw)
     beam.encode = None
-    beam(enc=np.zeros((25, reader.model.adim), np.float32))     # warm-up
+    beam(enc=np.zeros((25, reader.model.adim), np.float32))
     cuda = reader.device.type == 'cuda'
     results.put(('ready', torch.cuda.max_memory_allocated() / 2 ** 20 if cuda else 0.0))
     while (enc := jobs.get()) is not None:
@@ -193,7 +192,7 @@ class FinalPass:
             beam = RemoteBeam(model, beam_size=beam_size, nbest=nbest, lm_weight=lm_weight, ctc_weight=ctc_weight,
                               device=device, threads=threads)
         self.beam, self.publish, self.max_pending = beam, publish, max_pending
-        self.pending = collections.deque()      # (seg_id, rois, enc, t_submit)
+        self.pending = collections.deque()
         self.cond = threading.Condition()
         self.busy = False
         self.closing = False
@@ -257,7 +256,7 @@ class FinalPass:
         self.thread.join(max(0.0, t_end - time.monotonic()))
         done = not self.thread.is_alive()
         if isinstance(self.beam, RemoteBeam):
-            self.beam.close(0.5 if done else 0.0)   # a beam still running in the process is killed
+            self.beam.close(0.5 if done else 0.0)
         if not done:
             log.warning('final pass still running a beam after %.1f s', timeout)
         return done

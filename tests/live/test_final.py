@@ -59,8 +59,8 @@ def test_queue_keeps_the_newest_and_counts_drops():
     beam = SlowBeam(0.2)
     fp, sent = make(beam, max_pending=2)
     fp.submit(1, rois(1))
-    assert beam.started.wait(1.0)           # 1 running
-    for i in (2, 3, 4, 5):                  # 2 waiting at most: 2 and 3 dropped, 4 and 5 kept
+    assert beam.started.wait(1.0)
+    for i in (2, 3, 4, 5):
         fp.submit(i, rois(i))
     assert fp.wait_idle(3.0)
     assert fp.dropped == [2, 3]
@@ -68,7 +68,7 @@ def test_queue_keeps_the_newest_and_counts_drops():
     assert [m.seg_id for m in sent] == [1, 4, 5]
     assert [s['seg_id'] for s in fp.stats] == [1, 4, 5]
     assert all(s['T'] == 50 and s['beam_ms'] >= 150 and s['queued_ms'] >= 0 for s in fp.stats)
-    assert fp.stats[1]['queued_ms'] >= 150  # waited for segment 1's beam
+    assert fp.stats[1]['queued_ms'] >= 150
     assert fp.close(1.0)
 
 
@@ -102,7 +102,7 @@ def test_close_finishes_or_drops_and_refuses_new_work():
         fp.submit(i, rois(i))
     assert beam.started.wait(1.0)
     t0 = time.perf_counter()
-    done = fp.close(timeout=0.45)           # 1 finishes, 2 starts (cannot be interrupted), 3 is dropped
+    done = fp.close(timeout=0.45)
     assert time.perf_counter() - t0 < 0.6
     assert not done or fp.dropped
     assert 3 in fp.dropped and not fp.submit(4, rois(4))
@@ -163,7 +163,7 @@ def test_real_beam_on_the_sample(sample_video, face_model):
     model = LiveModel(warmup=(25,))
     r = model.read(x, keep_enc=True)
     assert r.enc is not None and tuple(r.enc.shape) == (192, model.reader.model.adim)
-    assert model.read(x).enc is None                        # default unchanged
+    assert model.read(x).enc is None
     sent = []
     fp = FinalPass(model, sent.append)
     t0 = time.perf_counter()
@@ -175,5 +175,5 @@ def test_real_beam_on_the_sample(sample_video, face_model):
     check_sample_nbest(sent[0].nbest)
     gpu = Beam(model)(x)
     check_sample_nbest(gpu)
-    assert gpu[0][0] == sent[0].nbest[0][0]                 # CPU and GPU agree on the best
+    assert gpu[0][0] == sent[0].nbest[0][0]
     print(f'\nbeam {fp.stats[0]["beam_ms"]:.0f} ms (process, CPU), best: {sent[0].nbest[0]}')

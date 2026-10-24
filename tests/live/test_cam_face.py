@@ -35,7 +35,7 @@ def test_roundtrip_with_and_without_pose():
             topic, msg = roundtrip(m)
             assert topic == FACE and msg['face_ok'] is True and msg['w'] == 1280 and msg['h'] == 720
             assert msg['pts'].dtype == np.float16 and msg['pts'].shape == (n, 2)
-            assert np.allclose(msg['pts'], m.pts, atol=1e-3)            # float16 is enough for screen coordinates
+            assert np.allclose(msg['pts'], m.pts, atol=1e-3)
             assert (msg['pose'] is None) == (not pose)
             back = bus.from_msg(topic, msg)
             assert isinstance(back, CamFace) and back.face_ok
@@ -51,13 +51,13 @@ def test_no_face_is_small_and_valid():
 
 
 def test_size_per_message():
-    assert len(bus.encode(face(), 1)[1]) < 2500     # ~2.2 KB: ~27 KB/s at 12.5 Hz, beside cam.tick's ~550 KB/s
+    assert len(bus.encode(face(), 1)[1]) < 2500
 
 
 @pytest.mark.parametrize('bad', [
     dict(pts=np.full((478, 2), np.nan, np.float32)),
     dict(pts=np.zeros((100, 2), np.float32)),
-    dict(pts=np.full((478, 2), 5.0, np.float32)),               # far off-frame: not normalised
+    dict(pts=np.full((478, 2), 5.0, np.float32)),
     dict(blend=np.full(52, 1.5, np.float32)),
     dict(blend=np.zeros(10, np.float32)),
     dict(pose=np.array([0, 0, 9], np.float32)),
@@ -78,14 +78,14 @@ def test_tick_and_final_still_need_seg_id():
     topic, msg = bus.decode(bus.encode(face(), 1))
     msg = dict(msg)
     with pytest.raises(ValueError):
-        bus.validate(bus.TICK, {k: v for k, v in msg.items()})   # a face body is not a tick
+        bus.validate(bus.TICK, {k: v for k, v in msg.items()})
 
 
 def test_nonblocking_send_drops_instead_of_waiting(tmp_path):
     pub = bus.Publisher(f'ipc://{tmp_path}/face')
     try:
         assert pub.send(face(), block=False) > 0
-        pub.lock.acquire()                                      # another thread is mid-send (a big cam.tick)
+        pub.lock.acquire()
         try:
             assert pub.send(face(), block=False) == 0
             assert pub.dropped_busy == 1
@@ -142,7 +142,7 @@ def test_crop_thread_publishes_every_second_frame_and_survives_errors():
     def boom(m):
         raise RuntimeError('subscriber exploded')
     q = queue.Queue()
-    crop_thread(FaceSource(10), FaceCropper(), q, threading.Event(), face_pub=boom)    # must not die
+    crop_thread(FaceSource(10), FaceCropper(), q, threading.Event(), face_pub=boom)
     items = []
     while not q.empty():
         items.append(q.get())

@@ -31,12 +31,11 @@ SENTENCES = [
     ('CAN YOU CALL MY DAUGHTER', 'neutral'),
     ('I AM FEELING A LITTLE TIRED', 'sad'),
     ('THANK YOU FOR YOUR HELP', 'happy'),
-    # > 8 s: exercises the cap and the 2 s carry-over
     ('I WANTED TO TELL YOU THAT THE DOCTOR SAID I CAN GO HOME ON MONDAY IF MY BLOOD TESTS LOOK GOOD AGAIN', 'surprised'),
 ]
 LOOKALIKES = {'WHAT': 'WHY', 'NEED': 'MEET', 'WATER': 'WAITER', 'CALL': 'CALM', 'TIRED': 'TIRE', 'HELP': 'HELD',
               'HOME': 'HOPE', 'GOOD': 'COULD', 'MY': 'BY', 'TELL': 'SELL'}
-FACE_LOST = (2, 1.0, 1.4)   # sentence index, seconds into the segment: face_ok False on ticks in that window
+FACE_LOST = (2, 1.0, 1.4)
 
 
 class Tokenizer:
@@ -106,20 +105,20 @@ class Stub:
         self.beam_s, self.gap_s = beam_s, gap_s
         self.cap, self.carry = int(cap_s * FPS), int(carry_s * FPS)
         self.seed = seed
-        self.k = -1                 # sentence index
+        self.k = -1
         self.seg_id = 0
         self.phase, self.next_at = 'gap', None
-        self.finals = []            # (due time, CamFinal)
+        self.finals = []
 
     def _start(self, now):
         self.k = (self.k + 1) % len(self.sentences)
         text, self.label = self.sentences[self.k]
         self.lab, self.widx = labels(self.tok, text)
         self.alt = [self.tok.encode(LOOKALIKES.get(w, w)) for w in text.split()]
-        self.t0 = now               # capture time of the utterance's first model frame (pre-roll included)
-        self.lo = 0                 # first utterance frame of the current segment
-        self.ticks = 0              # ticks since the utterance started
-        self.shown = 0              # utterance frames covered by the previous tick
+        self.t0 = now
+        self.lo = 0
+        self.ticks = 0
+        self.shown = 0
         self.seg_id += 1
         self.phase = 'speak'
 
@@ -134,7 +133,6 @@ class Stub:
             p[lab], p[BLANK] = 0.8, 0.08
             alt = self.alt[w][0] if w >= 0 and self.alt[w] else lab
             if alt != lab:
-                # newest frames: the look-alike wins for a moment, the re-read fixes it once more frames arrive
                 p[alt] = 0.85 if n_frames - f < 4 and w % 2 == 1 else 0.06
                 if p[alt] > p[lab]:
                     p[lab] = 0.1
@@ -173,7 +171,6 @@ class Stub:
         truth = [self.sentences[self.k][0].split()[w] for w in words]
         nbest, seen = [], set()
         for j in range(len(truth) + 1):
-            # 0: the truth; then one look-alike swapped at a time
             cand = ' '.join(LOOKALIKES.get(w, w) if i == j - 1 else w for i, w in enumerate(truth))
             if cand not in seen:
                 seen.add(cand)
@@ -190,11 +187,9 @@ class Stub:
         if self.phase == 'gap' and now >= self.next_at:
             self._start(now)
         if self.phase == 'speak':
-            n = math.ceil(self.ticks * self.period * FPS - 1e-9)   # due frames: 0, 3, 5, 8, 10, ... at 100 ms
+            n = math.ceil(self.ticks * self.period * FPS - 1e-9)
             self.ticks += 1
             if n - self.lo > self.cap:
-                # 8 s cap: one last read of the full 8 s, close this segment, start a new one with the last 2 s
-                # carried over
                 if self.shown < self.lo + self.cap:
                     out.append(self._tick(now, self.lo + self.cap))
                 self._final(now, self.lo + self.cap)

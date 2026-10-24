@@ -25,18 +25,18 @@ from live.types import BLANK, TOPK
 
 @dataclass(frozen=True)
 class Reading:
-    topk_ids: np.ndarray    # (T, K) int32, most likely first
-    topk_logp: np.ndarray   # (T, K) float32
-    blank_logp: np.ndarray  # (T,) float32
-    greedy: str             # CTC best path, UPPERCASE words
-    enc_ms: float           # encoder (GPU, synchronised) = frontend_ms + conformer_ms
-    ctc_ms: float           # CTC head + top-k + copy to host
-    enc: object = None      # read(keep_enc=True): (T, D) torch tensor on the GPU, encoder dtype; else None
-    frontend_ms: float = 0.0   # host -> GPU upload + 3D conv / ResNet front end (enc_ms - conformer_ms)
-    conformer_ms: float = 0.0  # embed + 12 Conformer blocks + final norm (CUDA events; 0.0 on CPU)
+    topk_ids: np.ndarray
+    topk_logp: np.ndarray
+    blank_logp: np.ndarray
+    greedy: str
+    enc_ms: float
+    ctc_ms: float
+    enc: object = None
+    frontend_ms: float = 0.0
+    conformer_ms: float = 0.0
 
 
-FE_CONTEXT = 2              # the front end's Conv3d (kernel 5 in time) sees each frame and 2 neighbours on each side
+FE_CONTEXT = 2
 
 
 class FrontendCache:
@@ -49,31 +49,25 @@ class FrontendCache:
 
     def __init__(self, seg_id=None):
         self.seg_id = seg_id
-        self.feats = None       # (1, n_final, D) front-end features of frames 0..n_final-1
+        self.feats = None
         self.n_final = 0
 
 
 class LiveModel:
     def __init__(self, half=False, device='cuda', warmup=range(1, 201), cudnn_benchmark=False):
         from lipflow.vsr import LipReader
-        # LM only matters for the final beam pass (E6); the live re-read is CTC only
         self.reader = LipReader(device=device, use_lm=False, personal=False)
         self.device = self.reader.enc_device
         self.encoder = self.reader.model.encoder
         self.ctc = self.reader.model.ctc
         self.half = half
-        # cudnn_benchmark: cuDNN times every kernel per input length during the warm-up (measured on the 5090:
-        # CHANGELOG "E3"); off by default because the search can take tens of seconds and GBs of scratch memory
         torch.backends.cudnn.benchmark = cudnn_benchmark
         self.dtype = torch.float16 if half else torch.float32
         if half:
             self.encoder.half()
         self.token_list = self.reader.token_list
-        # front end / Conformer split of the encoder time: two CUDA events per read, no extra synchronise
         self._events = ((torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True))
                         if self.device.type == 'cuda' else None)
-        # every segment length once: the first call at a new length is slow (kernel selection, measured up to ~60 ms
-        # on the 5090), and a live segment passes through all lengths up to the 8 s cap (200 frames)
         t0 = time.perf_counter()
         for t in warmup:
             self.read(np.zeros((t, 96, 96), np.uint8))
@@ -100,9 +94,9 @@ class LiveModel:
         T, a = len(rois), cache.n_final
         lo = max(0, a - FE_CONTEXT)
         x = self.reader.to_tensor(np.stack(rois[lo:T])).unsqueeze(0).to(self.device, self.dtype)
-        new = e.frontend(x)[:, a - lo:]                               # frames a..T-1
+        new = e.frontend(x)[:, a - lo:]
         feats = new if cache.feats is None else torch.cat([cache.feats, new], dim=1)
-        n_final = max(a, T - FE_CONTEXT)                              # frames with their 2 right neighbours seen
+        n_final = max(a, T - FE_CONTEXT)
         cache.feats, cache.n_final = feats[:, :n_final], n_final
         if events is not None:
             events[0].record()
@@ -125,7 +119,7 @@ class LiveModel:
         self._sync()
         t1 = time.perf_counter()
         conformer = events[0].elapsed_time(events[1]) if events is not None else 0.0
-        logp = self.ctc.log_softmax(enc.float().unsqueeze(0))[0]          # (T, V)
+        logp = self.ctc.log_softmax(enc.float().unsqueeze(0))[0]
         top = logp.topk(TOPK, dim=-1)
         out = torch.cat([top.values, logp[:, BLANK:BLANK + 1], top.indices.float()], dim=1).cpu().numpy()
         t2 = time.perf_counter()

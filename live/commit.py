@@ -24,18 +24,18 @@ class Committer:
             raise ValueError('agree must be >= 1')
         self.margin_frames = margin_frames
         self.agree = agree
-        self.revisions = 0          # faint words changed or dropped since start (all utterances)
-        self.last_revisions = 0     # the same, for the last update only
-        self.updates = 0            # updates seen since start
+        self.revisions = 0
+        self.last_revisions = 0
+        self.updates = 0
         self.reset()
 
     def reset(self):
         """Start a new utterance."""
         self.utt_id = None
         self.t0 = 0.0
-        self.solid = []             # [WordEnd, ...] committed prefix
+        self.solid = []
         self._history = deque(maxlen=self.agree)
-        self._prev = ()             # texts of the previous update
+        self._prev = ()
         self._prev_solid = 0
 
     def _tail(self, hyp):

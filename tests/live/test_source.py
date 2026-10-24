@@ -15,10 +15,9 @@ import live.source as source
 from live.source import MAX_REPEAT, ReplaySource, Resampler, find_ts, load_ts, resolve_recording
 from live.types import FPS
 
-SIZE = (64, 48)     # w, h
+SIZE = (64, 48)
 
 
-# --- webcam: stalls, unplug, close from another thread -----------------------------------------------------------
 
 class StallCap:
     """cv2.VideoCapture stand-in at 50 fps. `script` (class attribute, shared by reopens): the number of good grabs
@@ -51,7 +50,7 @@ class StallCap:
         cls = type(self)
         with cls.lock:
             if self.released:
-                cls.races += 1      # a driver call on a released device: the segfault case
+                cls.races += 1
             cls.in_call += 1
         try:
             return fn()
@@ -101,21 +100,21 @@ def drain(src, limit_s=5.0):
 
 
 def test_camera_unplug_ends_the_stream(stall_cam):
-    src = stall_cam([10])           # 10 grabs, then the device is gone and never reopens
+    src = stall_cam([10])
     got, wall = drain(src)
     src.close()
     assert 0 < len(got) <= 10 and wall < 2.0
     assert src.error and 'lost' in src.error and src.reopens == 0 and src.grab_failures > 0
-    assert StallCap.opened == 3     # the first open + reopen_tries
+    assert StallCap.opened == 3
     assert StallCap.races == 0
 
 
 def test_camera_recovers_after_a_stall(stall_cam):
-    src = stall_cam([10, 20])       # stalls, the reopen works, then the second device is lost too
+    src = stall_cam([10, 20])
     got, _ = drain(src)
     src.close()
     assert src.reopens == 1 and src.error
-    assert len(got) > 12            # frames from both devices
+    assert len(got) > 12
     assert [f.index for f in got] == list(range(len(got)))
     assert StallCap.races == 0
 
@@ -125,18 +124,17 @@ def test_camera_close_from_another_thread(stall_cam):
     threading.Timer(0.3, src.close).start()
     got, wall = drain(src)
     assert got and wall < 1.5 and src.error is None
-    src.close()                     # twice is fine
+    src.close()
     assert StallCap.races == 0
 
 
 def test_camera_close_during_a_stall(stall_cam):
-    src = stall_cam([5], stall_s=10.0)  # failing grabs, no reopen yet: close() must still end frames()
+    src = stall_cam([5], stall_s=10.0)
     threading.Timer(0.4, src.close).start()
     got, wall = drain(src)
     assert wall < 1.5 and src.error is None and StallCap.races == 0
 
 
-# --- replay of recordings with per-frame timestamps --------------------------------------------------------------
 
 def level(i):
     return 10 + 12 * (i % 20)
@@ -170,7 +168,7 @@ def expected(ts, max_repeat=MAX_REPEAT):
 def test_replay_uses_sibling_timestamps(tmp_path):
     rng = np.random.default_rng(0)
     n = 90
-    ts = vfr_ts(n, rng, gaps={30: 0.08, 60: 0.4})   # a 3-step gap (frames repeat) and a stall (grid re-anchors)
+    ts = vfr_ts(n, rng, gaps={30: 0.08, 60: 0.4})
     write_clip(tmp_path / 'u1.mp4', n)
     np.save(tmp_path / 'u1_video_ts.npy', ts)
     src = ReplaySource(str(tmp_path / 'u1.mp4'), realtime=False)
@@ -183,9 +181,8 @@ def test_replay_uses_sibling_timestamps(tmp_path):
     assert [f.index for f in got] == list(range(len(got)))
     d = np.diff([f.t for f in got])
     steady = d[d < 0.1]
-    assert abs(steady.mean() - 1 / FPS) < 0.004       # 25 fps between the gaps
-    assert d.max() > 0.4                               # the stall shows as a jump, as the live camera would
-    # no timestamps file: the old constant-rate behaviour
+    assert abs(steady.mean() - 1 / FPS) < 0.004
+    assert d.max() > 0.4
     plain = ReplaySource(str(tmp_path / 'u1.mp4'), realtime=False, ts=None)
     assert plain.ts is None and [f.t for f in plain.frames()] == pytest.approx(
         [i / 30 for i in expected(np.arange(n) / 30, None)])
@@ -225,7 +222,7 @@ def test_replay_more_frames_than_timestamps(tmp_path):
     write_clip(tmp_path / 'u.mp4', 15)
     np.save(tmp_path / 'u_video_ts.npy', ts)
     src = ReplaySource(str(tmp_path / 'u.mp4'), realtime=False)
-    assert max(level_of(f.image) for f in src.frames()) == 9  # of 0..14
+    assert max(level_of(f.image) for f in src.frames()) == 9
     src.close()
 
 
@@ -268,8 +265,8 @@ def test_resolve_recording_md_layout(tmp_path):
                                          's1_001,1,train,natural,"Hi, there.",session_01/s1_001.emg.npy,'
                                          'session_01/s1_001.mp4,austin\n')
     assert resolve_recording('s1_001', str(tmp_path)) == (str(d / 's1_001.mp4'), str(d / 's1_001.video_t.npy'))
-    assert resolve_recording(str(d / 's1_001'), str(tmp_path))[0] == str(d / 's1_001.mp4')   # path, no extension
-    src = ReplaySource(str(d / 's1_001.mp4'), 0.0, None, realtime=False)                     # run.py's call
+    assert resolve_recording(str(d / 's1_001'), str(tmp_path))[0] == str(d / 's1_001.mp4')
+    src = ReplaySource(str(d / 's1_001.mp4'), 0.0, None, realtime=False)
     assert src.ts_path == str(d / 's1_001.video_t.npy')
     src.close()
 

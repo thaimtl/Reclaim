@@ -57,10 +57,10 @@ from live.endpoint import START, Segmenter
 from live.types import FPS, CamTick, Frame
 
 log = logging.getLogger('live.run')
-TICK_MS = 100               # tick period (docs/EVAN_REALTIME_LIP_READING.md E2); 200 also allowed (--tick-ms)
-MAX_FAILURES = 10           # failed ticks in a row before the process gives up (exit 1)
-BACKLOG_WARN = 5            # crops queued behind a tick (5 crops = 200 ms) worth a warning
-JOIN_S = 10.0               # wait for the crop thread to close the camera before the process exits
+TICK_MS = 100
+MAX_FAILURES = 10
+BACKLOG_WARN = 5
+JOIN_S = 10.0
 
 
 @dataclass(frozen=True)
@@ -68,15 +68,15 @@ class TickStat:
     """One tick's costs; timing_ms() is the bus's cam.tick timing_ms, from the same numbers."""
     seg: int
     T: int
-    mediapipe_ms: float     # mean per-frame crop ms over the frames since the last tick
+    mediapipe_ms: float
     frontend_ms: float
     conformer_ms: float
-    enc_ms: float           # front end + Conformer
+    enc_ms: float
     ctc_ms: float
-    total_ms: float         # read + building the message (publishing comes after, so it is not in here)
-    lag_ms: float           # newest frame's capture -> message ready (meaningful live only)
+    total_ms: float
+    lag_ms: float
     greedy: str
-    backlog: int = 0        # crops drained behind the one that triggered this tick
+    backlog: int = 0
 
     def timing_ms(self):
         return {'T': self.T, 'mediapipe': self.mediapipe_ms, 'frontend': self.frontend_ms,
@@ -91,7 +91,7 @@ class End:
 
 def due_after(n, tick_ms=TICK_MS):
     """Smallest due point ceil(k * tick_ms * FPS / 1000), k >= 1, that is > n frames."""
-    per = tick_ms * FPS                     # frames per tick * 1000
+    per = tick_ms * FPS
     k = n * 1000 // per + 1
     return -(-k * per // 1000)
 
@@ -99,22 +99,21 @@ def due_after(n, tick_ms=TICK_MS):
 class Runner:
     def __init__(self, model, publish, segmenter, emotion=None, tick_ms=TICK_MS, final=None, fe_cache=False):
         self.model, self.publish = model, publish
-        self.fe_cache = fe_cache    # run the front end once per frame (E3 step 2): a FrontendCache per segment
+        self.fe_cache = fe_cache
         self.cache = None
         if fe_cache:
             from live.model import FrontendCache
             self._new_cache = FrontendCache
-        self.final = final          # live.final.FinalPass (E6) or None
-        self.last_enc = (None, 0, None)   # (seg_id, T, encoder output) of the last read, reused by the final pass
-        # () -> types.Emotion (live/emotion_net.py EmotionWorker.current); NEUTRAL with --no-emotion
+        self.final = final
+        self.last_enc = (None, 0, None)
         self.emotion = emotion or (lambda: NEUTRAL)
         self.segmenter = segmenter
         self.tick_ms = int(tick_ms)
-        self.read = (None, 0)       # (seg_id, frames) of the last read
-        self.last_t = -np.inf       # model-frame time of the newest crop
-        self.capture_t = -np.inf    # capture time of the newest crop (for lag)
-        self.crop_ms = []           # per-frame crop ms since the last tick
-        self.stats = []             # TickStat per tick, for summary()
+        self.read = (None, 0)
+        self.last_t = -np.inf
+        self.capture_t = -np.inf
+        self.crop_ms = []
+        self.stats = []
 
     def unread(self, seg):
         return len(seg.crops) - (self.read[1] if self.read[0] == seg.seg_id else 0)
@@ -137,7 +136,7 @@ class Runner:
         """(crop, crop_ms) items (one in replay, a drained backlog live): push them all, then at most one scheduled
         tick on the newest state. Returns the TickStats of the ticks it sent (a cap also reads the closed segment)."""
         events = []
-        for crop, ms in items:      # every crop reaches the segmenter before anything can raise (a failed read)
+        for crop, ms in items:
             if ms is not None:
                 self.crop_ms.append(float(ms))
             events += self.segmenter.push(self.stamp(crop))
@@ -153,7 +152,6 @@ class Runner:
                 out.append(self.tick(seg))
             if self.final is not None and seg.crops:
                 sid, T, enc = self.last_enc
-                # a capped segment is crops[:200]: reuse the encoder output only if the last read was exactly it
                 self.final.submit(seg.seg_id, np.stack([c.roi96 for c in seg.crops]),
                                   enc if (sid, T) == (seg.seg_id, len(seg.crops)) else None)
         return out
@@ -168,7 +166,7 @@ class Runner:
         keep_enc = self.final is not None
         if self.fe_cache:
             if self.cache is None or self.cache.seg_id != seg.seg_id:
-                self.cache = self._new_cache(seg.seg_id)        # new segment (also after a cap): new left padding
+                self.cache = self._new_cache(seg.seg_id)
             r = self.model.read([c.roi96 for c in crops], keep_enc=keep_enc, cache=self.cache)
         else:
             r = self.model.read(np.stack([c.roi96 for c in crops]), keep_enc=keep_enc)
@@ -237,7 +235,7 @@ def crop_thread(source, cropper, q, stop, emotion=None, rebase=False, process_si
                 q.put((c, ms))
             if emotion is not None:
                 try:
-                    emotion.submit(frame.t, frame.image, cropper.last_face)   # non-blocking (E5)
+                    emotion.submit(frame.t, frame.image, cropper.last_face)
                 except Exception:  # noqa: BLE001  (emotion is optional: it never stops the lip reader)
                     emotion_errors += 1
                     if emotion_errors == 1:
@@ -402,7 +400,6 @@ def main(argv=None):
     pub = Publisher(args.pub)
     final, box = None, {}
     if not args.no_final:
-        # the beam subprocess takes ~30 s to start: start it while the model loads and warms up
         from live.final import FinalPass
         starter = threading.Thread(target=lambda: box.update(final=FinalPass(None, pub.send)), name='final-start')
         starter.start()
@@ -414,7 +411,7 @@ def main(argv=None):
         if final is None:
             log.error('final pass failed to start: running without cam.final')
         else:
-            final.beam.model = model            # encodes a closed segment whose last read can't be reused
+            final.beam.model = model
             log.info('final pass ready (beam 5 + LM, background process)')
     live_mode = args.replay is None or args.realtime
     source = make_source(args)
@@ -428,7 +425,7 @@ def main(argv=None):
     runner = Runner(model, pub.send, segmenter, emotion.current if emotion else None, tick_ms=args.tick_ms,
                     final=final, fe_cache=not args.no_fe_cache)
     q, stop = queue.Queue(), threading.Event()
-    face_pub = None if args.no_face else (lambda m: pub.send(m, block=False))     # drop, never wait (crop thread)
+    face_pub = None if args.no_face else (lambda m: pub.send(m, block=False))
     th = threading.Thread(target=crop_thread, args=(source, cropper, q, stop, emotion, bool(args.replay),
                                                     args.process_size, face_pub), name='crop', daemon=True)
     logf = open(args.log, 'w') if args.log else None
@@ -457,14 +454,14 @@ def main(argv=None):
             log.exception('last read failed')
     finally:
         stop.set()
-        th.join(timeout=JOIN_S)     # the crop thread closes the source and the cropper itself
+        th.join(timeout=JOIN_S)
         if th.is_alive():
             log.error('crop thread still running after %.0f s (source stuck?): exiting without closing it', JOIN_S)
             code = code or 1
         if emotion:
             emotion.close()
         if final is not None:
-            final.close(timeout=3.0)            # publishes what it can finish, before the publisher closes
+            final.close(timeout=3.0)
             log.info('final pass: %d beams, %d dropped, %d errors', len(final.stats), len(final.dropped),
                      len(final.errors))
         pub.close()

@@ -60,7 +60,7 @@ def main():
                 continue
             counts[topic] = counts.get(topic, 0) + 1
             if topic in last_seq and msg['seq'] <= last_seq[topic]:
-                restarts += 1               # the publisher restarted: seq counts from 1 again
+                restarts += 1
                 print(f'{topic}: seq {last_seq[topic]} -> {msg["seq"]}, publisher restarted', flush=True)
             elif topic in last_seq:
                 gaps += msg['seq'] - last_seq[topic] - 1

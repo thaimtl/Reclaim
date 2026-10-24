@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-# Laptop smoke test for the live camera reader (live/README.md; E0/E3 in docs/EVAN_REALTIME_LIP_READING.md). Run from anywhere, paste the
-# whole output back:
-#   bash live/bench/laptop_check.sh                  # venv-live, /dev/video0
-#   VENV=venv-camera CAM=1 SIZE=1280x720 bash live/bench/laptop_check.sh
-#   SKIP_GPU=1 bash live/bench/laptop_check.sh     # no GPU load (matmul + encoder sections SKIP)
-# Every check is independent: OK / FAIL / SKIP lines, never aborts. Summary at the end.
 set -u
 cd "$(dirname "$0")/../.." || exit 1
 VENV=${VENV:-venv-live}
@@ -23,7 +17,6 @@ fail() { echo "FAIL $*"; echo FAIL >> "$RES"; }
 skip() { echo "SKIP $*"; echo SKIP >> "$RES"; }
 have() { command -v "$1" > /dev/null 2>&1; }
 hdr()  { echo; echo "== $*"; }
-# run python with a timeout; prints its output indented
 pyrun() { local t=$1; shift; timeout "$t" "$PY" "$@" 2>&1 | sed 's/^/    /'; return "${PIPESTATUS[0]}"; }
 
 echo "laptop_check $(date '+%F %T') host=$(hostname) kernel=$(uname -r) repo=$(pwd)"

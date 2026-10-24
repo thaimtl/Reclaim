@@ -29,7 +29,7 @@ MODES = {
 
 def crops_for(frames, cache, face_model, **kw):
     c = LiveCropper(face_model, **kw)
-    c.detect = lambda image, t: cache[t]      # shared landmarks: only the smoothing differs
+    c.detect = lambda image, t: cache[t]
     out = []
     for f in frames:
         out += c.push(f)

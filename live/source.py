@@ -38,7 +38,7 @@ from live.types import FPS, Frame  # noqa: E402
 log = logging.getLogger(__name__)
 
 GRID = 1.0 / FPS
-MAX_REPEAT = 3  # a capture stall longer than this many grid steps re-anchors the grid instead of repeating frames
+MAX_REPEAT = 3
 
 
 class Resampler:
@@ -65,12 +65,8 @@ class Resampler:
         return n
 
 
-# Per-frame timestamp files a recorder writes next to <stem>.mp4, in the order they are tried:
-#   <stem>_video_ts.npy   live/record.py and svr/recordings.py (float64 seconds, time.monotonic(), 1:1 with frames)
-#   <stem>.video_t.npy    the team recorder as RECORDING.md specifies it (laptop clock of each video frame)
-# and the same names with .csv (one time per line or the first column; a header line is skipped).
-TS_SUFFIXES = ('_video_ts', '.video_t', '_video_t', '.video_ts')   # the first is what live/record.py writes
-MANIFEST, VIDEO_MANIFEST = 'manifest.jsonl', 'manifest_video.jsonl'  # live/record.py: camera alone / beside EMG
+TS_SUFFIXES = ('_video_ts', '.video_t', '_video_t', '.video_ts')
+MANIFEST, VIDEO_MANIFEST = 'manifest.jsonl', 'manifest_video.jsonl'
 VIDEO_EXTS = ('.mp4', '.mov', '.mkv', '.avi', '.webm')
 RECORDINGS = os.path.join(os.environ.get('RECLAIM_WORKDIR', os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
                           'recordings')
@@ -92,7 +88,7 @@ def load_ts(path):
             try:
                 rows.append(float(cell))
             except ValueError:
-                continue    # header or blank line
+                continue
     return np.asarray(rows, dtype=np.float64)
 
 
@@ -184,7 +180,7 @@ class ReplaySource:
             raise RuntimeError(f'could not open {self.path}')
         self.src_fps = self.cap.get(cv2.CAP_PROP_FPS) or 25.0
         self.t_offset = 0.0
-        self.ts_gaps = 0            # timestamp intervals over 1.5x the median (frames the recorder lost)
+        self.ts_gaps = 0
         if self.ts is not None:
             self.t_offset = float(self.ts[0])
             d = np.diff(self.ts)
@@ -192,7 +188,7 @@ class ReplaySource:
                 log.warning('%s: %d non-increasing frame times', self.ts_path, int(np.sum(d <= 0)))
             if len(d):
                 span = float(self.ts[-1] - self.ts[0])
-                self.src_fps = len(d) / span if span > 0 else self.src_fps     # mean rate, as record.py's fps
+                self.src_fps = len(d) / span if span > 0 else self.src_fps
                 self.ts_gaps = int(np.sum(d > 1.5 * float(np.median(d))))
             n = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
             if n and n != len(self.ts):
@@ -281,7 +277,6 @@ def v4l2_controls(device):
                                                              out, re.M)}
 
 
-# (control, value) pairs, old and new UVC names: manual exposure, keep the frame rate in low light, autofocus off
 LOCKS = [('auto_exposure', 1), ('exposure_auto', 1), ('exposure_dynamic_framerate', 0), ('exposure_auto_priority', 0),
          ('focus_automatic_continuous', 0), ('focus_auto', 0)]
 
@@ -293,12 +288,12 @@ def lock_controls(device, cap=None, exposure=None):
     if exposure is not None:
         sets += [(k, int(exposure)) for k in ('exposure_time_absolute', 'exposure_absolute') if k in have]
     if sets:
-        for k, v in sets:  # one at a time: a batch fails whole when one control is inactive
+        for k, v in sets:
             subprocess.run(['v4l2-ctl', '-d', _v4l2_dev(device), '-c', f'{k}={v}'], capture_output=True, timeout=5)
         after = v4l2_controls(device)
         return {k: after.get(k) for k, _ in sets}
     done = {}
-    if cap is not None:  # OpenCV's V4L2 backend: 1 = manual exposure (older builds took 0.25)
+    if cap is not None:
         done['auto_exposure'] = cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1) or cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
         done['autofocus'] = cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
         if exposure is not None:
@@ -326,19 +321,17 @@ class CameraSource:
             raise RuntimeError(f'could not open camera {device}')
         self.offered = v4l2_fps(device, width, height)
         self.cam_fps = self._pick_fps(fps)
-        # 50 fps: every other frame is a steady 25. 60 fps: every other frame would be 30 (33/33/33/33/67 ms after
-        # resampling), so resample 60 -> 25 directly (33/50 ms); only kept frames are decoded either way.
         self.keep_every = 2 if abs(self.cam_fps - 2 * FPS) < 2 else 1
         self.fourcc = int(self.cap.get(cv2.CAP_PROP_FOURCC)).to_bytes(4, 'little').decode(errors='replace')
         self.size = (int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
         self.locked = lock_controls(device, self.cap, exposure) if lock else {}
-        self.dropped_frames = 0     # frames the consumer was too slow to take (drop-oldest)
-        self.grab_failures = 0      # failed grab() / retrieve() calls, cumulative
-        self.reopens = 0            # successful reopens after a stall
-        self.error = None           # why the stream ended by itself (camera lost), None otherwise
-        self.grab_ts = deque(maxlen=600)  # raw grab times, for fps/jitter stats
-        self.emit_ts = deque(maxlen=600)  # times of the frames handed to the queue (25 fps after resampling)
-        self._q = queue.Queue(maxsize=1)    # (newest Frame, how many grid points it fills): repeats never evict it
+        self.dropped_frames = 0
+        self.grab_failures = 0
+        self.reopens = 0
+        self.error = None
+        self.grab_ts = deque(maxlen=600)
+        self.emit_ts = deque(maxlen=600)
+        self._q = queue.Queue(maxsize=1)
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name='live-camera', daemon=True)
         self._thread.start()
@@ -392,7 +385,7 @@ class CameraSource:
     def _run(self):
         try:
             self._capture()
-        except Exception as e:  # a driver error must end the stream, not leave frames() waiting
+        except Exception as e:
             self.error = f'camera {self.device} capture failed: {e!r}'
             log.exception(self.error)
         finally:
@@ -413,7 +406,6 @@ class CameraSource:
                 if (n - 1) % self.keep_every:
                     last_ok, fails = t, 0
                     continue
-                # on the grid already (50 / 2): every kept frame once; faster or slower (15 fps): resample to 25
                 reps = rs.push(t) if abs(self.cam_fps / self.keep_every - FPS) > 2 else 1
                 if not reps:
                     last_ok, fails = t, 0
@@ -463,7 +455,7 @@ class CameraSource:
         self._stop.set()
         if threading.current_thread() is not self._thread:
             self._thread.join(timeout=2)
-            if self._thread.is_alive():  # stuck in a driver call: it releases the device when that returns
+            if self._thread.is_alive():
                 log.warning('camera %s: capture thread still in a driver call after close()', self.device)
 
 
@@ -482,7 +474,7 @@ def probe(device, fps, seconds, width, height):
     print(f'requested {fps} fps: driver {src.cam_fps:g} fps, {src.fourcc} {src.size[0]}x{src.size[1]}, '
           f'keep every {src.keep_every}, offered {src.offered or "?"}, locked {src.locked}')
     t_end, got = time.monotonic() + 1.0 + seconds, []
-    for f in src.frames():  # first second: warm-up (exposure, USB start)
+    for f in src.frames():
         now = time.monotonic()
         if now > t_end:
             break

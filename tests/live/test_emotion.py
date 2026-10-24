@@ -17,7 +17,6 @@ from .conftest import needs_sample
 
 Z = np.zeros((96, 96), np.uint8)
 IX = {n: i for i, n in enumerate(MEDIAPIPE_NAMES)}
-# a resting face as MediaPipe reads the sample newsreader: brows already 'down', eyes already 'squinting'
 REST = {'browDownLeft': 0.55, 'browDownRight': 0.5, 'eyeSquintLeft': 0.5, 'eyeSquintRight': 0.45,
         'eyeBlinkLeft': 0.12, 'eyeBlinkRight': 0.1, 'mouthPressLeft': 0.1}
 BROW_RAISE = {'browInnerUp': 0.6, 'browOuterUpLeft': 0.5, 'browOuterUpRight': 0.5, 'browDownLeft': 0.05,
@@ -44,7 +43,7 @@ class Seq:
             b = np.zeros(52, np.float32)
             for n, v in {**REST, **(expr or {})}.items():
                 b[IX[n]] = v
-            if speech:      # mouthing: jaw and lips move at syllable rate, every score jitters a little
+            if speech:
                 b[IX['jawOpen']] = 0.15 + 0.15 * np.sin(2 * np.pi * 4 * t)
                 b[IX['mouthPucker']] = max(0.0, 0.3 * np.sin(2 * np.pi * 3 * t))
                 b += self.rng.normal(0, 0.03, 52).astype(np.float32)
@@ -71,7 +70,7 @@ def first(out, label, start_s=0.0):
 def test_names_match_mediapipe():
     from live.crop import BLEND_NAMES
     assert len(MEDIAPIPE_NAMES) == 52 and len(set(MEDIAPIPE_NAMES)) == 52
-    if BLEND_NAMES:     # filled once any test ran the face landmarker (test_sample_newsreader asserts it too)
+    if BLEND_NAMES:
         assert tuple(BLEND_NAMES) == MEDIAPIPE_NAMES
 
 
@@ -91,7 +90,7 @@ def test_brow_raise_is_surprised():
     out = Seq().add(3).add(1).add(3, BROW_RAISE).run()
     lag = first(out, 'surprised', 4.0)
     print(f'\nsurprised after {lag:.2f} s')
-    assert lag is not None and 0.5 <= lag <= 1.5       # switch_s hysteresis + smoothing, but not sluggish
+    assert lag is not None and 0.5 <= lag <= 1.5
     assert labels(out)[-1] == 'surprised' and out[-1].confidence > 0.5
 
 
@@ -136,7 +135,6 @@ def test_flicker_suppressed():
     for k in range(25):
         s.add(0.2, BROW_RAISE if k % 2 else ANGRY)
     assert set(labels(s.run())) == {'neutral'}
-    # and once a label is published, a 0.2 s blip of another one does not replace it
     s = Seq().add(3).add(3, ANGRY)
     for _ in range(5):
         s.add(0.2, BROW_RAISE).add(0.4, ANGRY)
@@ -156,7 +154,7 @@ def test_no_face_before_baseline_and_baseline_from_face_frames_only():
     s = Seq().add(2, face=False).add(3).add(3, BROW_RAISE)
     t = EmotionTagger()
     out = [t.push(c) for c in s.crops[:5 * FPS - 1]]
-    assert t.base is None and set(labels(out)) == {'neutral'}       # 2 s without a face did not count
+    assert t.base is None and set(labels(out)) == {'neutral'}
     out += [t.push(c) for c in s.crops[5 * FPS - 1:]]
     assert t.base is not None and labels(out)[-1] == 'surprised'
 
@@ -178,7 +176,7 @@ def test_label_map():
     with pytest.raises(ValueError):
         EmotionTagger(labels=names, label_map={**lm, 'happy': 'happy'})
     with pytest.raises(ValueError):
-        EmotionTagger(labels=names)         # default identity map: 'neutral' is not a label
+        EmotionTagger(labels=names)
 
 
 def tick_with(emotion, T=3):

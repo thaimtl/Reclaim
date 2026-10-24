@@ -36,9 +36,8 @@ from live.types import FPS, Crop
 
 CROP = 96
 REF = STABLE_REFERENCE.astype(np.float32)
-MOUTH_PTS = [13, 14, 61, 291]   # inner lip top, bottom, corners (Lipflow FaceObs.mouth_open uses the same points)
-BLEND_NAMES = []                # MediaPipe's 52 blendshape names, in the order of Crop.blend (filled on first face)
-# Named smoothing settings (--smooth); measured on the sample by live/bench/smooth_check.py (CHANGELOG "Measured")
+MOUTH_PTS = [13, 14, 61, 291]
+BLEND_NAMES = []
 SMOOTHING = {'k0': dict(k=0), 'k2': dict(k=2), 'ema': dict(k=0, smooth='ema', ema_alpha=0.3)}
 DEFAULT_SMOOTHING = 'k0'
 Pending = namedtuple('Pending', 't gray anchors mouth_open blend mouth_pts eye_dist')
@@ -50,7 +49,7 @@ class LiveFaceObs(FaceObs):
     def __init__(self, pts, blend=None, pose=None):
         super().__init__(pts)
         self.blend = blend
-        self.pose = pose            # (3,) float32 yaw, pitch, roll in radians, or None (BlendTracker pose=False)
+        self.pose = pose
 
 
 def head_pose(matrix):
@@ -79,7 +78,7 @@ class BlendTracker(FaceTracker):
         self._last_ts = -1
 
     def detect(self, frame_bgr, ts_ms):
-        ts_ms = max(int(ts_ms), self._last_ts + 1)  # MediaPipe needs strictly increasing time
+        ts_ms = max(int(ts_ms), self._last_ts + 1)
         self._last_ts = ts_ms
         rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
         res = self._lm.detect_for_video(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb), ts_ms)
@@ -128,14 +127,14 @@ class LiveCropper:
         self.roi_px, self.roi_margin = roi_px, roi_margin
         self.half_window, self.symmetric = window_margin // 2, symmetric
         self.tracker = BlendTracker(face_model, blendshapes, pose)
-        self.roi_tracker = (BlendTracker(face_model, blendshapes, pose)   # own VIDEO-mode state for the ROI images
+        self.roi_tracker = (BlendTracker(face_model, blendshapes, pose)
                             if face_roi else None)
-        self.box = None             # (x0, y0, side) of the face ROI, full-frame pixels
-        self.past = deque(maxlen=self.half_window)  # anchors used for the last crops (None before the first face)
-        self.pending = deque()      # detected, not yet cropped (at most k)
-        self.times = deque(maxlen=FPS)  # per-frame crop ms, last second at 25 fps
-        self.last_face = None       # see push()
-        self.last_pose = None       # (3,) yaw, pitch, roll of the newest frame, with pose=True; else None
+        self.box = None
+        self.past = deque(maxlen=self.half_window)
+        self.pending = deque()
+        self.times = deque(maxlen=FPS)
+        self.last_face = None
+        self.last_pose = None
 
     @property
     def crop_ms(self):
@@ -177,7 +176,6 @@ class LiveCropper:
         """Add one Frame; returns the crops that became final (0 or 1, k frames behind)."""
         t0 = time.perf_counter()
         obs = self.detect(frame.image, frame.t)
-        # newest frame's face for live/emotion_net.py (E5): (t, pts (478, 2) pixels, blend (52,) or None), or None
         self.last_face = None if obs is None else (frame.t, obs.pts, obs.blend)
         self.last_pose = None if obs is None else obs.pose
         gray = cv2.cvtColor(frame.image, cv2.COLOR_BGR2GRAY)

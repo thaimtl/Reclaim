@@ -61,13 +61,11 @@ def test_k6_symmetric_reproduces_mouth_rois(frames, face_model, reference):
     d = frame_diff(crops, ref)
     print(f'\nk=6 symmetric vs mouth_rois: {len(crops)} frames, mean {d.mean():.3f}, max {d.max():.3f}')
     assert len(crops) == len(ref)
-    assert d.max() == 0  # same landmarks, same window, same ops: bit-exact
+    assert d.max() == 0
 
 
 @needs_sample
 def test_k6_default_matches_mouth_rois(frames, face_model, reference):
-    # Default window = past 6 + k future. With k = 6 it equals mouth_rois' +-6 everywhere except the first and last
-    # 6 frames, where mouth_rois shrinks the window symmetrically. Measured: mean 0.10, interior frames exact.
     ref, _ = reference
     crops, _ = run(frames, face_model, k=6)
     d = frame_diff(crops, ref)
@@ -89,7 +87,7 @@ def test_k2_counts_and_times(frames, face_model):
     out = []
     for i, f in enumerate(frames):
         got = c.push(f)
-        assert len(got) == (1 if i >= 2 else 0)  # emitted exactly k frames late
+        assert len(got) == (1 if i >= 2 else 0)
         out += got
     out += c.flush()
     c.close()
@@ -110,11 +108,9 @@ def test_blendshapes_and_mouth_points(frames, face_model):
     for x in out:
         assert x.blend.shape == (52,) and x.blend.dtype == np.float32 and 0 <= x.blend.min() <= x.blend.max() <= 1
         assert x.mouth_pts.shape == (4, 2) and x.eye_dist > 10
-        # mouth_open is Lipflow's: inner-lip gap (13-14) / mouth width (61-291), from the same points
         p = x.mouth_pts
         assert x.mouth_open == pytest.approx(np.linalg.norm(p[0] - p[1]) / (np.linalg.norm(p[2] - p[3]) + 1e-6),
                                              rel=1e-4)
-    # mouthing moves the jaw blendshape
     jaw = np.array([x.blend[BLEND_NAMES.index('jawOpen')] for x in out])
     assert jaw.std() > 0.01
 
@@ -131,7 +127,7 @@ def test_smoothing_presets(frames, face_model, reference):
         out = c.flush()
         c.close()
         k = kw['k']
-        assert got == [1 if i >= k else 0 for i in range(n)], name   # k = 0: a crop as soon as its frame arrives
+        assert got == [1 if i >= k else 0 for i in range(n)], name
         assert len(out) == k
     ema, _ = run(frames, face_model, **SMOOTHING['ema'])
     box, _ = run(frames, face_model, **SMOOTHING['k0'])
@@ -149,7 +145,7 @@ def test_face_gap_fields_consistent(frames, face_model):
         assert len(out) == 100 and sum(x.face_ok for x in out) == 80, name
         for x in out:
             assert (x.blend is not None) == (x.mouth_pts is not None) == (x.eye_dist > 0) == x.face_ok, name
-        assert all(out[i].roi96.any() for i in range(40, 60)), name   # held / interpolated through the gap
+        assert all(out[i].roi96.any() for i in range(40, 60)), name
 
 
 @needs_sample
@@ -160,11 +156,9 @@ def test_no_face_before_first_and_held_after(frames, face_model):
     out, _ = run(seq, face_model, k=2)
     assert len(out) == len(seq)
     first = [i for i, x in enumerate(out) if x.face_ok][0]
-    # before the first face: zeros, except the k frames right before it, held back from the first face (lookahead)
     assert all(not x.face_ok and x.mouth_open == 0.0 for x in out[:first])
     assert all(not x.roi96.any() for x in out[:first - 2])
     assert all(x.roi96.any() for x in out[first - 2:first])
-    # after the face is lost: held from the last face, flagged
     assert all(not x.face_ok and x.mouth_open == 0.0 and x.roi96.any() for x in out[-5:])
 
 
@@ -179,7 +173,6 @@ def test_replay_25fps_steady(frames):
     assert abs(t[0] - live.SAMPLE_START) < 1e-6
     assert len(frames) == int(np.floor(span * FPS + 1e-6)) + 1
     assert abs(d.mean() - 1 / FPS) < 1e-3
-    # each frame is the first source frame at or after its 25 fps grid point (29.97 fps source -> < 33.4 ms late)
     grid = t[0] + np.arange(len(t)) / FPS
     lag = t - grid
     assert lag.min() >= -1e-9 and lag.max() < 1 / 29.0
@@ -292,7 +285,7 @@ def test_camera_source_rates(monkeypatch, offered, cam_fps, keep):
     st = source.interval_stats([f.t for f in got])
     print(f'\nfake {cam_fps} fps camera, keep every {keep}: out {st}')
     assert abs(st['fps'] - FPS) < 1.0
-    assert [f.index for f in got] == list(range(got[0].index, got[0].index + len(got)))  # fast consumer: no drops
+    assert [f.index for f in got] == list(range(got[0].index, got[0].index + len(got)))
 
 
 def test_slow_camera_is_resampled_to_25fps(monkeypatch):
@@ -318,7 +311,7 @@ def test_slow_camera_is_resampled_to_25fps(monkeypatch):
             break
     src.close()
     ts = [f.t for f in got[5:]]
-    assert len(ts) / (ts[-1] - ts[0]) == pytest.approx(FPS, abs=2.0)      # 25 frames per second, repeats included
+    assert len(ts) / (ts[-1] - ts[0]) == pytest.approx(FPS, abs=2.0)
 
 
 @needs_sample
@@ -329,7 +322,7 @@ def test_crop_view_on_a_15fps_clip(tmp_path, face_model):
     cap.set(cv2.CAP_PROP_POS_MSEC, live.SAMPLE_START * 1000)
     clip = str(tmp_path / 'clip15.mp4')
     w = None
-    for i in range(60):             # 2 s of the 29.97 fps sample, every other frame
+    for i in range(60):
         ok, im = cap.read()
         if not ok:
             break
@@ -343,7 +336,7 @@ def test_crop_view_on_a_15fps_clip(tmp_path, face_model):
     src = ReplaySource(clip, realtime=False)
     ts = [f.t for f in src.frames()]
     src.close()
-    assert len(ts) > len(set(ts))   # repeated frame times
+    assert len(ts) > len(set(ts))
     c = LiveCropper(face_model)
     src = ReplaySource(clip, realtime=False)
     pairs = list(crop_view.paired(src, c))

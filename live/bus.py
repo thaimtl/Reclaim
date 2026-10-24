@@ -34,30 +34,29 @@ log = logging.getLogger(__name__)
 DEFAULT_CAM_PUB = 'ipc:///tmp/reclaim/cam.tick'
 CAM_PUB = os.environ.get('RECLAIM_CAM_PUB', DEFAULT_CAM_PUB)
 TICK, FINAL, FACE = 'cam.tick', 'cam.final', 'cam.face'
-VERSION = 2                 # v2: cam.tick carries timing_ms (required), ticks every 100 ms, ipc:// default
-TICK_S = 0.1                # cam.tick period while a segment is open (2.5 model frames)
-SNDHWM = 20                 # a slow subscriber drops old ticks instead of building a backlog
-_TEXT = re.compile(r"^([A-Z0-9']+( [A-Z0-9']+)*)?$")      # what validate accepts as greedy / nbest text
-_SPECIAL = re.compile(r'<[a-z]+>')                          # <blank>, <unk>, <eos>
+VERSION = 2
+TICK_S = 0.1
+SNDHWM = 20
+_TEXT = re.compile(r"^([A-Z0-9']+( [A-Z0-9']+)*)?$")
+_SPECIAL = re.compile(r'<[a-z]+>')
 _NOT_TEXT = re.compile(r"[^A-Z0-9' ]")
-# dtype of each array field on the wire (explicit little-endian)
 DTYPES = {'frame_t': '<f8', 'topk_ids': '<i4', 'topk_logp': '<f4', 'blank_logp': '<f4', 'activity': '<f4',
           'pts': '<f2', 'blend': '<f2', 'pose': '<f4'}
-FACE_POINTS = (468, 478)    # MediaPipe face mesh, without / with the 10 iris points
-FACE_RANGE = (-1.0, 2.0)    # normalised landmarks may sit off-frame (face at the edge), never this far
+FACE_POINTS = (468, 478)
+FACE_RANGE = (-1.0, 2.0)
 
 
 @dataclass(frozen=True)
 class CamFace:
     """The newest face for the dashboard (topic cam.face, ~12.5 Hz), from the crop thread. pts are normalised to the
     processed frame (x / w, y / h), so the dashboard needs no frame size; w, h say what they are relative to."""
-    t: float                    # capture time of the frame (time.monotonic())
-    w: int                      # processed frame size the points were normalised by (1280x720 by default)
+    t: float
+    w: int
     h: int
-    face_ok: bool               # False: no face on this frame; pts, blend and pose are then None
-    pts: np.ndarray = None      # (N, 2) float16, N = 478 (468 mesh + 10 iris) or 468
-    blend: np.ndarray = None    # (52,) float16 MediaPipe blendshapes, order live.crop.BLEND_NAMES; None if off
-    pose: np.ndarray = None     # (3,) float32 yaw, pitch, roll radians; None with run.py --no-pose
+    face_ok: bool
+    pts: np.ndarray = None
+    blend: np.ndarray = None
+    pose: np.ndarray = None
 
 
 def face_msg(t, last_face, last_pose, w, h):
@@ -133,7 +132,7 @@ def _timing_out(tm):
         return None
     def plain(v):
         if isinstance(v, (bool, np.bool_)):
-            return bool(v)              # left for validate to refuse
+            return bool(v)
         if isinstance(v, (int, np.integer)):
             return int(v)
         if isinstance(v, (float, np.floating)):
@@ -251,11 +250,11 @@ def validate(topic, msg):
             raise ValueError(f'{topic}: NaN log-prob')
         if np.any(logp > 1e-4) or np.any(blank > 1e-4):
             raise ValueError(f'{topic}: log-probs must be <= 0')
-        with np.errstate(invalid='ignore'):     # -inf - -inf = NaN: equal, so sorted
+        with np.errstate(invalid='ignore'):
             if np.any(np.diff(logp, axis=1) > 1e-4):
                 raise ValueError(f'{topic}.topk_logp: each row must be sorted, most likely first')
         act = msg['activity']
-        if not np.all((act >= 0) & (act <= 1)):  # also rejects NaN
+        if not np.all((act >= 0) & (act <= 1)):
             raise ValueError(f'{topic}.activity: values in [0, 1] expected')
         if not isinstance(msg['greedy'], str) or not _TEXT.match(msg['greedy']):
             raise ValueError(f'{topic}.greedy: UPPERCASE words expected, got {msg["greedy"]!r}')
@@ -342,7 +341,6 @@ def _prepare_ipc(path):
         return
     finally:
         probe.close()
-    # libzmq would silently unlink and steal the path from the live publisher; make that an error instead
     raise zmq.ZMQError(errno.EADDRINUSE, f'{path}: another publisher is bound here')
 
 
@@ -367,7 +365,7 @@ class Publisher:
         self.addr = self.sock.getsockopt_string(zmq.LAST_ENDPOINT) if bind else addr
         self._ipc = (path, os.stat(path).st_ino) if bind and path else None
         self.seq = {TICK: 0, FINAL: 0, FACE: 0}
-        self.dropped_busy = 0       # non-blocking sends dropped because another thread was sending
+        self.dropped_busy = 0
         self.lock = threading.Lock()
         self.closed = False
         self.dropped_after_close = 0
@@ -386,7 +384,7 @@ class Publisher:
                 if self.dropped_after_close == 1:
                     log.warning('bus send after close: %s dropped', topic)
                 return 0
-            frames = encode(obj, self.seq[topic] + 1)   # an invalid message raises here and uses no seq
+            frames = encode(obj, self.seq[topic] + 1)
             self.sock.send_multipart(frames, copy=False)
             self.seq[topic] += 1
             return len(frames[1])
@@ -402,8 +400,6 @@ class Publisher:
             self.closed = True
             self.sock.close(linger=linger_ms)
             if self._ipc:
-                # libzmq 4.3 leaves the socket file behind; remove it if it is still ours, so the next bind (this
-                # process or a restart) is clean. Connected subscribers keep their connection for the linger.
                 path, ino = self._ipc
                 try:
                     if os.stat(path).st_ino == ino:

@@ -17,7 +17,7 @@ from live.crop import BLEND_NAMES, DEFAULT_SMOOTHING, SMOOTHING, LiveCropper
 from live.source import CameraSource, ReplaySource
 from live.types import FPS
 
-SCALE = 4                   # crop shown at 384x384
+SCALE = 4
 
 
 def panel(frame, crop, ms):
@@ -46,7 +46,7 @@ def paired(src, cropper):
         pending.append(frame)
         for crop in cropper.push(frame):
             yield pending.popleft(), crop
-    for crop in cropper.flush():        # the last k crops of a replay
+    for crop in cropper.flush():
         yield pending.popleft(), crop
 
 

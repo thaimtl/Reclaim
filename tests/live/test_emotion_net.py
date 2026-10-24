@@ -12,7 +12,7 @@ from live.emotion_net import (CLASSES, MODEL_PATH, EmgTonic, EmotionEstimator, f
 from live.types import EMOTIONS
 
 RNG = np.random.default_rng(0)
-REST = np.array([0.5, -1.0, -1.0, -1.5, -0.5, 3.0, 0.8, -0.5])   # a resting face: neutral leads, some anger/sadness
+REST = np.array([0.5, -1.0, -1.0, -1.5, -0.5, 3.0, 0.8, -0.5])
 
 
 def calibrated(**kw):
@@ -50,7 +50,7 @@ def test_sad_when_still():
     est = calibrated()
     labels = [est.update(bump('sadness', 3.0), still=True).label for _ in range(10)]
     assert labels[-1] == 'sad'
-    assert labels[0] == 'neutral'           # hysteresis: not on the first read
+    assert labels[0] == 'neutral'
 
 
 def test_mouthing_cannot_vote_surprise():
@@ -75,13 +75,13 @@ def test_sadness_read_before_talking_persists_briefly():
         est.update(bump('sadness', 3.0), still=True)
     assert est.current.label == 'sad'
     for _ in range(5):
-        e = est.update(REST, still=False)      # starts mouthing: the still reading carries over
+        e = est.update(REST, still=False)
     assert e.label == 'sad'
 
 
 def test_emg_tonic_smile():
     est = calibrated()
-    for _ in range(40):                                  # EMG starts later: calibrates on its own still reads
+    for _ in range(40):
         est.update(REST, still=True, emg=1.0 + RNG.normal(0, 0.05))
     for _ in range(10):
         e = est.update(REST, still=False, emg=2.0)
@@ -115,8 +115,8 @@ def test_scores_shape():
 def test_emg_tonic_separates_bursts_from_held_level():
     fs = 1000
     t = np.arange(4 * fs) / fs
-    bursts = (np.sin(2 * np.pi * 4 * t) > 0.6) * RNG.normal(0, 1, t.size)     # speech-like 4 Hz bursts
-    held = RNG.normal(0, 1, t.size)                                           # sustained contraction, same peak
+    bursts = (np.sin(2 * np.pi * 4 * t) > 0.6) * RNG.normal(0, 1, t.size)
+    held = RNG.normal(0, 1, t.size)
     a, b = EmgTonic(1), EmgTonic(1)
     for i in range(0, t.size, 100):
         va = a.push(bursts[i:i + 100, None])[0]
@@ -227,7 +227,6 @@ def test_worker_end_to_end_on_sample():
     assert set(w.current().scores) == set(EMOTIONS)
 
 
-# --- review fixes (E5 review, 2026-10-24) -----------------------------------------------------------------------------
 def _passes_bus(emotion):
     """The Emotion survives encode -> decode -> validate exactly as cam.tick sends it."""
     from live import bus
@@ -253,7 +252,7 @@ def test_emg_tonic_survives_bad_samples_and_1d_input():
     t.push(np.full((100, 4), np.inf))
     assert np.isfinite(t.zi).all() and np.isfinite(t.value).all()
     t1 = EmgTonic(1, warmup_s=0.0)
-    assert np.isfinite(t1.push(np.ones(50))).all()               # 1-D: one channel
+    assert np.isfinite(t1.push(np.ones(50))).all()
 
 
 def test_first_read_after_calibration_cannot_lock_in_anger_while_mouthing():
@@ -270,7 +269,7 @@ def test_first_read_after_calibration_cannot_lock_in_anger_while_mouthing():
 
 def test_hysteresis_needs_the_same_challenger_in_a_row():
     est = calibrated()
-    seq = [bump('sadness', 4.0), bump('anger', 4.0)] * 8      # two challengers taking turns, neither holds
+    seq = [bump('sadness', 4.0), bump('anger', 4.0)] * 8
     labels = [est.update(x, still=True, tag={'happy': 0, 'sad': 0.6, 'angry': 0.6, 'surprised': 0}).label for x in seq]
     assert labels[-1] in ('neutral', 'sad', 'angry')
     assert labels.count('neutral') >= 5, 'no switch on the first reads of an alternating pair'
@@ -279,16 +278,16 @@ def test_hysteresis_needs_the_same_challenger_in_a_row():
 def test_emg_floor_is_relative_to_its_level():
     est = calibrated()
     for _ in range(40):
-        est.update(REST, still=True, emg=1000.0)                  # perfectly steady big numbers (MAD = 0)
+        est.update(REST, still=True, emg=1000.0)
     for _ in range(10):
-        e = est.update(REST, still=True, emg=1001.0)              # 0.1% drift is not a smile
+        e = est.update(REST, still=True, emg=1001.0)
     assert e.label == 'neutral'
 
 
 def test_face_crop_is_square_at_the_frame_edge():
     from live.emotion_net import face_crop
     img = np.full((100, 200, 3), 255, np.uint8)
-    box = face_box(np.array([[150, 10], [230, 90]], np.float32), img.shape)   # runs off the right edge
+    box = face_box(np.array([[150, 10], [230, 90]], np.float32), img.shape)
     crop = face_crop(img, box)
     assert crop.shape[0] == crop.shape[1]
 
@@ -314,14 +313,14 @@ def test_worker_reads_every_second_frame_at_25_fps_even_far_from_t0():
     w = EmotionWorker(net=net)
     img = np.zeros((720, 1280, 3), np.uint8)
     try:
-        t0 = 183456.7                                             # large monotonic offset, as on a laptop
+        t0 = 183456.7
         for i in range(100):
             w.submit(t0 + i / 25, img, _face(t0 + i / 25))
             time.sleep(0.004)
         time.sleep(0.2)
     finally:
         w.close()
-    assert 45 <= net.calls <= 50, net.calls                        # 12.5 reads/s, not 8-11
+    assert 45 <= net.calls <= 50, net.calls
 
 
 def test_worker_recalibrate_is_applied_on_the_worker_thread():
@@ -348,7 +347,7 @@ def test_submit_never_raises():
     from live.emotion_net import EmotionWorker
     w = EmotionWorker(net=FakeNet())
     try:
-        w.submit(0.0, np.zeros((10, 10, 3), np.uint8), (0.0, np.zeros((3, 2), np.float32), None))   # too few points
+        w.submit(0.0, np.zeros((10, 10, 3), np.uint8), (0.0, np.zeros((3, 2), np.float32), None))
         w.submit(0.04, None, 'garbage')
     finally:
         w.close()

@@ -35,7 +35,6 @@ from live.types import EMOTIONS, FPS, Emotion
 
 CANON = ('neutral', 'happy', 'sad', 'angry', 'surprised')
 NEUTRAL = 'neutral'
-# MediaPipe face_landmarker blendshape order (ARKit 52 + _neutral); live.crop.BLEND_NAMES wins when filled
 MEDIAPIPE_NAMES = (
     '_neutral', 'browDownLeft', 'browDownRight', 'browInnerUp', 'browOuterUpLeft', 'browOuterUpRight', 'cheekPuff',
     'cheekSquintLeft', 'cheekSquintRight', 'eyeBlinkLeft', 'eyeBlinkRight', 'eyeLookDownLeft', 'eyeLookDownRight',
@@ -46,21 +45,19 @@ MEDIAPIPE_NAMES = (
     'mouthRight', 'mouthRollLower', 'mouthRollUpper', 'mouthShrugLower', 'mouthShrugUpper', 'mouthSmileLeft',
     'mouthSmileRight', 'mouthStretchLeft', 'mouthStretchRight', 'mouthUpperUpLeft', 'mouthUpperUpRight',
     'noseSneerLeft', 'noseSneerRight')
-# feature -> blendshapes averaged (L/R pairs)
 FEATURES = {'brow_down': ('browDownLeft', 'browDownRight'), 'brow_inner': ('browInnerUp',),
             'brow_outer': ('browOuterUpLeft', 'browOuterUpRight'), 'eye_wide': ('eyeWideLeft', 'eyeWideRight'),
             'eye_squint': ('eyeSquintLeft', 'eyeSquintRight'), 'cheek_squint': ('cheekSquintLeft', 'cheekSquintRight'),
             'smile': ('mouthSmileLeft', 'mouthSmileRight'), 'frown': ('mouthFrownLeft', 'mouthFrownRight')}
-# ramp (lo, hi) of each feature's rise over baseline; sample newsreader: brow_down swings 0.23-0.72 while talking
 RAMP = {'brow_down': (0.12, 0.30), 'brow_inner': (0.20, 0.50), 'brow_outer': (0.10, 0.35), 'eye_wide': (0.08, 0.25),
         'squint': (0.10, 0.25), 'smile': (0.25, 0.50), 'frown': (0.15, 0.35)}
-SMILE_ON, FROWN_ON = 0.25, 0.15  # mouth rise over baseline that starts the sustain timer
-SUSTAIN_S = 0.6             # a mouth shape counts only after this long (a mouthed syllable is ~0.1-0.3 s)
-SUSTAIN_RAMP_S = 0.3        # then fades in over this
-GAP_S = 0.12                # dips shorter than this (3 frames) do not restart the timer
-MARGIN = 0.35               # smoothed score a label needs to beat neutral
-NOFACE_TAU_S = 2.0          # no face: scores decay to 0 with this time constant
-MAX_DT = 0.5                # a longer gap between crops counts as this (replay seeks, stalls)
+SMILE_ON, FROWN_ON = 0.25, 0.15
+SUSTAIN_S = 0.6
+SUSTAIN_RAMP_S = 0.3
+GAP_S = 0.12
+MARGIN = 0.35
+NOFACE_TAU_S = 2.0
+MAX_DT = 0.5
 
 
 def _ramp(v, lo_hi):

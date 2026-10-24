@@ -75,7 +75,7 @@ def test_round_trip_through_load_manifest(clip, tmp_path):
     assert entry['n_frames'] == r['n_frames'] == len(ts) == len(written) and entry['dropped'] == 0
     assert entry['clip_t0'] == ts[0] and entry['clip_t1'] == ts[-1] and abs(entry['fps'] - 25) < 0.1
     dec = read_video(r['video'])
-    assert len(dec) == len(ts) and dec[0].shape == clip[0].image.shape  # full size, as captured
+    assert len(dec) == len(ts) and dec[0].shape == clip[0].image.shape
     diff = np.mean([np.abs(a.astype(np.int16) - b.image).mean() for a, b in zip(dec, clip)])
     assert diff < 3.0, diff
     src = ReplaySource(r['video'], realtime=False)
@@ -132,15 +132,15 @@ def test_write_never_blocks_and_drops_stay_consistent(tmp_path, monkeypatch):
     np.testing.assert_array_equal(ts, [f.t for f in kept])
     dec = read_video(str(tmp_path / 's1' / 'u.mp4'))
     assert len(dec) == len(ts) == e['n_frames']
-    assert [level_of(im) for im in dec] == [f.index % 34 for f in kept]  # the same frames in video and ts
+    assert [level_of(im) for im in dec] == [f.index % 34 for f in kept]
 
 
 def test_repeats_skipped_idle_ignored_empty_clip(tmp_path):
     with Recorder(str(tmp_path), 's1') as rec:
-        assert not rec.write(level_frame(0, 1.0))           # not recording
+        assert not rec.write(level_frame(0, 1.0))
         rec.start('a', set='C')
         assert rec.write(level_frame(0, 1.0))
-        assert not rec.write(level_frame(0, 1.0))           # CameraSource's repeated frame
+        assert not rec.write(level_frame(0, 1.0))
         assert rec.write(level_frame(1, 1.04))
         e = rec.stop()
         assert (e['n_frames'], e['repeats'], e['dropped']) == (2, 1, 0)
@@ -188,7 +188,6 @@ def test_read_prompts(tmp_path):
     p = tmp_path / 'p.txt'
     p.write_text("s1_001\tHi, it's nice to meet you.\n\n# comment\nrest_01\n")
     assert read_prompts(str(p)) == [('s1_001', "Hi, it's nice to meet you."), ('rest_01', '')]
-    # the team's prompt files: recording_prompts/ in the working folder, docs/recording/ in the repo
     real = [f for f in (os.path.join(ROOT, 'recording_prompts', 'session1.txt'),
                         os.path.join(ROOT, 'docs', 'recording', 'session1.txt')) if os.path.exists(f)]
     if real:
@@ -243,10 +242,10 @@ def test_an_empty_redo_keeps_the_good_take(tmp_path):
         for i in range(5):
             rec.write(level_frame(i, 1.0 + i / 25))
         good = rec.stop()
-        rec.start('u1')                                      # redo, but the camera delivers nothing
+        rec.start('u1')
         assert rec.stop()['n_frames'] == 0
     rows = load_manifest(str(tmp_path))
-    assert len(rows) == 1 and rows[0]['n_frames'] == 5 and good['video'] == 'u1.mp4'  # load_manifest makes paths absolute
+    assert len(rows) == 1 and rows[0]['n_frames'] == 5 and good['video'] == 'u1.mp4'
     d = tmp_path / 's1'
     assert (d / 'u1.mp4').exists() and len(np.load(d / 'u1_video_ts.npy')) == 5
     assert not list(d.glob('*.part.*'))

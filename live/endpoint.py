@@ -38,10 +38,10 @@ from live.types import FPS
 log = logging.getLogger(__name__)
 
 START, CAP, END = 'start', 'cap', 'end'
-ACT_FULL = 0.15             # weighted lip ptp (eye distances) that counts as activity 1.0; sample speech ~0.1
-W_WIDTH, W_LIFT = 0.5, 0.5  # weights of the corner measures relative to the gap
-START_THR = 0.25            # activity that opens a candidate (sample speech ~0.7, still face ~0.05)
-STILL_THR = 0.12            # activity below this counts as still
+ACT_FULL = 0.15
+W_WIDTH, W_LIFT = 0.5, 0.5
+START_THR = 0.25
+STILL_THR = 0.12
 MEDIAN_N = 3
 
 
@@ -60,7 +60,7 @@ def lip_features(crop):
     if width <= 0:
         return None
     rel = top - (left + right) / 2
-    lift = (axis[0] * rel[1] - axis[1] * rel[0]) / width     # signed distance of lip 13 from the corner line
+    lift = (axis[0] * rel[1] - axis[1] * rel[0]) / width
     return np.array([np.hypot(*(top - bot)), width, lift]) / crop.eye_dist
 
 
@@ -70,8 +70,8 @@ class Activity:
     def __init__(self, window_s=0.3, act_full=ACT_FULL):
         self.act_full = act_full
         self.weights = np.array([1.0, W_WIDTH, W_LIFT])
-        self.raw = deque(maxlen=MEDIAN_N)       # lip features of the last frames, for the median
-        self.window = deque(maxlen=frames(window_s))  # median-filtered features of the last window_s
+        self.raw = deque(maxlen=MEDIAN_N)
+        self.window = deque(maxlen=frames(window_s))
 
     def reset(self):
         self.raw.clear()
@@ -91,8 +91,8 @@ class Activity:
 @dataclass
 class Segment:
     seg_id: int
-    crops: list = field(default_factory=list)       # list[Crop] of the segment, incl. pre-roll / carry-over
-    activity: list = field(default_factory=list)    # list[float], one per crop
+    crops: list = field(default_factory=list)
+    activity: list = field(default_factory=list)
 
     @property
     def t_start(self):
@@ -116,8 +116,8 @@ class Segmenter:
         self.never_end = never_end
         self.act = Activity(window_s, act_full)
         self.next_id = 1
-        self.rejected = 0           # candidates that died before min_active_s (twitches, glitches), for tuning
-        self.face_lost = 0          # crops without a face, since start
+        self.rejected = 0
+        self.face_lost = 0
         self.reset()
 
     def reset(self):
@@ -125,9 +125,9 @@ class Segmenter:
         self.act.reset()
         self.segment = None
         self.activity = 0.0
-        self.buf = deque(maxlen=self.n_pre + self.n_min)   # (crop, activity) of the last frames, for the pre-roll
-        self.run = 0                # frames of the open candidate (0: none)
-        self.quiet = 0              # consecutive still frames of the open segment
+        self.buf = deque(maxlen=self.n_pre + self.n_min)
+        self.run = 0
+        self.quiet = 0
 
     def push(self, crop):
         """Add one Crop; returns the events it caused, in order."""
@@ -182,7 +182,7 @@ class Segmenter:
     def _end(self, t):
         seg, self.segment = self.segment, None
         self.quiet = 0
-        self.buf.clear()    # the next segment's pre-roll holds only crops after this one's last crop
+        self.buf.clear()
         log.info('segment %d end at %.2f: %.2f s, mean activity %.2f', seg.seg_id, t, seg.duration_s,
                  float(np.mean(seg.activity)))
         return END, seg

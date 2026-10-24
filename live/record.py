@@ -53,9 +53,9 @@ from live.types import Frame  # noqa: E402
 
 log = logging.getLogger(__name__)
 CODEC, CRF, PRESET = 'libx264', 18, 'veryfast'
-PIX_FMT = 'yuv420p'         # what every player and cv2 reads; the crop uses luma, which 4:2:0 keeps at full size
+PIX_FMT = 'yuv420p'
 TIME_BASE = Fraction(1, 90000)
-QUEUE_SIZE = 90             # ~3 s at 30 fps of slack before frames drop (640x480 BGR: ~83 MB at the worst)
+QUEUE_SIZE = 90
 VIDEO_KEYS = ('video', 'video_ts')
 DEFAULTS = {'set': None, 'prompt': '', 'target_wpm': None, 'mouth': 'open', 'voiced': False, 'emg': None,
             't_start': None, 't_end': None}
@@ -68,11 +68,11 @@ class Recorder:
         os.makedirs(self.dir, exist_ok=True)
         self.session, self.fps_hint, self.codec, self.crf, self.preset = session, fps_hint, codec, crf, preset
         self.manifest = os.path.join(self.dir, manifest)
-        self.dropped = 0            # frames dropped on a full queue, cumulative (each entry has its own count)
-        self.repeats = 0            # repeated frames skipped (t not after the last frame), cumulative
-        self.encode_ms = []         # writer time per frame (encode + mux) of the current / last utterance
+        self.dropped = 0
+        self.repeats = 0
+        self.encode_ms = []
         self._q = queue.Queue(maxsize=queue_size)
-        self._utt = None            # (seq, id, fields) of the open utterance; None: write() ignores frames
+        self._utt = None
         self._seq = 0
         self._last_t = None
         self._utt_dropped = self._utt_repeats = 0
@@ -93,7 +93,7 @@ class Recorder:
         self._seq += 1
         self._last_t, self._utt_dropped, self._utt_repeats = None, 0, 0
         fields = {**DEFAULTS, **manifest_fields}
-        self._q.put(('open', self._seq, utt_id))  # control messages block (never from the capture thread)
+        self._q.put(('open', self._seq, utt_id))
         self._utt = (self._seq, utt_id, fields)
 
     def write(self, frame: Frame):
@@ -127,7 +127,7 @@ class Recorder:
         err, self._error = self._error, None
         if err is not None:
             raise RuntimeError(f'recorder failed on {utt_id}') from err
-        ts, size = self._result        # the writer has put <id>.mp4 and its timestamps in place (if any frames)
+        ts, size = self._result
         fps = (len(ts) - 1) / (ts[-1] - ts[0]) if len(ts) > 1 and ts[-1] > ts[0] else 0.0
         entry = {'id': utt_id, 'session': self.session, **fields,
                  'video': f'{utt_id}.mp4' if len(ts) else None,
@@ -155,7 +155,6 @@ class Recorder:
     def __exit__(self, *exc):
         self.close()
 
-    # writer thread
     def _run(self):
         out = stream = None
         seq, ts, size = 0, [], (None, None)
@@ -166,7 +165,7 @@ class Recorder:
                 if kind == 'open':
                     seq, ts, size, self.encode_ms = s, [], (None, None), []
                     utt, final = item, os.path.join(self.dir, f'{item}.mp4')
-                    path = os.path.join(self.dir, f'{item}.part.mp4')  # renamed onto final only once complete
+                    path = os.path.join(self.dir, f'{item}.part.mp4')
                 elif kind == 'frame' and s == seq and path is not None:
                     t0 = time.perf_counter()
                     if out is None:
@@ -192,17 +191,17 @@ class Recorder:
                             os.replace(ts_part, os.path.join(self.dir, ts_name(utt)))
                     if kind == 'close':
                         self._result = (np.asarray(ts, dtype=np.float64), size)
-                    _remove(path)       # 'quit' with an open clip, or a clip without frames
+                    _remove(path)
                     out = stream = path = None
                     seq = 0
-            except Exception as e:  # keep the thread alive; stop() re-raises
+            except Exception as e:
                 self._error = self._error or e
                 if out is not None:
                     try:
                         out.close()
                     except Exception:
                         pass
-                _remove(path)           # a failed take never replaces the previous good one
+                _remove(path)
                 if utt is not None:
                     _remove(os.path.join(self.dir, ts_name(utt, part=True)))
                 out = stream = path = None

@@ -25,7 +25,7 @@ from live.model import LiveModel
 from live.run import Runner
 from live.types import FPS, Crop
 
-BANDS = ((2, 50), (4, 100), (8, 200))   # seconds, frames
+BANDS = ((2, 50), (4, 100), (8, 200))
 TARGET_MS = 40.0
 
 

@@ -43,35 +43,34 @@ import cv2
 import numpy as np
 
 import live
-from live.emotion import MARGIN as TAG_MARGIN  # the tagger's own bar for a label
-from live.endpoint import STILL_THR             # mouthing activity below this is still
+from live.emotion import MARGIN as TAG_MARGIN
+from live.endpoint import STILL_THR
 from live.types import EMOTIONS, FPS, Emotion
 
 log = logging.getLogger(__name__)
 
-MODEL_PATH = os.path.join(live.WORK, 'third_party', 'emotiefflib', 'enet_b0_8_va_mtl.onnx')  # RECLAIM_WORKDIR (README)
-CLASSES = ('anger', 'contempt', 'disgust', 'fear', 'happiness', 'neutral', 'sadness', 'surprise')  # model order
-# Model class -> our label. Contempt and disgust are rare and read as negative; fear shares surprise's raised brows.
+MODEL_PATH = os.path.join(live.WORK, 'third_party', 'emotiefflib', 'enet_b0_8_va_mtl.onnx')
+CLASSES = ('anger', 'contempt', 'disgust', 'fear', 'happiness', 'neutral', 'sadness', 'surprise')
 TO_LABEL = {'anger': 'angry', 'contempt': 'angry', 'disgust': 'angry', 'fear': 'surprised', 'happiness': 'happy',
             'neutral': 'neutral', 'sadness': 'sad', 'surprise': 'surprised'}
 MEAN = np.array([0.485, 0.456, 0.406], np.float32)
 STD = np.array([0.229, 0.224, 0.225], np.float32)
-IMG = 224                   # B0 input size
-BOX_MARGIN = 0.12           # face box margin, fraction of the landmark box size (as measured in the spikes)
+IMG = 224
+BOX_MARGIN = 0.12
 
-CALIB_READS = 60            # reads that define the resting face (~5 s at 12 reads/s)
-Z_THR = 2.0                 # a class must rise this many baseline std above the resting face (measured: 84% neutral)
-SD_FLOOR = 0.25             # logit std floor, so a very steady calibration cannot make tiny changes look huge
+CALIB_READS = 60
+Z_THR = 2.0
+SD_FLOOR = 0.25
 EMG_SD_FLOOR = 1e-6
-EMG_REL_FLOOR = 0.1         # EMG spread floor relative to its level (units differ between rigs: volts, ADC counts)
-MOUTH_W = 0.35              # weight of classifier evidence while mouthing (lower face unreliable)
-EMA = 0.4                   # evidence smoothing per read
-MOUTH_DECAY = 0.973         # while mouthing, non-happy evidence decays this much per read (half in ~2 s at 12.5/s)
-LEAD = 0.5                  # z units a new label must lead the current one by
-HOLD = 6                    # consecutive reads it must lead for (~0.5 s at 12.5 reads/s, as the tagger's switch_s)
-MAX_HZ = 12.5               # classifier reads per second: every round(FPS / MAX_HZ) = 2nd frame at 25 fps
-EMG_WARMUP_S = 4.0          # the 0.5 Hz envelope needs this long to settle before it may calibrate
-EV_CLIP = 20.0              # evidence bound in z units (keeps the softmax finite whatever comes in)
+EMG_REL_FLOOR = 0.1
+MOUTH_W = 0.35
+EMA = 0.4
+MOUTH_DECAY = 0.973
+LEAD = 0.5
+HOLD = 6
+MAX_HZ = 12.5
+EMG_WARMUP_S = 4.0
+EV_CLIP = 20.0
 NEUTRAL = Emotion('neutral', 1.0, {e: float(e == 'neutral') for e in EMOTIONS})
 HAPPY = np.array([k == 'happy' for k in EMOTIONS])
 
@@ -149,7 +148,7 @@ class EmgTonic:
     def __init__(self, channels=4, fs=1000, cutoff_hz=0.5, warmup_s=EMG_WARMUP_S):
         from scipy.signal import butter
         self.sos = butter(2, cutoff_hz, fs=fs, output='sos')
-        self.zi = np.zeros((self.sos.shape[0], 2, channels))   # sosfilt state along axis 0
+        self.zi = np.zeros((self.sos.shape[0], 2, channels))
         self.value = np.zeros(channels)
         self.seen, self.warmup = 0, int(warmup_s * fs)
 
@@ -166,7 +165,7 @@ class EmgTonic:
         if x.ndim == 1:
             x = x[:, None]
         y, self.zi = sosfilt(self.sos, x, axis=0, zi=self.zi)
-        if not np.isfinite(self.zi).all():      # never let one bad block poison the filter for good
+        if not np.isfinite(self.zi).all():
             self.zi[:] = 0.0
         self.seen += len(x)
         self.value = y[-1]
@@ -211,7 +210,7 @@ class EmotionEstimator:
         self.z_thr, self.mouth_w, self.ema, self.lead, self.hold = z_thr, mouth_w, ema, lead, hold
         self.base_logits = Baseline(calib_reads, SD_FLOOR)
         self.base_emg = Baseline(calib_reads, EMG_SD_FLOOR, EMG_REL_FLOOR)
-        self.ev = None              # smoothed evidence per label (z units), EMOTIONS order
+        self.ev = None
         self.label, self.cand, self.run = 'neutral', None, 0
         self.valence = self.arousal = 0.0
         self.current = NEUTRAL
@@ -243,7 +242,7 @@ class EmotionEstimator:
             if emg is not None:
                 self.base_emg.push([emg], still)
             if self.calibrated:
-                self.ev = np.zeros(len(EMOTIONS))   # start from rest, so the first reads go through the same rules
+                self.ev = np.zeros(len(EMOTIONS))
             return self.current
         z = self.base_logits.z(logits)
         w = 1.0 if still else self.mouth_w
@@ -252,24 +251,21 @@ class EmotionEstimator:
             lab = TO_LABEL[c]
             if lab != 'neutral':
                 e[lab] = max(e[lab], w * zc)
-        if tag is not None:         # tagger scores on its own scale: its margin maps onto our z threshold
+        if tag is not None:
             for k, v in tag.items():
                 if k not in e or k == 'neutral':
                     continue
                 tz = v / TAG_MARGIN * self.z_thr
-                # happy: either source (a held smile is reliable geometry). Negative labels and surprise: both must
-                # agree (mean), since emphasis brows alone read "angry" on a calm speaker (54% of the sample).
                 e[k] = max(e[k], tz) if k == 'happy' else 0.5 * (e[k] + tz)
         if not still:
-            e['surprised'] = 0.0    # an open, moving jaw reads as surprise: never trust it while mouthing (any source)
+            e['surprised'] = 0.0
         if emg is not None and self.base_emg.ready:
             e['happy'] = max(e['happy'], float(self.base_emg.z([emg])[0]))
         if not self.base_emg.ready and emg is not None:
-            self.base_emg.push([emg], still)  # EMG may start after the camera calibrated: calibrate on its own reads
+            self.base_emg.push([emg], still)
         vec = np.array([e[k] for k in EMOTIONS])
         new = (1 - self.ema) * self.ev + self.ema * vec
         if not still:
-            # the mouth is busy: only 'happy' takes new evidence; the rest keep their last still reading, fading
             new = np.where(HAPPY, new, self.ev * MOUTH_DECAY)
         self.ev = np.clip(new, -EV_CLIP, EV_CLIP)
         if va is not None:
@@ -288,7 +284,7 @@ class EmotionEstimator:
         """Label with hysteresis: the same challenger must lead the current label by `lead` for `hold` reads in a row.
         confidence = the held label's softmax score, so while a label is held it can be lower than a rising one's."""
         ev = dict(zip(EMOTIONS, np.clip(np.nan_to_num(self.ev), -EV_CLIP, EV_CLIP)))
-        ev['neutral'] = self.z_thr      # neutral wins unless something clears the bar
+        ev['neutral'] = self.z_thr
         best = max(EMOTIONS, key=lambda k: ev[k])
         if best != self.label and ev[best] - ev[self.label] > self.lead:
             self.run = self.run + 1 if best == self.cand else 1
@@ -324,7 +320,7 @@ class EmotionWorker:
         self._tag = None
         self.still = Stillness()
         self.tonic = EmgTonic()
-        self.every = max(1, round(FPS / max_hz))    # count frames: float time steps (0.0799999 < 0.08) skip reads
+        self.every = max(1, round(FPS / max_hz))
         self._n = 0
         self._slot, self._emg = None, None
         self._lock, self._wake = threading.Lock(), threading.Event()
@@ -477,9 +473,9 @@ def _main():
             face = None if obs is None else (t, obs.pts, obs.blend)
             worker.submit(t, img, face)
             if args.replay and not args.out:
-                time.sleep(1 / fps)     # real time, so the worker sees what it would live
+                time.sleep(1 / fps)
             elif args.replay:
-                time.sleep(0.02)        # writing a file: give the worker its reads at ~real rate
+                time.sleep(0.02)
             e = worker.current()
             if e.label != last:
                 est = worker.est
