@@ -33,6 +33,8 @@ flowchart LR
 The 4 core sites are the best 4-electrode set from [Gaddy and Klein, 2020](https://aclanthology.org/2020.emnlp-main.445.pdf).
 The 2 extras are added once the core 4 are clean, and they double as spares.
 
+![Pad placement: six electrode pairs around the chin, mouth, and right jaw, plus three reference pads behind each ear](images/pad-placement.png)
+
 | Pin | Site in the paper | Where | Reads |
 |---|---|---|---|
 | A0 | 3 | Under the chin, 3 cm back from the tip | Tongue |
@@ -48,6 +50,10 @@ The 2 extras are added once the core 4 are clean, and they double as spares.
 - Cables run back behind the ears, so the webcam can still see the lips.
 
 ## Wiring
+
+![Wiring: the Uno's 5V and GND go to the breadboard's left + and − columns, each BioAmp takes VCC and GND from those columns, and each OUT goes to its own analog pin](images/wiring.png)
+
+The diagram shows the 4 core boards, and the 2 extras wire the same way, with OUT to A4 and A5.
 
 | From | To |
 |---|---|
