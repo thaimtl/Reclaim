@@ -7,7 +7,7 @@ sometimes misread as a look-alike for a few frames and then corrected, the long 
 (new seg_id, 2 s carried over), the face is lost for a moment in one sentence, and the emotion changes per sentence.
 timing_ms is made up but plausible: MediaPipe and front end scale with the new frames, Conformer and CTC with T.
 
-    venv-live/bin/python -m bus.stub [--pub ipc:///tmp/reclaim/cam.tick]
+    venv-live/bin/python -m bus.stub [--pub tcp://127.0.0.1:5556]
     venv-live/bin/python -m bus.listen             # in another terminal
 """
 import argparse

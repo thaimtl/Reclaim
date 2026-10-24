@@ -101,7 +101,7 @@ def test_close_finishes_or_drops_and_refuses_new_work():
         fp.submit(i, rois(i))
     assert beam.started.wait(1.0)
     t0 = time.perf_counter()
-    done = fp.close(timeout=0.45)
+    fp.close(timeout=0.45)
     assert time.perf_counter() - t0 < 0.6
     assert 3 in fp.dropped and not fp.submit(4, rois(4))
     fp.thread.join(1.0)

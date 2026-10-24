@@ -1,5 +1,5 @@
 """Frame sources: the webcam's stall / unplug handling and thread-safe close(), and replay of recordings with
-per-frame timestamps (lipread/record.py + svr/recordings.py layout, and RECORDING.md's <id>.video_t.npy + labels.csv).
+per-frame timestamps (recorder/record.py + svr/recordings.py layout, and RECORDING.md's <id>.video_t.npy + labels.csv).
 
     venv-live/bin/python -m pytest tests/lipread/test_source.py -q
 """
@@ -240,7 +240,7 @@ def test_replay_close_from_another_thread(tmp_path):
 
 
 def test_resolve_manifest_id_svr_layout(tmp_path):
-    """svr/recordings.py / lipread/record.py: recordings/<session>/manifest.jsonl + <id>.mp4 + <id>_video_ts.npy."""
+    """svr/recordings.py / recorder/record.py: recordings/<session>/manifest.jsonl + <id>.mp4 + <id>_video_ts.npy."""
     d = tmp_path / 's1'
     d.mkdir()
     write_clip(d / 's1_C_0001.mp4', 30)

@@ -205,7 +205,7 @@ def test_activity_zero_without_landmarks():
 
 @needs_sample
 def test_sample_one_segment(sample_video, face_model):
-    import live
+    import lipread
     from lipread.crop import LiveCropper
     from lipread.source import ReplaySource
     cropper = LiveCropper(face_model, k=0)

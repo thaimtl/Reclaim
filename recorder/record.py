@@ -14,7 +14,7 @@ Each clip is saved in svr/recordings.py's layout, under <root>/session_0N/ (root
     <id>_emg.npy         raw Uno readings, (samples, 4),   <id>_emg_ts.npy    laptop-clock time of every sample
                          uint16, unfiltered, A0..A3
     manifest.jsonl       one JSON line per clip (a redo replaces its line), meta.json for the session
-Camera and EMG share time.monotonic(): EMG sample times come from a fit of sample count against arrival time, so they
+Camera and EMG share time.perf_counter(): EMG sample times come from a fit of sample count against arrival time, so they
 are exact to about a millisecond even though the Uno's clock drifts from the laptop's.
 """
 import argparse
@@ -156,7 +156,7 @@ class EmgBuffer:
         with self.lock:
             pts = np.array([p for p in self.anchors if p[0] >= self.n - window_s * FS], dtype=np.float64)
         if len(pts) < 2:
-            return (pts[0][1] - pts[0][0] / FS, 1.0 / FS) if len(pts) else (time.monotonic(), 1.0 / FS)
+            return (pts[0][1] - pts[0][0] / FS, 1.0 / FS) if len(pts) else (time.perf_counter(), 1.0 / FS)
         n, t = pts[:, 0], pts[:, 1]
         b, a = np.polyfit(n, t, 1)
         resid = t - (a + b * n)
@@ -169,8 +169,8 @@ class EmgBuffer:
         """Raw samples taken between t0 and t1 (laptop clock), and each sample's time."""
         a, b = self.clock()
         n0, n1 = int(np.ceil((t0 - a) / b)), int(np.floor((t1 - a) / b))
-        deadline = time.monotonic() + wait_s
-        while self.n <= n1 and time.monotonic() < deadline:  # the last samples may still be in the USB pipe
+        deadline = time.perf_counter() + wait_s
+        while self.n <= n1 and time.perf_counter() < deadline:  # the last samples may still be in the USB pipe
             time.sleep(0.01)
         with self.lock:
             parts = []
@@ -206,7 +206,7 @@ class SerialEmg(threading.Thread):
         try:
             for chunk in frames(self.port, stats):
                 d = stats.get('dropped', 0)
-                self.buf.push(chunk, time.monotonic(), d - seen)
+                self.buf.push(chunk, time.perf_counter(), d - seen)
                 seen = d
         except Exception as e:  # noqa: BLE001  (shown in the window)
             self.error = str(e)
@@ -221,10 +221,10 @@ class FakeEmg(threading.Thread):
 
     def run(self):
         rng = np.random.default_rng(0)
-        n, t0 = 0, time.monotonic()
+        n, t0 = 0, time.perf_counter()
         while True:
             time.sleep(0.008 + rng.uniform(0, 0.006))
-            target = int((time.monotonic() - t0) * FS * self.drift)
+            target = int((time.perf_counter() - t0) * FS * self.drift)
             k = target - n
             if k <= 0:
                 continue
@@ -232,7 +232,7 @@ class FakeEmg(threading.Thread):
             burst = (np.sin(2 * np.pi * 0.4 * tt) > 0.3) * rng.normal(0, 25, (k, CHANNELS))
             x = 512 + 20 * np.sin(2 * np.pi * 60 * tt) + rng.normal(0, 3, (k, CHANNELS)) + burst
             n = target
-            self.buf.push(np.clip(x, 0, 1023).astype(np.uint16), time.monotonic() + rng.uniform(0.001, 0.004))
+            self.buf.push(np.clip(x, 0, 1023).astype(np.uint16), time.perf_counter() + rng.uniform(0.001, 0.004))
 
 
 def find_port():
@@ -245,7 +245,7 @@ def find_port():
 
 # ------------------------------------------------------------------------------------------------ camera
 class Camera(threading.Thread):
-    """Grabs frames as fast as the camera gives them and stamps each with time.monotonic() right after read()."""
+    """Grabs frames as fast as the camera gives them and stamps each with time.perf_counter() right after read()."""
 
     def __init__(self, source, width, height, fps):
         super().__init__(daemon=True)
@@ -275,11 +275,11 @@ class Camera(threading.Thread):
     def run(self):
         k = 0
         period = 1.0 / self.fps
-        next_t = time.monotonic()
+        next_t = time.perf_counter()
         while True:
             if self.fake:
                 next_t += period
-                time.sleep(max(0.0, next_t - time.monotonic()))
+                time.sleep(max(0.0, next_t - time.perf_counter()))
                 frame = np.full((self.height, self.width, 3), 40, np.uint8)
                 x = int((k * 7) % self.width)
                 cv2.rectangle(frame, (x, self.height // 3), (x + 60, 2 * self.height // 3), (80, 160, 220), -1)
@@ -292,8 +292,8 @@ class Camera(threading.Thread):
                     continue
                 if self.file:
                     next_t += period
-                    time.sleep(max(0.0, next_t - time.monotonic()))
-            t = time.monotonic()
+                    time.sleep(max(0.0, next_t - time.perf_counter()))
+            t = time.perf_counter()
             if not ok:
                 self.error = 'camera stopped sending frames'
                 time.sleep(0.1)
@@ -397,7 +397,7 @@ class Session:
                         'units': 'raw 10-bit Uno readings, unfiltered', 'source': self.emg_source},
                 'camera': {'width': self.cam.width, 'height': self.cam.height, 'fps_requested': self.cam.fps,
                            'mirrored': False},
-                'clock': 'time.monotonic() on this laptop, shared by camera and EMG',
+                'clock': 'time.perf_counter() on this laptop (bus.now()), shared by camera and EMG',
                 'recorder_version': VERSION, 'platform': platform.platform(),
                 'n_items': len(self.items), 'prompts': SESSIONS[self.session][0],
                 'styles': STYLES.get(self.session, {})}
@@ -410,12 +410,12 @@ class Session:
         path = os.path.join(self.dir, f"{item['id']}.mp4")
         self.writer = ClipWriter(path, self.cam.fps, (self.cam.width, self.cam.height))
         self.writer.start()
-        self.t_start = time.monotonic()
+        self.t_start = time.perf_counter()
         with self.cam.lock:
             self.cam.sink = self.writer
 
     def stop(self):
-        t_end = time.monotonic()
+        t_end = time.perf_counter()
         with self.cam.lock:
             self.cam.sink = None
         video_ts = self.writer.finish()
@@ -505,7 +505,7 @@ def draw(sess, cam, emg, emg_thread, state, item, help_on, msg, charger, real_em
     # side panel: EMG levels
     lv, pinned = emg.levels()
     put(canvas, 'EMG', (VW + 20, 40), 0.8)
-    alive = emg.last_arrival is not None and time.monotonic() - emg.last_arrival < 1.0
+    alive = emg.last_arrival is not None and time.perf_counter() - emg.last_arrival < 1.0
     for c in range(CHANNELS):
         y = 80 + c * 60
         put(canvas, f'A{c} site {SITES[c]}', (VW + 20, y), 0.55)
@@ -548,7 +548,7 @@ def draw(sess, cam, emg, emg_thread, state, item, help_on, msg, charger, real_em
         text = item['prompt'] or item['cue']
         for i, line in enumerate(textwrap.wrap(text, 42)[:3]):
             put(canvas, line, (30, top + i * 52), 1.45, (255, 255, 255), 3)
-        status = (f'RECORDING  {time.monotonic() - sess.t_start:4.1f} s   (SPACE to stop)' if state == 'rec'
+        status = (f'RECORDING  {time.perf_counter() - sess.t_start:4.1f} s   (SPACE to stop)' if state == 'rec'
                   else 'SPACE to start, mouth it once, SPACE to stop')
         put(canvas, status, (30, H - 25), 0.8, (60, 60, 230) if state == 'rec' else (200, 200, 200))
         if state == 'rec':
@@ -609,8 +609,8 @@ def main(argv=None):
     cam.start()
     sess = Session(a.root, a.session, a.speaker, emg, cam, emg_source)
     print(f'{len(sess.pending())} of {len(sess.items)} clips to record, saving to {sess.dir}', flush=True)
-    t_wait = time.monotonic() + 6  # the Uno resets when the port opens
-    while (emg.last_arrival is None or cam.latest is None) and time.monotonic() < t_wait:
+    t_wait = time.perf_counter() + 6  # the Uno resets when the port opens
+    while (emg.last_arrival is None or cam.latest is None) and time.perf_counter() < t_wait:
         time.sleep(0.05)
     if a.auto is not None:  # testing: no window
         for item in sess.pending()[:a.auto]:
@@ -622,15 +622,15 @@ def main(argv=None):
     cv2.namedWindow(WIN, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(WIN, 1280, 820)
     state, help_on, msg, msg_t = 'idle', True, '', 0
-    charger, charger_t = charger_plugged(), time.monotonic()
+    charger, charger_t = charger_plugged(), time.perf_counter()
     while True:
-        if time.monotonic() - charger_t > 2:
-            charger, charger_t = charger_plugged(), time.monotonic()
+        if time.perf_counter() - charger_t > 2:
+            charger, charger_t = charger_plugged(), time.perf_counter()
         pend = sess.pending()
         item = sess.current if state == 'rec' else (pend[0] if pend else None)
         if item is None and state != 'rec':
             state = 'done'
-        if msg and time.monotonic() - msg_t > 4:
+        if msg and time.perf_counter() - msg_t > 4:
             msg = ''
         cv2.imshow(WIN, draw(sess, cam, emg, emg_thread, state, item, help_on, msg, charger, not a.fake_emg))
         key = cv2.waitKey(15) & 0xFF
@@ -641,7 +641,7 @@ def main(argv=None):
             break
         elif key == ord(' ') and state == 'idle':
             if charger and not a.fake_emg:
-                msg, msg_t = 'Unplug the charger first (pads are on).', time.monotonic()
+                msg, msg_t = 'Unplug the charger first (pads are on).', time.perf_counter()
             else:
                 sess.start(item)
                 state = 'rec'
@@ -649,15 +649,15 @@ def main(argv=None):
             e = sess.stop()
             state = 'idle'
             msg = f"saved {e['id']}" + (f": {', '.join(e['warnings'])}" if e['warnings'] else '')
-            msg_t = time.monotonic()
+            msg_t = time.perf_counter()
             print(msg, flush=True)
         elif key == ord('r') and state in ('idle', 'done') and sess.last_id:
             sess.redo(sess.last_id)
-            msg, msg_t = f'redo {sess.last_id}', time.monotonic()
+            msg, msg_t = f'redo {sess.last_id}', time.perf_counter()
             sess.last_id, state = None, 'idle'
         elif key == ord('s') and state == 'idle' and item is not None:
             sess.skipped.add(item['id'])
-            msg, msg_t = f"skipped {item['id']} (rerun to get it back)", time.monotonic()
+            msg, msg_t = f"skipped {item['id']} (rerun to get it back)", time.perf_counter()
         elif key == ord('h'):
             help_on = not help_on
     cv2.destroyAllWindows()

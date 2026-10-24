@@ -1,6 +1,6 @@
 """Print what the camera reader publishes: one line per message, validated, with bus latency (now - t_pub).
 
-    venv-live/bin/python -m bus.listen [--sub ipc:///tmp/reclaim/cam.tick] [--topic cam.face] [--duration 30]
+    venv-live/bin/python -m bus.listen [--sub tcp://127.0.0.1:5556] [--topic cam.face] [--duration 30]
 
 Ends with a summary: messages per topic, invalid ones, seq gaps (dropped messages), publisher restarts (seq went
 back), payload size, bus latency p50/p95, and the camera's own pass time (timing_ms total) p50/p95.

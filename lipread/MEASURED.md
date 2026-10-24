@@ -7,6 +7,12 @@ Unless a line says otherwise it was measured on the dev box (RTX 5090, WSL2, sha
 history; the code and `bus_schema.md` are current.
 
 
+Since this log was written: `live/` became `lipread/` plus the team bus `bus/`; `laptop_check.sh` became
+`lipread/bench/laptop_check.py` (Windows and Linux); `record.py` and `commit.py` were removed (the team's `recorder/`
+records, and fusion locks words); the opt-in EmotiEffLib classifier (`emotion_net.py`), `smooth_check.py` and
+`prompts.txt` were removed (the blendshape tagger is the plan's emotion, and k0 smoothing was chosen); the bus moved from `ipc://` to `tcp://127.0.0.1:5556` with `bus.now()`
+(`time.perf_counter()`) as the clock. Paths below are the new ones; the numbers are unchanged.
+
 All numbers measured on the dev box (RTX 5090, Ryzen 7 9850X3D, WSL2), NOT the demo laptop (RTX 5060 8 GB).
 Laptop numbers come from `lipread/bench/laptop_check.sh` (T1).
 

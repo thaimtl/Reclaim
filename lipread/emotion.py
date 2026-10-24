@@ -26,13 +26,19 @@ exactly the `labels` keys, all in [0, 1], so every Emotion passes bus.validate.
     for crop in crops:
         emotion = tagger.push(crop)                             # Emotion(label, confidence, scores), ~30 us
     tagger.reset_baseline()                                     # new person in front of the camera
+
+EmotionWorker wraps it for the crop thread: submit() every frame (never raises), current() from the tick thread.
 """
+import logging
 import math
+from types import SimpleNamespace
 
 import numpy as np
 
 from bus import EMOTIONS, Emotion
 from lipread.types import FPS
+
+log = logging.getLogger(__name__)
 
 CANON = ('neutral', 'happy', 'sad', 'angry', 'surprised')
 NEUTRAL = 'neutral'
@@ -189,3 +195,26 @@ class EmotionTagger:
             scores[n] = max(scores[n], min(1.0, max(0.0, float(v))))
         label = self.label_map[self.label]
         return Emotion(label, scores[label], scores)
+
+
+RESTING = Emotion(NEUTRAL, 1.0, {e: float(e == NEUTRAL) for e in EMOTIONS})
+
+
+class EmotionWorker:
+    """EmotionTagger on the crop thread. face = (t, pts, blend or None) as LiveCropper.last_face, or None."""
+
+    def __init__(self):
+        self.tagger = EmotionTagger()
+        self.emotion = RESTING
+        self.failed = False
+
+    def submit(self, t, image, face):
+        try:
+            self.emotion = self.tagger.push(SimpleNamespace(t=t, blend=None if face is None else face[2]))
+        except Exception:  # noqa: BLE001
+            if not self.failed:
+                self.failed = True
+                log.exception('emotion failed (logged once; the lip reader goes on)')
+
+    def current(self):
+        return self.emotion

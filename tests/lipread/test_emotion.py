@@ -11,7 +11,7 @@ import pytest
 import lipread
 import bus
 from bus import decode, encode, validate
-from lipread.emotion import CANON, MEDIAPIPE_NAMES, SUSTAIN_S, EmotionTagger
+from lipread.emotion import CANON, MEDIAPIPE_NAMES, RESTING, SUSTAIN_S, EmotionTagger, EmotionWorker
 from bus import CamTick, EMOTIONS, TOPK
 from lipread.types import FPS, Crop
 
@@ -233,3 +233,16 @@ def test_sample_newsreader_mostly_neutral(sample_video, face_model):
     for e in out:
         validate(*decode(encode(tick_with(e))))
     assert dist['neutral'] >= 0.8 * len(out)
+
+
+def test_worker_is_the_tagger_and_never_raises():
+    w, ref = EmotionWorker(), EmotionTagger()
+    assert w.current() == RESTING
+    blend = np.zeros(52, np.float32)
+    for i in range(120):
+        w.submit(i / FPS, None, (i / FPS, None, blend))
+        want = ref.push(Crop(t=i / FPS, roi96=None, mouth_open=0.0, face_ok=True, blend=blend))
+    assert w.current() == want
+    validate(*decode(encode(tick_with(w.current()))))
+    w.submit(5.0, None, 'garbage')
+    assert w.failed and w.current() == want

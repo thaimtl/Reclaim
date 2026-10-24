@@ -69,7 +69,7 @@ recordings/                  ($RECLAIM_WORKDIR/recordings; not committed to git)
                              clip start and end on the laptop clock, sample and frame counts, warnings
     meta.json                speaker, sample rate, pins and sites (A0 to A3 = sites 3, 2, 6, 1), camera settings
     s1_001.mp4               camera video, unmirrored
-    s1_001_video_ts.npy      laptop clock (time.monotonic) of each video frame
+    s1_001_video_ts.npy      laptop clock (time.perf_counter, the bus clock) of each video frame
     s1_001_emg.npy           raw readings, shape (samples, 4), uint16, unfiltered
     s1_001_emg_ts.npy        laptop clock of each EMG sample
   session_02/

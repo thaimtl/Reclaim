@@ -1,25 +1,21 @@
 """Live mouth crops: one 96x96 grayscale patch per 25 fps frame, aligned like Lipflow's mouth_rois (D12).
 
-Each frame gets MediaPipe landmarks (Lipflow FaceTracker, VIDEO mode) on the full frame, a downscaled copy
-(detect_scale < 1) or a square face ROI around the last face (face_roi=True), mapped back to full-frame coordinates.
-The frame is cropped once, k frames late: the transform is smoothed over the past window_margin // 2 crops plus the
-k frames of lookahead, then frozen (re-cropping a growing clip would change past crops, D12). Missing faces are
-interpolated or held within that window; before the first face the patch is zeros with face_ok False.
-
-Smoothing (smooth=): 'box' averages the past window_margin // 2 anchors plus k frames of lookahead (k = 2: 80 ms
-late); 'ema' weights the past window by (1 - ema_alpha) ** age and needs no lookahead (k = 0, crop on arrival).
-BlendTracker adds MediaPipe's 52 blendshapes and the mouth points E4 (activity) and E5 (emotion) read.
+Each frame gets MediaPipe landmarks (Lipflow FaceTracker, VIDEO mode) on the full frame. The frame is cropped once,
+k frames late: the transform is averaged over the past window_margin // 2 anchors plus k frames of lookahead, then
+frozen (re-cropping a growing clip would change past crops, D12). The live default is k = 0: past frames only, a crop
+as soon as its frame arrives. Missing faces are interpolated or held within the window; before the first face the
+patch is zeros with face_ok False. BlendTracker adds MediaPipe's 52 blendshapes and the mouth points that activity
+(endpoint.py) and emotion read.
 
 With symmetric=True the window is the same +-m frames as mouth_rois (m = min(window_margin // 2, past, future)), so
-k = 6 with full-res detection reproduces mouth_rois exactly on a clip without long face gaps (tests/lipread/test_crop.py).
-Measured on the sample (640x360) and a 2x upscale (1280x720), 16-core CPU: detection ~4.5 ms/frame at full res, no
-faster downscaled (MediaPipe resizes internally) and slower with face_roi, both less accurate: full res is the default.
+k = 6 reproduces mouth_rois exactly on a clip without long face gaps (tests/lipread/test_crop.py): the check that the
+alignment matches what Auto-AVSR was trained on.
 
-    crop = LiveCropper(face_model, k=2)                  # or smooth='ema', k=0
+    crop = LiveCropper(face_model)
     for frame in source.frames():
         for c in crop.push(frame):
             ...                  # lipread.types.Crop, k frames behind the newest frame
-    rest = crop.flush()          # end of the utterance / clip: the last k crops with the lookahead that exists
+    rest = crop.flush()          # end of the clip: the last k crops with the lookahead that exists
 """
 import os
 import time
@@ -38,8 +34,6 @@ CROP = 96
 REF = STABLE_REFERENCE.astype(np.float32)
 MOUTH_PTS = [13, 14, 61, 291]
 BLEND_NAMES = []
-SMOOTHING = {'k0': dict(k=0), 'k2': dict(k=2), 'ema': dict(k=0, smooth='ema', ema_alpha=0.3)}
-DEFAULT_SMOOTHING = 'k0'
 Pending = namedtuple('Pending', 't gray anchors mouth_open blend mouth_pts eye_dist')
 
 
@@ -97,14 +91,13 @@ class BlendTracker(FaceTracker):
         return LiveFaceObs(pts, blend, pose)
 
 
-def align(gray, lms_i, window, crop=CROP, weights=None):
+def align(gray, lms_i, window, crop=CROP):
     """One frame of Lipflow mouth_rois: smoothed anchors -> similarity transform to the mean face -> patch at the mouth.
 
-    lms_i: this frame's 4x2 anchors; window: the anchors to average (including lms_i), optionally weighted.
-    Same ops as face.py mouth_rois when weights is None.
+    lms_i: this frame's 4x2 anchors; window: the anchors to average (including lms_i). Same ops as face.py mouth_rois.
     """
     half = crop // 2
-    smoothed = np.mean(window, axis=0) if weights is None else np.average(window, axis=0, weights=weights)
+    smoothed = np.mean(window, axis=0)
     smoothed += lms_i.mean(axis=0) - smoothed.mean(axis=0)
     tf, _ = cv2.estimateAffinePartial2D(smoothed.astype(np.float32), REF, method=cv2.LMEDS)
     if tf is None:
@@ -118,59 +111,18 @@ def align(gray, lms_i, window, crop=CROP, weights=None):
 
 
 class LiveCropper:
-    def __init__(self, face_model, k=2, detect_scale=1.0, face_roi=False, roi_px=256, roi_margin=1.6,
-                 window_margin=12, symmetric=False, smooth='box', ema_alpha=0.5, blendshapes=True, pose=False):
-        if smooth not in ('box', 'ema') or (smooth == 'ema' and (k != 0 or symmetric)):
-            raise ValueError(f'smooth={smooth!r} k={k} symmetric={symmetric}: box (any k) or ema (k = 0)')
-        self.smooth, self.ema_alpha = smooth, ema_alpha
-        self.k, self.detect_scale, self.face_roi = k, detect_scale, face_roi
-        self.roi_px, self.roi_margin = roi_px, roi_margin
+    def __init__(self, face_model, k=0, window_margin=12, symmetric=False, blendshapes=True, pose=False):
+        self.k = k
         self.half_window, self.symmetric = window_margin // 2, symmetric
         self.tracker = BlendTracker(face_model, blendshapes, pose)
-        self.roi_tracker = (BlendTracker(face_model, blendshapes, pose)
-                            if face_roi else None)
-        self.box = None
         self.past = deque(maxlen=self.half_window)
         self.pending = deque()
         self.times = deque(maxlen=FPS)
         self.last_face = None
         self.last_pose = None
 
-    @property
-    def crop_ms(self):
-        """Mean per-frame crop time (detect + align) over the last 25 frames, for Status.crop_ms."""
-        return float(np.mean(self.times)) if self.times else 0.0
-
     def detect(self, image, t):
-        """FaceObs-like landmarks (pts in full-frame pixels) or None, per detect_scale / face_roi."""
-        ts = int(round(t * 1000))
-        obs = None
-        if self.face_roi and self.box is not None:
-            x0, y0, side = self.box
-            s = self.roi_px / side
-            sub = cv2.resize(image[y0:y0 + side, x0:x0 + side], (self.roi_px, self.roi_px),
-                             interpolation=cv2.INTER_AREA if s < 1 else cv2.INTER_LINEAR)
-            obs = self.roi_tracker.detect(sub, ts)
-            if obs is not None:
-                obs.pts = obs.pts / s + np.array([x0, y0], np.float32)
-        if obs is None:
-            s = self.detect_scale
-            small = image if s == 1 else cv2.resize(image, None, fx=s, fy=s, interpolation=cv2.INTER_AREA)
-            obs = self.tracker.detect(small, ts)
-            if obs is not None and s != 1:
-                obs.pts = obs.pts * np.array([image.shape[1] / small.shape[1], image.shape[0] / small.shape[0]],
-                                             np.float32)
-        if self.face_roi:
-            self.box = self._box(obs.pts, image.shape) if obs is not None else None
-        return obs
-
-    def _box(self, pts, shape):
-        h, w = shape[:2]
-        (x0, y0), (x1, y1) = pts.min(0), pts.max(0)
-        side = int(min(max(x1 - x0, y1 - y0) * self.roi_margin, w, h))
-        bx = int(np.clip((x0 + x1) / 2 - side / 2, 0, w - side))
-        by = int(np.clip((y0 + y1) / 2 - side / 2, 0, h - side))
-        return bx, by, side
+        return self.tracker.detect(image, int(round(t * 1000)))
 
     def push(self, frame):
         """Add one Frame; returns the crops that became final (0 or 1, k frames behind)."""
@@ -203,22 +155,16 @@ class LiveCropper:
             self.past.append(None)
             return Crop(t=p.t, roi96=np.zeros((CROP, CROP), np.uint8), mouth_open=0.0, face_ok=False)
         i = len(past)
-        weights = None
         if self.symmetric:
             m = min(self.half_window, i, future)
             window = lms[i - m:i + m + 1]
-        elif self.smooth == 'ema':
-            window = lms[max(0, i - self.half_window):i + 1]
-            weights = (1 - self.ema_alpha) ** np.arange(len(window) - 1, -1, -1)
         else:
             window = lms[max(0, i - self.half_window):i + future + 1]
         self.past.append(lms[i])
         face_ok = p.anchors is not None
-        return Crop(t=p.t, roi96=align(p.gray, lms[i], window, weights=weights),
+        return Crop(t=p.t, roi96=align(p.gray, lms[i], window),
                     mouth_open=p.mouth_open if face_ok else 0.0, face_ok=face_ok, blend=p.blend,
                     mouth_pts=p.mouth_pts, eye_dist=p.eye_dist)
 
     def close(self):
         self.tracker.close()
-        if self.roi_tracker is not None:
-            self.roi_tracker.close()

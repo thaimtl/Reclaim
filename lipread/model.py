@@ -9,7 +9,6 @@ The encoder (3D-conv/ResNet front end + 12 Conformer blocks) runs on the whole s
 r.conformer_ms = r.enc_ms, split with CUDA events); the CTC head
 (log_softmax, blank = 0) and top-k run on the GPU, one device-to-host copy per call. half=True runs the encoder in
 fp16 via .half() (measured faster than autocast, CHANGELOG T0); the CTC head stays fp32.
-bench_encoder(T) is the hook lipread/bench/laptop_check.sh calls.
 """
 import statistics
 import time

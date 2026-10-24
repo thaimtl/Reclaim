@@ -3,7 +3,7 @@ crop ms per frame and the top blendshapes. A window when there is a display, els
 
     venv-live/bin/python -m lipread.crop_view                      # webcam 0, window (q quits)
     venv-live/bin/python -m lipread.crop_view --replay third_party/lipflow/samples/2016-03-12.mov --start 20.4 \\
-        --end 28.1 --out runs/lipread/crop_view.mp4 --smooth k0
+        --end 28.1 --out runs/lipread/crop_view.mp4
 """
 import argparse
 import os
@@ -14,7 +14,7 @@ import cv2
 import numpy as np
 
 import lipread
-from lipread.crop import BLEND_NAMES, DEFAULT_SMOOTHING, SMOOTHING, LiveCropper
+from lipread.crop import BLEND_NAMES, LiveCropper
 from lipread.run import fit
 from lipread.source import CameraSource, ReplaySource
 from lipread.types import FPS
@@ -60,13 +60,12 @@ def main(argv=None):
     ap.add_argument('--start', type=float, default=0.0)
     ap.add_argument('--end', type=float, default=None)
     ap.add_argument('--cam', type=int, default=0)
-    ap.add_argument('--smooth', choices=sorted(SMOOTHING), default=DEFAULT_SMOOTHING)
     ap.add_argument('--out', default=None, help='write an MP4 instead of (or when there is no) window')
     args = ap.parse_args(argv)
 
     src = (ReplaySource(args.replay, args.start, args.end, realtime=args.out is None) if args.replay
            else CameraSource(args.cam))
-    cropper = LiveCropper(os.path.join(lipread.LIPFLOW_MODELS, 'face_landmarker.task'), **SMOOTHING[args.smooth])
+    cropper = LiveCropper(os.path.join(lipread.LIPFLOW_MODELS, 'face_landmarker.task'))
     has_display = sys.platform in ('win32', 'darwin') or bool(os.environ.get('DISPLAY') or
                                                               os.environ.get('WAYLAND_DISPLAY'))
     show = args.out is None and has_display

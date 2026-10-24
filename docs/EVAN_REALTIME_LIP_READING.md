@@ -44,7 +44,7 @@ Done when: you get a sensible transcript, and you have the three encode times wr
 
 ### E1. Live capture and mouth crops (about 2 hours)
 
-1. A capture thread reads the webcam (Logitech C920) at 1920×1080, 30 fps, MJPG, and stamps every frame with `time.monotonic()`. Never block it. Recordings keep the full 1080p. The live reader shrinks each frame to 1280×720 before MediaPipe, so the mouth crop and Frank's emotion crop both come from the same 720p frame.
+1. A capture thread reads the webcam (Logitech C920) at 1920×1080, 30 fps, MJPG, and stamps every frame with `bus.now()` (`time.perf_counter()`, the team clock). Never block it. Recordings keep the full 1080p. The live reader shrinks each frame to 1280×720 before MediaPipe, so the mouth crop and Frank's emotion crop both come from the same 720p frame.
    - **Why 720p is enough:** the lip-reading crop is cut from a reference face whose eyes are 54 px apart, and the emotion classifier takes a 224 px face. At laptop distance, 720p gives roughly 70 to 100 px between the eyes, so both crops are already shrunk from it. Below about 60 px they would have to be enlarged, which is why 640×480 is too small.
    - **Why not process the full 1080p:** it adds about 2 ms of decoding and 2 ms of MediaPipe per frame on the dev box, for no gain.
 2. Run MediaPipe FaceLandmarker in VIDEO mode on each frame with `output_face_blendshapes=True`. Lipflow's `face.py` gives the four anchors (eyes, nose base, mouth centre) and the crop.

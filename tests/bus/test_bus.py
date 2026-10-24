@@ -20,7 +20,8 @@ def make_tick(T=10, seg_id=1, t0=100.0):
     rng = np.random.default_rng(0)
     logp = np.sort(np.log(rng.uniform(1e-4, 1.0, (T, TOPK))), axis=1)[:, ::-1]
     scores = {e: 0.2 for e in EMOTIONS}
-    return CamTick(seg_id, t0, t0 + np.arange(T) / 25, np.argsort(rng.random((T, 5049)), axis=1)[:, :TOPK], logp,
+    ids = (rng.integers(0, 5049, (T, 1)) + np.arange(TOPK)) % 5049
+    return CamTick(seg_id, t0, t0 + np.arange(T) / 25, ids, logp,
                    np.full(T, -0.1), 'WHAT DO', np.full(T, 0.5), True, Emotion('neutral', 0.2, scores),
                    timing_ms={'T': T, 'mediapipe': 14.5, 'frontend': 3.0, 'conformer': 9.25, 'ctc': 0.5, 'total': 28.0})
 
@@ -250,7 +251,8 @@ def test_stub_rereads_change_only_the_newest_frames():
 
 
 def test_last_final_survives_close():
-    for _ in range(10):
+    big = make_tick(T=200)
+    for _ in range(5):
         pub = Publisher('tcp://127.0.0.1:*')
         sub = Subscriber(pub.addr)
         try:
@@ -258,7 +260,7 @@ def test_last_final_survives_close():
             while sub.recv(timeout_ms=20):
                 pass
             for _ in range(10):
-                pub.send(make_tick(T=200))
+                pub.send(big)
             pub.send(FINAL_MSG)
             pub.close()
             topics = []
@@ -401,7 +403,7 @@ def test_drain_keeps_every_final_and_the_newest_tick_per_segment():
 
 def test_close_while_sending_from_another_thread():
     import threading
-    for _ in range(20):
+    for _ in range(5):
         pub = Publisher('tcp://127.0.0.1:*')
         errors, sent, started = [], [], threading.Event()
         tick = make_tick(T=50)

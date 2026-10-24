@@ -28,7 +28,6 @@ import shutil
 import subprocess
 import sys
 import threading
-import time
 from collections import deque
 
 import cv2
@@ -79,7 +78,7 @@ RECORDINGS = os.path.join(os.environ.get('RECLAIM_WORKDIR', os.path.dirname(os.p
 
 
 def ts_name(stem, part=False):
-    """File name of the per-frame times lipread/record.py writes for <stem>.mp4 (part: while the take is open)."""
+    """File name of the per-frame times recorder/record.py writes for <stem>.mp4 (part: while the take is open)."""
     return f'{stem}{TS_SUFFIXES[0]}{".part" if part else ""}.npy'
 
 
@@ -109,7 +108,7 @@ def find_ts(video):
 
 
 def _manifest_rows(root):
-    """(base dir, row) of every recording listed under root: <session>/manifest*.jsonl (svr/recordings.py, lipread/record.py)
+    """(base dir, row) of every recording listed under root: <session>/manifest*.jsonl (svr/recordings.py, recorder/record.py)
     and labels.csv (RECORDING.md: id, session, ..., video), at root or in a session folder."""
     import csv
     import json
@@ -317,6 +316,12 @@ def keep_every(cam_fps):
     return 2 if abs(cam_fps - 2 * FPS) < 2 else 1
 
 
+def resampled(cam_fps, keep):
+    """Kept frames go through the 25 fps resampler unless they already arrive at 25 fps; 27 fps passed straight
+    through would stretch time by 8%."""
+    return abs(cam_fps / keep - FPS) > 0.5
+
+
 class CameraSource:
     """The webcam as a 25 fps Frame stream (module docstring).
 
@@ -431,7 +436,7 @@ class CameraSource:
                 if (n - 1) % self.keep_every:
                     last_ok, fails = t, 0
                     continue
-                reps = rs.push(t) if abs(self.cam_fps / self.keep_every - FPS) > 2 else 1
+                reps = rs.push(t) if resampled(self.cam_fps, self.keep_every) else 1
                 if not reps:
                     last_ok, fails = t, 0
                     continue

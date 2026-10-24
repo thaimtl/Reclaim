@@ -51,8 +51,8 @@ import numpy as np
 
 import lipread
 from bus import CAM_PUB, Publisher, now, face_msg
-from lipread.crop import DEFAULT_SMOOTHING, SMOOTHING, LiveCropper
-from lipread.emotion_net import NEUTRAL
+from lipread.crop import LiveCropper
+from lipread.emotion import RESTING, EmotionWorker
 from lipread.endpoint import START, Segmenter
 from bus import CamTick
 from lipread.types import FPS, Frame
@@ -107,7 +107,7 @@ class Runner:
             self._new_cache = FrontendCache
         self.final = final
         self.last_enc = (None, 0, None)
-        self.emotion = emotion or (lambda: NEUTRAL)
+        self.emotion = emotion or (lambda: RESTING)
         self.segmenter = segmenter
         self.tick_ms = int(tick_ms)
         self.read = (None, 0)
@@ -373,7 +373,6 @@ def parse_args(argv=None):
     ap.add_argument('--process-size', type=lambda s: None if s == '0' else size_arg(s), default=(1280, 720),
                     metavar='WxH',
                     help='shrink larger frames to fit this before cropping (0: never)')
-    ap.add_argument('--smooth', choices=sorted(SMOOTHING), default=DEFAULT_SMOOTHING)
     ap.add_argument('--half', action='store_true', help='encoder in fp16 (.half())')
     ap.add_argument('--segments', choices=('auto', 'stream'), default='auto',
                     help='auto: E4 activity segments; stream: one segment always open (8 s cap)')
@@ -382,8 +381,6 @@ def parse_args(argv=None):
     ap.add_argument('--log', default=None, help='JSONL of per-tick timings')
     ap.add_argument('--quiet', action='store_true')
     ap.add_argument('--no-emotion', action='store_true', help='publish neutral instead of running E5')
-    ap.add_argument('--emotion-classifier', action='store_true',
-                    help='E5 experiment beyond the repo spec: add the EmotiEffLib classifier to the blendshape tagger')
     ap.add_argument('--no-face', action='store_true', help='no cam.face (the dashboard\'s face mesh, ~12.5 Hz)')
     ap.add_argument('--no-pose', action='store_true',
                     help='no head pose in cam.face (+0.02 ms/frame at 1280x720 on the dev box, so on by default)')
@@ -431,12 +428,10 @@ def main(argv=None):
                 final.beam.model = model
                 log.info('final pass ready (beam 5 + LM, background process)')
         source = make_source(args)
-        cropper = LiveCropper(os.path.join(lipread.LIPFLOW_MODELS, 'face_landmarker.task'), pose=not args.no_pose,
-                              **SMOOTHING[args.smooth])
+        cropper = LiveCropper(os.path.join(lipread.LIPFLOW_MODELS, 'face_landmarker.task'), pose=not args.no_pose)
         segmenter = Segmenter() if args.segments == 'auto' else Segmenter.stream()
         if not args.no_emotion:
-            from lipread.emotion_net import EmotionWorker
-            emotion = EmotionWorker(classifier=args.emotion_classifier)
+            emotion = EmotionWorker()
         runner = Runner(model, pub.send, segmenter, emotion.current if emotion else None, tick_ms=args.tick_ms,
                         final=final, fe_cache=not args.no_fe_cache)
         q = queue.Queue()
@@ -475,8 +470,6 @@ def main(argv=None):
             if th.is_alive():
                 log.error('crop thread still running after %.0f s (source stuck?): exiting without closing it', JOIN_S)
                 code = code or 1
-        if emotion:
-            emotion.close()
         if final is not None:
             final.close(timeout=3.0)
             log.info('final pass: %d beams, %d dropped, %d errors', len(final.stats), len(final.dropped),
