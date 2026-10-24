@@ -58,7 +58,7 @@ You can feel it with two fingers under your chin while saying "ta ta ta", then "
 
 ![Wiring: the Uno's 5V and GND go to the breadboard's left + and − columns, each BioAmp takes VCC and GND from those columns, and each OUT goes to its own analog pin](images/wiring.png)
 
-The diagram shows the 4 core boards, and the 2 extras wire the same way, with OUT to A4 and A5.
+The diagram shows all 6 boards, with A4 and A5 as the 2 extras.
 Only the breadboard's left + and − columns are used, and each column is one connected strip, so any hole in it works.
 
 | From | To | Wire |
