@@ -29,7 +29,7 @@ venv-live/bin/python -m bus.stub                                  # fake cam.tic
 venv-live/bin/python -m lipread.bench.tick_bench                  # tick p50/p95 at 2/4/8 s, fp32 vs fp16
 ```
 
-Useful flags: `--size 1920x1080` (camera capture, default), `--process-size 1280x720` (frames shrunk before MediaPipe, default), `--half` (fp16 encoder, parity-checked), `--no-fe-cache`, `--no-emotion`, `--no-final`, `--segments stream`, `--tick-ms 200`, `--log ticks.jsonl`.
+Useful flags: `--size 1920x1080` (camera capture, default), `--process-size 1280x720` (frames shrunk before MediaPipe, default), `--fp32` (encoder in fp32; fp16 is the default, parity-checked), `--no-fe-cache`, `--no-emotion`, `--no-final`, `--segments stream`, `--tick-ms 200`, `--log ticks.jsonl`.
 
 ## Files
 
