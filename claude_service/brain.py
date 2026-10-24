@@ -8,17 +8,11 @@ predictions always, repairs only when words are under review.
 Code, not Claude, enforces the guard rails: an edit must swap one word for one of the alternatives the
 decoder sent, so Claude can never add, drop or reword anything.
 
-Warnings for whoever changes the call in ask():
-- Thinking can't be turned off on claude-opus-5-5: thinking={"type": "disabled"} is a 400 at every effort.
-  Effort is the only knob. Garbled lip-reading input ("Is a corn") makes it think longer, so keep MAX_TOKENS
-  well above the answer size, or the budget goes to thinking and the reply has no text.
-- Never trust a reply without stop_reason == "end_turn" and a text block. Read text blocks only, since
-  content[0] can be a thinking block. On anything else, publish nothing and log it.
-- No temperature, top_p, top_k (400 since 2026-10-21) and no assistant prefill (400). Shape output with the schema.
-- Editing or trimming earlier turns (the MAX_MESSAGES drop) costs the cache and can 400 on replayed thinking
-  blocks (preserved thinking). Append only. The claude-api skill's model-migration guide has the rules.
-- On a refusal the fallback model gets the turn without Opus 5.5's earlier thinking blocks (it can't read them).
-- Each teammate should call with their own API key, so one key can be revoked or capped alone.
+Warnings for whoever changes ask():
+- Thinking can't be turned off on claude-opus-5-5 ({"type": "disabled"} is a 400). Keep MAX_TOKENS big, or
+  garbled input spends it all on thinking and the reply has no text.
+- Publish only when stop_reason == "end_turn" and there is a text block. content[0] may be thinking.
+- Append only: trimming old turns misses the cache and can 400 on replayed thinking blocks.
 """
 import json
 import time
