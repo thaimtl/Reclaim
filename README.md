@@ -1,7 +1,7 @@
 # Reclaim
 
 Silent speech for people who lost their voice box.
-You mouth the words, and Reclaim says them out loud in your own voice.
+You mouth the words, and Reclaim says them out loud in your own voice, while you are still mouthing.
 
 Built at Cal Hacks 13.0, October 23 to 25, 2026.
 
@@ -11,82 +11,71 @@ A laryngectomy removes the voice box, usually after throat cancer.
 People can still move their lips, tongue, and jaw, so the words are there without the sound.
 Most rely on an electrolarynx, a handheld buzzer that sounds robotic and needs a free hand.
 
-## Two modes
+Our demo speaker is Austin, who is healthy; no patients take part in the demo.
 
-| | Free speech | Quick phrases |
-|---|---|---|
-| Priority | Main goal | Stretch goal |
-| You do | Mouth any sentence | Mouth one of 10 set phrases |
-| Sensor | Webcam | 6 face electrode channels, no camera |
-| Reads it | Auto-AVSR lip reading, then Claude fixes mistakes | Our classifier, then Jev picks using the conversation |
-| Voice | Cartesia, live in a cloned voice | 10 pre-made Cartesia clips |
+## How it works
 
-### Free speech
+One mode: open mouth, no sound, real time.
+Three readers work together, because each sees what the others can't.
 
 ```mermaid
 flowchart LR
-    W[Webcam] -->|lip video| AV[Auto-AVSR<br/>lip reading]
-    AV -->|live captions| D[Dashboard]
-    AV -->|rough text| CL[Claude<br/>fixes mistakes]
-    CL -->|clean sentence| OK{Speaker<br/>confirms}
-    OK --> V[Cartesia<br/>cloned voice]
-    V --> S[Speaker]
+    W[Webcam] --> AV[Camera reader<br/>Auto-AVSR]
+    P[6 EMG pads] --> E[EMG reader<br/>SVR-1]
+    AV --> D[Fusion decoder]
+    E --> D
+    M[Partner's mic] --> I[Cartesia Ink]
+    I --> C[Claude<br/>whole conversation]
+    C <--> D
+    D --> CAP[Live captions<br/>both speakers]
+    I --> CAP
+    D --> V[Cartesia Sonic<br/>cloned voice + emotion]
 ```
 
-Claude only swaps words that look alike on the lips or don't fit the conversation, and never adds new ideas.
-If it isn't sure, the screen says "Please repeat" instead of guessing.
+- The camera reads the lips and does most of the work. It also reads the facial expression, which sets the voice's emotion.
+- The EMG model reads the face muscles, so it sees the tongue and jaw that no camera can. It settles words that look alike on the lips ("bat", "mat", "pat"), proposes its own guesses, and keeps going when the face is hard to see.
+- Claude follows the whole conversation, both sides. It predicts likely words, and it repairs look-alike mistakes ("bills" → "pills" after a question about medicine). It only swaps look-alike words, never adds ideas, and says "Please repeat" when it isn't sure.
+- Cartesia speaks each word in Austin's cloned voice about a second after he mouths it, without waiting for the end of the sentence.
+- A deliberate jaw clench stops the voice instantly, so the speaker stays in control.
 
-### Quick phrases
-
-```mermaid
-flowchart LR
-    P[6 pad pairs] --> A[6 BioAmp<br/>amplifiers]
-    A --> U[Arduino Uno]
-    U --> C[Classifier<br/>top 3 phrases]
-    C --> J{Jev<br/>context check}
-    J -->|confident| V[Pre-made clip]
-    J -.->|unsure| R[Please repeat]
-```
-
-Picking 1 of 10 phrases is far easier than reading any sentence, and it works in the dark or with the face turned away.
+Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Plan and owners: [docs/PLAN.md](docs/PLAN.md). What changed and why: [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## What we demo
 
 Two minutes, live, at our table.
 
-1. **Free speech.**
-   The partner asks "What do you need?", and Austin mouths an answer at the webcam.
-   Captions appear as he mouths, Claude fixes a look-alike word like "bills" to "pills", and the sentence plays in Austin's cloned voice.
-2. **Quick phrases, camera off.**
-   The partner asks "Want some water?", and Austin mouths "I'm thirsty".
-   The muscle signals jump on screen, the classifier shows its top 3, Jev picks "I'm thirsty" from the question, and the clip plays.
-3. **The raw and fixed text side by side**, to show exactly what Claude changed.
+1. A judge asks Austin a question out loud; their words appear in the captions.
+2. Austin answers by mouthing. His words appear as he mouths and play in his cloned voice while he is still going.
+3. He smiles or looks surprised, and the voice's emotion follows.
+4. A look-alike word gets fixed live, and the screen shows what Claude changed and what the EMG settled.
+5. A jaw clench stops the voice mid-sentence.
 
 ## Stack
 
 | Part | Tool |
 |---|---|
-| Lip reading | [Auto-AVSR](https://github.com/mpc001/auto_avsr), on a laptop GPU |
-| Fixing mistakes | Claude |
-| Voice clone and speech | Cartesia Sonic, Instant Voice Clone |
-| Partner's speech to text | Cartesia Ink |
-| Phrase context | [Jev](https://typesafe.ai) |
+| Lip reading | [Auto-AVSR](https://github.com/mpc001/auto_avsr), as is, re-read every 200 ms for real time |
+| Face, mouth crop, expression | MediaPipe FaceLandmarker |
 | Muscle signals | BioAmp EXG Pill boards and an Arduino Uno, see [HARDWARE.md](HARDWARE.md) |
-| Classifier | PyTorch, pre-trained on Berkeley's silent speech data |
+| EMG model | SVR-1, ours: PyTorch, pre-trained on Berkeley's silent speech data, fine-tuned on Austin |
+| Context and repairs | Claude, through the Claude API |
+| Voice clone and speech | Cartesia Sonic 3.6, Instant Voice Clone |
+| Partner's speech to text | Cartesia Ink |
+| Compute | One laptop, RTX 5060 |
 
 ## Known limitations
 
 - This is a prototype, not a medical device.
-- Lip reading gets about 1 in 5 words wrong even on normal speaking video, and silent mouthing is harder.
-- Quick phrases is trained per person, from about 30 minutes of recordings.
-- Auto-AVSR reads a whole sentence at a time, so the voice waits until the speaker finishes.
-  Evan owns making it stream, so words come out while the speaker is still mouthing.
+- Lip reading gets about 1 in 5 words wrong even on normal speaking video, and silent mouthing is harder; the EMG model and Claude are there to close that gap.
+- The EMG model is trained for one person (Austin), from about 75 minutes of recordings.
+- The voice runs about a second behind the lips, so that words can settle and Claude can repair them before they are spoken.
 
 ## Built on
 
 - [Digital Voicing of Silent Speech](https://aclanthology.org/2020.emnlp-main.445.pdf), Gaddy and Klein, UC Berkeley, 2020, for the electrode sites and pre-training data.
 - [Auto-AVSR](https://github.com/mpc001/auto_avsr), Ma et al., 2023, for lip reading.
+- [Lipflow](https://github.com/amywork777/lipflow), MIT license, for live mouth cropping with MediaPipe.
 
 ## Team
 
-Thai (hardware), Austin (ML, and the speaker in the demo), Frank (voice AI), and Evan (app, dashboard, and streaming the lip reading).
+Thai (EMG hardware), Austin (EMG model and fusion, and the speaker in the demo), Frank (Cartesia voice), and Evan (real-time lip reading and facial emotion).

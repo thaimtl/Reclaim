@@ -6,8 +6,7 @@ The rig is a short chain, and each part does one job before passing its output o
 flowchart LR
     P[Pads on the face<br/>6 channels] -->|snap cables| A[6 BioAmp EXG Pill<br/>amplifiers]
     A -->|OUT to A0-A5| U[Arduino Uno]
-    U -->|USB| M[Thai's Mac<br/>on battery]
-    M -->|hotspot| L[Austin's laptop<br/>plugged in]
+    U -->|USB, through an isolator| L[Austin's laptop<br/>runs everything]
     W[Webcam and mic] --> L
     L -->|Bluetooth| S[Speaker]
 ```
@@ -20,12 +19,12 @@ flowchart LR
 | BioAmp EXG Pill, 6 boards | Boost each channel about 1,000x and cancel the hum shared by all pads |
 | Breadboard | Shares the Uno's 5V and ground with all 6 boards |
 | Arduino Uno | Reads each board 1,000 times a second and sends the numbers over USB |
-| Thai's Mac | Reads the Uno, filters out hum, and runs the quick phrases classifier |
-| Austin's laptop, RTX 5060 | Runs lip reading, Claude, Cartesia, and the dashboard |
+| USB isolator | Breaks the electrical path between the pads and the laptop's charger, see Safety |
+| Austin's laptop, RTX 5060 | Reads the Uno, and runs the EMG model, lip reading, the decoder, Claude, Cartesia, and the dashboard |
 | Webcam and mic | Film the lips, and hear the partner's question |
 | Bluetooth speaker | Plays the voice loud enough for a noisy room |
 
-The BioAmp is built for 5V boards like the Uno, so its output plugs straight in, and the Uno runs off the Mac's USB with no separate battery.
+The BioAmp is built for 5V boards like the Uno, so its output plugs straight in, and the Uno runs off the laptop's USB, through the isolator, with no separate battery.
 
 ## Pad sites
 
@@ -40,8 +39,8 @@ The 2 extras go on once the core 4 are clean, and they double as spares if a cor
 | A1 | 2 | Left corner of the chin | Lower lip and jaw |
 | A2 | 6 | Right cheek, just below the mouth | Lower lip |
 | A3 | 1 | Left cheek, just above the mouth | Upper lip |
-| A4 | 5 | Right side of the jaw, midway | Jaw, extra |
-| A5 | 8 | Back of the right cheek, 4 cm in front of the ear | Back of the cheek, extra |
+| A4 | 5 | Right side of the jaw, midway | Jaw, and the jaw-clench cancel gesture |
+| A5 | 8 | Back of the right cheek, 4 cm in front of the ear | The chewing muscle, and the jaw-clench cancel gesture |
 
 The chin channel matters most.
 The muscles that move the tongue sit just above the skin under the chin, so the pad reads the tongue, which no camera can see.
@@ -69,7 +68,7 @@ Only the breadboard's left + and − columns are used, and each column is one co
 | Each board's GND | Breadboard − column | Male-to-female jumper |
 | Each board's OUT | Its pin, A0 to A5 | Male-to-female jumper |
 | Each board's JST connector | Its electrode cable | Cable from the kit |
-| Uno USB | Thai's Mac | USB-C to USB-B cable |
+| Uno USB | USB isolator, then Austin's laptop | USB-B cable to the isolator, isolator to the laptop |
 
 Check VCC and GND before powering on, since swapping them destroys a board.
 Keep the jumpers short, since longer wires pick up more hum.
@@ -81,11 +80,16 @@ That's 6,000 readings a second, too much for plain text at 115200 baud, so it se
 
 ## Safety
 
-- The pads connect Austin's face to Thai's Mac through the Uno, so that Mac stays off its charger whenever pads are on skin.
-  To charge it with the pads on, unplug the Uno first.
-  The [BioAmp docs](https://docs.upsidedownlabs.tech/hardware/bioamp/bioamp-exg-pill/index.html) also warn that a charger adds noise.
-- Austin's laptop never touches the rig, so it can charge.
-- The two laptops talk over a phone hotspot, never a cable, since a cable would connect the charging laptop to the pads.
+Everything now runs on Austin's laptop, so the pads connect to the same laptop that charges and drives the GPU.
+A charger ties the laptop to mains ground, and without care that path runs through the USB cable to the pads on Austin's face.
+
+- **Default: a galvanically isolated USB link** between the Uno and the laptop (a USB 2.0 full-speed isolator, which the Uno's USB supports).
+  With the isolator in line, the laptop can stay on its charger, so the GPU runs at full power.
+- **Fallback if there is no isolator:** the laptop runs on battery whenever pads are on skin.
+  Unplug the Uno before plugging in the charger.
+  The GPU slows down on battery, so measure the latency in that state too.
+- **Never** a charging laptop with the Uno connected directly, without an isolator.
+- The [BioAmp docs](https://docs.upsidedownlabs.tech/hardware/bioamp/bioamp-exg-pill/index.html) also warn that a charger adds noise; the isolator helps with that too.
 - Voices are only cloned with the person's permission.
 - This is a prototype, not a medical device.
 
