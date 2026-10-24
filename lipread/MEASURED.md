@@ -209,3 +209,24 @@ Findings:
 - `lipread.run` now runs the encoder in fp16 (`.half()`) by default, `--fp32` for the old path: the team chose fp16
   for the 8 GB laptop (peak 966 vs 1310 MiB in `tick_bench` above) and its parity is checked (51/51 greedy
   identical). Costs on the 5090: paced p95 22.9 vs 17.2 ms and a longer warm-up (19.5 vs 3.8 s).
+
+### Face adapter (Lipflow speaker adaptation) on Austin's session 1, 2026-10-24 (5090 dev box)
+
+- `lipread/adapt.py` = `lipflow/train_vsr.py` (scope frontend + embed + Conformer block 0, 6 epochs, lr 1e-4, its
+  augmentation), crops made as live (1080p -> 720p -> LiveCropper). Held-out test: every 5th of the 250 sentence
+  clips (50: 5 slow, 35 natural, 10 fast), trained on the other 200; nothing tuned on the test clips. Training 92 s.
+- `python -m lipread.adapt --sessions session_01 --test-every 5` (repo script):
+
+  | 50 held-out clips | Base | Face adapter |
+  | --- | --- | --- |
+  | Tick reading (greedy CTC) WER | 0.298 (9 exact) | **0.170** (23 exact) |
+  | Final pass (beam 5 + LM) WER | 0.215 (21 exact) | **0.154** (30 exact) |
+
+  A first run of the same recipe (scratchpad script): tick 0.186 (fast 0.188), final 0.151 (fast 0.174, base fast
+  0.203); 10 test sentences fixed by the final pass, 2 broken ("APPLES AND NUTS" -> "AT NIGHT", "TOMORROW" -> "TO
+  MORROW").
+- Cost: none per read. 162 tensors (25.8 M params, 98 MB); ticks 100 ms apart on real crops, read p50 13.27 ms base
+  vs 13.38 / 13.71 ms adapted (two runs; noise), per-stage front end / Conformer / CTC unchanged; load at start
+  29 ms. The final pass is unchanged (it reuses the tick's encoder output).
+- Caveats: train and test are the same session (same day, light, pads), and test sentences share words with the
+  training ones, so this is optimistic. Check on session 2; never train on session 3.

@@ -4,6 +4,7 @@
     r = model.read(rois)                   # rois (T, 96, 96) uint8 crops at 25 fps -> Reading
     r.topk_ids (T, 32) int32, r.topk_logp (T, 32) float32, r.blank_logp (T,), r.greedy 'UPPERCASE TEXT', r.enc_ms ...
     r = model.read(rois, keep_enc=True)    # also r.enc, the (T, D) encoder output on the GPU (the final pass reuses it)
+    model = LiveModel(face_adapter=path)   # with Austin's face adapter on top (lipread/adapt.py)
 
 The encoder (3D-conv/ResNet front end + 12 Conformer blocks) runs on the whole segment every call (r.frontend_ms +
 r.conformer_ms = r.enc_ms, split with CUDA events); the CTC head
@@ -52,10 +53,30 @@ class FrontendCache:
         self.n_final = 0
 
 
+FACE_ADAPTER_PREFIXES = ('encoder.frontend.', 'encoder.embed.', 'encoder.encoders.0.')
+
+
+def load_face_adapter(model, path):
+    """Lipflow's face adapter (lipread/adapt.py, as lipflow/train_vsr.py): new values for the front end, the embed and
+    Conformer block 0, loaded over the base weights. Same shapes, so a read costs the same. Returns the tensor count;
+    ValueError for a file with any other tensor, which would silently change the rest of the model."""
+    state = torch.load(path, map_location='cpu', weights_only=True)
+    other = sorted(k for k in state if not k.startswith(FACE_ADAPTER_PREFIXES))
+    if other:
+        raise ValueError(f'{path}: not a face adapter, {len(other)} other tensors (first: {other[0]})')
+    res = model.load_state_dict(state, strict=False)
+    if res.unexpected_keys:
+        raise ValueError(f'{path}: tensors the model does not have: {res.unexpected_keys[:3]}')
+    return len(state)
+
+
 class LiveModel:
-    def __init__(self, half=False, device='cuda', warmup=range(1, 201), cudnn_benchmark=False):
+    def __init__(self, half=False, device='cuda', warmup=range(1, 201), cudnn_benchmark=False, face_adapter=None):
         from lipflow.vsr import LipReader
         self.reader = LipReader(device=device, use_lm=False, personal=False)
+        self.face_adapter = face_adapter
+        if face_adapter:
+            load_face_adapter(self.reader.model, face_adapter)
         self.device = self.reader.enc_device
         self.encoder = self.reader.model.encoder
         self.ctc = self.reader.model.ctc
