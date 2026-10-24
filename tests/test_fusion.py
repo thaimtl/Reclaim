@@ -487,3 +487,112 @@ def test_bus_round_trip():
         for s in (cam, claude, dec_pub, sub, listen):
             s.close()
         ctx.term()
+
+
+# --- review regressions ----------------------------------------------------------------------------------------
+
+def at(spec, T):
+    """Frames with a piece (id, p) at the given frame indices, blank elsewhere."""
+    out = [None] * T
+    for f, piece in spec:
+        out[f] = piece
+    return out
+
+
+def pump_until(dec, now, until, dt=0.1):
+    out = []
+    while now < until:
+        out += dec.pump(now)
+        now += dt
+    return out, now
+
+
+def test_swapped_last_word_reread_a_frame_later_is_not_locked_twice():
+    dec = Decoder(U, lookalikes=LookAlikes(BAT_MAT, {}))
+    dec.on_predict({'words': [{'w': 'mat', 'weight': 0.9}], 'phrases': [], 'predictability': 0.5, 'ttl_s': 30}, 0.0)
+    out, now = [], 0.1
+    for T in (18, 20, 22):                                    # camera 'bat', Claude makes it 'mat', it locks
+        out += dec.on_tick(tick(1, at([(10, (7, 0.95))], T)), now) + dec.pump(now)
+        now += 0.1
+    for T in (24, 26, 30, 34):                                # the re-read moves 'bat' one frame later
+        out += dec.on_tick(tick(1, at([(11, (7, 0.95)), (20, (14, 0.95))], T)), now) + dec.pump(now)
+        now += 0.1
+    out += pump_until(dec, now, now + 1.0)[0]
+    assert [w['w'] for t, m in out if t == 'dec.lock' for w in m['words']] == ['mat', 'now']
+    assert [w for t, m in out if t == 'voice.say' for w in m['words']] == ['mat', 'now']
+
+
+def test_voice_speaks_sentences_in_order():
+    dec = Decoder(U)
+    out, now = [], 0.0
+    for T in (14, 16, 18, 20):                                # 'i' sure, 'want' unsure: waits for cam.final
+        out += dec.on_tick(tick(1, at([(3, (2, 0.95)), (9, (3, 0.6))], T)), now) + dec.pump(now)
+        now += 0.1
+    o, now = pump_until(dec, now, now + 0.6)
+    out += o
+    for T in (12, 14, 16, 18):                                # the next sentence starts and locks 'there'
+        out += dec.on_tick(tick(2, at([(3, (13, 0.95))], T), t0=102.0), now) + dec.pump(now)
+        now += 0.1
+    out += dec.on_final({'seg_id': 1, 'nbest': [{'text': 'I WANT', 'score': 0.0}]}, now)
+    out += pump_until(dec, now, now + 4.0)[0]
+    said = [(m['utt_id'], m['words'], m['final']) for t, m in out if t == 'voice.say']
+    assert said == [(1, ['i'], False), (1, ['want'], True), (2, ['there'], True)]    # 'there' waited for sentence 1
+
+
+def test_camera_restart_reusing_seg_ids_starts_new_sentences():
+    dec = Decoder(U)
+    fr = frames_for([(2, 0.95)])
+    out, now = feed(dec, fr, [len(fr)] * 3, quiet_tail=12)
+    out += pump_until(dec, now, now + 4.0)[0]
+    assert dec.utts[1].state == 'done'
+    out2, now = feed(dec, frames_for([(10, 0.95)]), [len(fr)] * 3, now=now + 4.0, t0=150.0, quiet_tail=12)
+    out2 += pump_until(dec, now, now + 4.0)[0]
+    assert [(m['utt_id'], m['words']) for t, m in out2 if t == 'voice.say' and m['words']] == [(2, ['yes'])]
+
+
+def test_ticks_resuming_after_a_settled_stall_go_on_as_a_new_utterance():
+    dec = Decoder(U)
+    fr = frames_for([(2, 0.95), (3, 0.95)])
+    first = fr[:12]                                           # 'i' only, then the camera stalls
+    out, now = feed(dec, first, [len(first)] * 3)
+    o, now = pump_until(dec, now, now + 4.5)
+    out += o
+    assert dec.utts[1].state == 'done'
+    o, now = feed(dec, fr, [len(fr)] * 3, now=now, quiet_tail=12)   # same segment, now with 'want'
+    out += o + pump_until(dec, now, now + 4.0)[0]
+    said = [w for t, m in out if t == 'voice.say' for w in m['words']]
+    assert said == ['i', 'want']
+
+
+def test_nbest_text_change_drops_the_old_texts_claude_weight():
+    from fusion.decoder import apply_nbest
+    w = Word(w='mat', f0=0, f1=1, t0=0.0, t1=0.04, cam=0.6, alts=[('bat', 0.6)], claude=0.9, source='claude')
+    apply_nbest([w], [w], [{'text': 'BAT', 'score': 0.0}])
+    assert (w.w, w.claude, w.source) == ('bat', 0.0, 'camera')
+
+
+def test_serve_survives_an_unsendable_message():
+    class OddDecoder:
+        def on_tick(self, msg, now):
+            return [('dec.hyp', {'bad': object()}), ('dec.hyp', {'ok': 1})]
+
+        def pump(self, now):
+            return []
+
+    class OneTick:
+        msgs = [('cam.tick', {'seg_id': [1]})]                 # unhashable seg_id too
+
+        def recv(self, timeout_ms=None):
+            return self.msgs.pop() if self.msgs else (None, None)
+
+    sent = []
+
+    class Pub:
+        def send(self, topic, msg):
+            from bus.team import encode
+            encode(topic, msg)
+            sent.append(topic)
+
+    n = iter(range(3))
+    serve(OddDecoder(), OneTick(), Pub(), lambda: next(n, None) is None)
+    assert 'dec.hyp' in sent and 'timing.dec' in sent

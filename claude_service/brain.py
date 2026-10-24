@@ -16,6 +16,9 @@ FALLBACK_BETA = "server-side-fallback-2026-07-01"
 MAX_TOKENS = 4000
 PREDICT_EVERY_S = 2.0  # while Austin is mouthing
 PREDICT_TTL_S = 4.0
+MAX_UTTS = 8           # utterances kept for late locks and reviews
+MAX_MESSAGES = 400     # history bound: at this many turns, drop to the newest KEEP_MESSAGES
+KEEP_MESSAGES = 200
 
 SYSTEM = """You are the conversation model inside Reclaim, a silent-speech system for people who lost their voice box. \
 Austin is on a phone call with a judge. The judge speaks normally; their words reach you as text from a speech \
@@ -91,15 +94,32 @@ def _norm(w):
     return str(w).strip().lower()
 
 
+def _num(x):
+    return float(x) if isinstance(x, (int, float)) and not isinstance(x, bool) else None
+
+
+def _word(w):
+    """A dec.lock word, cleaned; (word, ok). A malformed one keeps its slot so indices stay the decoder's."""
+    if isinstance(w, str):
+        w = {"w": w}
+    if not isinstance(w, dict) or not isinstance(w.get("w"), str) or not _norm(w["w"]):
+        return {"w": "?", "alts": []}, False
+    alts = w.get("alts")
+    return {"w": w["w"], "alts": [a for a in alts if isinstance(a, str)] if isinstance(alts, list) else [],
+            "conf": _num(w.get("conf")), "cam": _num(w.get("cam")), "emg": _num(w.get("emg")), "t": _num(w.get("t"))}, True
+
+
 class Brain:
     def __init__(self, client):
         self.client = client
         self.messages = []    # the append-only conversation sent to Claude
         self.events = []      # judge lines not yet sent
-        self.utt_id = None    # Austin's current utterance
-        self.words = []       # its locked words: dicts from dec.lock, "w" updated by repairs
-        self.review = []      # indices locked since the last request
-        self.dirty = False    # the current utterance changed since the last request
+        self.utt_id = None    # Austin's newest utterance
+        self.utts = {}        # utt_id -> its locked words (dicts from dec.lock, "w" updated by repairs), last MAX_UTTS
+        self.gone = set()     # utt_ids dropped from utts: their late locks are ignored, not restarted at index 0
+        self.review = {}      # utt_id -> its indices locked since they were last sent
+        self.unlocked = []    # dec.hyp's unlocked words, last seen
+        self.fresh = False    # unlocked words changed since the last request
         self.last_request = -1e9
 
     def partner(self, msg):
@@ -107,37 +127,72 @@ class Brain:
             self.events.append(msg["text"].strip())
 
     def locked(self, msg):
-        if msg["utt_id"] != self.utt_id:
-            self.utt_id, self.words, self.review = msg["utt_id"], [], []
-        for w in msg["words"]:
-            self.review.append(len(self.words))
-            self.words.append(dict(w))
-        self.dirty = True
+        """Words are kept per utterance, so a late lock for the previous one lands at its own index.
+        Returns how many words were malformed (kept as placeholders, never reviewed)."""
+        utt, words = msg["utt_id"], msg["words"]
+        if not isinstance(words, list):
+            raise TypeError(f"words is {type(words).__name__}")
+        if utt in self.gone:
+            return 0
+        if utt not in self.utts:
+            self.utts[utt], self.utt_id = [], utt
+            while len(self.utts) > MAX_UTTS:
+                old = next(iter(self.utts))
+                del self.utts[old]
+                self.review.pop(old, None)
+                self.gone.add(old)
+        ws, bad = self.utts[utt], 0
+        for w in words:
+            w, ok = _word(w)
+            if ok:
+                self.review.setdefault(utt, []).append(len(ws))
+            bad += not ok
+            ws.append(w)
+        return bad
+
+    def hyp(self, msg):
+        unlocked = [_norm(w) for w in msg.get("unlocked") or [] if isinstance(w, str)]
+        if unlocked and unlocked != self.unlocked:
+            self.fresh = True
+        self.unlocked = unlocked
 
     def due(self, now, mouthing):
-        return bool(self.events or self.review) or (mouthing and now - self.last_request >= PREDICT_EVERY_S)
+        # While mouthing, only when the unlocked words moved, at most every PREDICT_EVERY_S: no "nothing new" calls.
+        return bool(self.events or self.review) or (mouthing and self.fresh and now - self.last_request >= PREDICT_EVERY_S)
 
     def next_request(self, now):
-        """Append the next user message; return what it puts under review (the utterance may move on mid-call)."""
+        """Append the next user message; return what it puts under review (the utterance may move on mid-call).
+        One utterance is reviewed per call, the oldest first; the others stay due for the next one."""
+        if len(self.messages) >= MAX_MESSAGES:
+            # Trim in one big step, starting on a user turn, so the cached prefix stays append-only between trims
+            # and the cache is rebuilt once every ~KEEP_MESSAGES / 2 calls, not every call.
+            m = self.messages[-KEEP_MESSAGES:]
+            while m and m[0]["role"] != "user":
+                m = m[1:]
+            self.messages = m
         parts = []
         if self.events:
             parts.append("\n".join(f"Judge: {t}" for t in self.events))
-        if self.words and (self.dirty or self.review):
-            lines = [f"{i} {w['w']}" for i, w in enumerate(self.words)]
-            parts.append(f"Austin, utterance {self.utt_id}, locked so far:\n" + "\n".join(lines))
-        if self.review:
+        utt = next((u for u in self.utts if u in self.review), None)
+        review = self.review.pop(utt, []) if utt is not None else []
+        words = self.utts.get(utt, [])
+        if review:
+            lines = [f"{i} {w['w']}" for i, w in enumerate(words)]
+            parts.append(f"Austin, utterance {utt}, locked so far:\n" + "\n".join(lines))
             lines = []
-            for i in self.review:
-                w = self.words[i]
-                alts = ", ".join(str(a) for a in w.get("alts", [])) or "none"
-                lines.append(f"{i} {w['w']} conf={_score(w.get('conf'))} cam={_score(w.get('cam'))} "
-                             f"emg={_score(w.get('emg'))} alts: {alts}")
+            for i in review:
+                w = words[i]
+                alts = ", ".join(w["alts"]) or "none"
+                lines.append(f"{i} {w['w']} conf={_score(w['conf'])} cam={_score(w['cam'])} "
+                             f"emg={_score(w['emg'])} alts: {alts}")
             parts.append("Review:\n" + "\n".join(lines))
+        if self.fresh and self.unlocked:
+            parts.append("Austin is mouthing, not locked yet (may change): " + " ".join(self.unlocked))
         if not parts:
             parts.append("Austin is still mouthing; nothing new has locked.")
         self.messages.append({"role": "user", "content": "\n\n".join(parts)})
-        target = {"utt_id": self.utt_id, "words": self.words, "review": self.review}
-        self.events, self.review, self.dirty = [], [], False
+        target = {"utt_id": utt, "words": words, "review": review}
+        self.events, self.fresh = [], False
         self.last_request = now
         return target
 
@@ -167,8 +222,13 @@ class Brain:
                    input_tokens=getattr(usage, "input_tokens", None),
                    cache_read=getattr(usage, "cache_read_input_tokens", None) or 0,
                    output_tokens=getattr(usage, "output_tokens", None))
-        self.messages.append({"role": "assistant", "content": r.content})
-        text = next((b.text for b in r.content if b.type == "text"), None)
+        content = [b for b in r.content or [] if not (b.type == "text" and not b.text)]
+        if r.stop_reason == "refusal":
+            # Drop the turn that was refused, so it does not refuse again; the prefix before it stays cached.
+            self.messages.pop()
+        elif content:  # an empty assistant turn would make every later request 400; the user turn merges instead
+            self.messages.append({"role": "assistant", "content": content})
+        text = next((b.text for b in content if b.type == "text"), None)
         log["reply"] = text
         if r.stop_reason != "end_turn" or text is None:
             return None, log

@@ -46,3 +46,14 @@ def test_leak_follows_a_slow_uno():
     last = out[-1]
     true_t0 = last['counter'] * 1.003e-3
     assert abs(last['t0'] - true_t0) < 0.005  # without the leak this would be 30 ms off after 10 s
+
+
+def test_a_gap_past_the_counter_wrap_is_recovered_from_the_clock():
+    # 140 frames lost: the 7-bit counter shows 12. The next chunk arrives 140 ms later than the count allows.
+    out = list(batches([chunk(0.0095, 0, 10), chunk(0.0195, 10, 10), chunk(0.1695, 160, 10, dropped=12)]))
+    assert out[-1]['counter'] == 160 and abs(out[-1]['t0'] - 0.160) < 2e-3
+
+
+def test_a_late_read_without_a_reported_gap_invents_nothing():
+    out = list(batches([chunk(0.0095, 0, 10), chunk(0.0995, 10, 10)]))   # 80 ms late, nothing lost
+    assert out[-1]['counter'] == 10

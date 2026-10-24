@@ -13,6 +13,12 @@ Timestamps come from the sample clock, not from when a read returned: USB hands 
 ms late, so each sample's time is offset + index / fs, with offset the lower envelope of t_read - index / fs
 (the read with the least delay). The envelope rises by LEAK s per s, so it follows the Uno's resonator if that
 runs slow (up to 0.5%); if it runs fast the envelope follows on its own.
+
+The Uno's frame counter is 7 bits, so rig/reader.py sees a gap of 128 frames or more as 128 fewer. The sample clock
+catches it: when a chunk that starts after a reported gap lands WRAP / 2 or more samples later than the counted index
+allows, the missing multiples of WRAP are added to the lost count (USB delays are a few ms, far below 64). Only after
+a reported gap, so a read that is merely late (the laptop stalled, nothing lost) never invents samples; a gap of
+exactly a multiple of 128 frames stays unseen.
 """
 import argparse
 import signal
@@ -25,21 +31,29 @@ from bus.team import Pub
 FS = 1000       # rig/uno samples every 1000 us
 BATCH = 10      # samples per message: 10 ms at 1 kHz
 LEAK = 0.005    # s per s the clock offset may rise, covering a 0.5% slow resonator
+WRAP = 128      # rig/uno's frame counter wraps here
 
 
-def batches(chunks, fs=FS, size=BATCH, leak=LEAK):
+def batches(chunks, fs=FS, size=BATCH, leak=LEAK, wrap=WRAP):
     """(t_read, rows, dropped) chunks -> emg.raw messages of at most `size` consecutive samples. rows is n x 4,
     t_read bus.now() right after it was read, dropped the running total of frames lost so far."""
-    seen = lost = 0                    # samples received, frames lost: the next sample's index is seen + lost
+    seen = reported = wrapped = 0      # samples received, frames the reader counted lost, counter wraps it missed
     offset = t_prev = None
     buf, start = [], 0                 # samples waiting to go out, and the index of the first
     for t_read, rows, dropped in chunks:
         if not len(rows):
             continue
-        if dropped > lost and buf:     # a gap: what came before it goes out on its own
+        before = reported + wrapped
+        new_gap = dropped > reported
+        reported = max(reported, dropped)
+        if new_gap and offset is not None:   # the clock says more went missing than the counter could show
+            behind = (t_read - offset) * fs - (seen + reported + wrapped + len(rows) - 1)
+            if behind >= wrap / 2:
+                wrapped += wrap * int(round(behind / wrap))
+        lost = reported + wrapped      # the next sample's index is seen + lost
+        if lost > before and buf:      # a gap: what came before it goes out on its own
             yield _msg(offset, start, buf, fs)
             buf = []
-        lost = max(lost, dropped)
         first = seen + lost
         seen += len(rows)
         floor = t_read - (first + len(rows) - 1) / fs

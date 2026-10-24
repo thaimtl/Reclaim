@@ -20,7 +20,10 @@ import numpy as np
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 WORK = os.environ.get('RECLAIM_WORKDIR', ROOT)  # datasets, checkpoints, third_party: outside the repo
 UNITS = os.path.join(WORK, 'third_party', 'lipflow', 'lipflow', 'unigram5000_units.txt')
-SPM = os.path.join(WORK, 'third_party', 'auto_avsr', 'spm', 'unigram', 'unigram5000.model')
+# lipread/setup.sh puts the SentencePiece model with the LM; a full auto_avsr checkout has it under spm/
+_SPMS = [os.path.join(WORK, 'third_party', 'lipflow', 'models', 'lm', 'unigram5000.model'),
+         os.path.join(WORK, 'third_party', 'auto_avsr', 'spm', 'unigram', 'unigram5000.model')]
+SPM = next((p for p in _SPMS if os.path.exists(p)), _SPMS[0])
 
 BLANK = 0
 UNK = 1
@@ -52,6 +55,7 @@ class Word:
     lock_t: float = None    # decoder time it locked
     raw: str = None         # the text it locked with (before any Claude repair)
     spoken: str = None      # the text sent on voice.say, None until it leaves the repair window
+    cam_w: str = None       # the camera's own reading, before any EMG / Claude / n-best change (cut() matches on it)
 
     @property
     def mid(self):
@@ -138,7 +142,7 @@ def load_lookalikes(units, spm=SPM):
         from bench.lookalikes import Lexicon, load_cmudict
         pron, logfreq = load_cmudict(), load_word_logfreq(spm)
     except OSError as e:
-        print(f'fusion: no look-alikes ({e})', file=sys.stderr)
+        print(f'fusion: WARNING no lip look-alikes, so EMG settling and most Claude repairs are off ({e})', file=sys.stderr)
         return None
     vocab = {p[1:].lower() for p in units.values() if p.startswith(WORD_START) and p[1:].isalpha()}
     return LookAlikes(Lexicon(vocab, pron), logfreq)

@@ -63,6 +63,7 @@ ACT_QUIET = 0.12        # activity below this is still lips (live/endpoint.py ST
 QUIET_FRAMES = 5        # newest frames still, after a word's end: the lips paused (200 ms at 25 fps)
 END_QUIET_FRAMES = 10   # still frames that must end the newest read before a tick gap closes the utterance
 MATCH_TOL_S = 0.5       # a prefix word and a pass word only match if their middles are this close
+FRAME_TOL_S = 0.045     # a pass word starting within a frame of the prefix's end is a re-read of its last word
 NEAR_TIE = 0.15         # a CTC competitor this close to the greedy word's prob counts as camera-tied
 CLAUDE_SWAP_MARGIN = 0.3  # Claude's weight must favour the tied alternative by this much to swap
 NBEST_W = 0.7           # after cam.final, camera confidence = (1 - NBEST_W) * greedy + NBEST_W * n-best support
@@ -139,23 +140,34 @@ class Decoder:
         t_start = time.perf_counter()
         out, seg, frame_t = [], msg['seg_id'], msg['frame_t']
         utt = self.seg_utt.get(seg)
+        if utt is not None and float(frame_t[0]) > utt.last_frame_t + FRAME_TOL_S:
+            # this seg_id's frames start after its utterance ended: the camera restarted and counts from 1 again,
+            # so every old seg_id is dead (utterances stay, for late repairs)
+            if self.cur is not None and self.cur.state == 'open':
+                out += self._close(self.cur, now)
+            self.seg_utt, utt = {}, None
+        elif utt is not None and utt.state == 'done' and seg == utt.segs[-1] and len(frame_t) > utt.last_T:
+            # ticks stalled long enough to settle the sentence, but the segment goes on: the rest is a new
+            # utterance, which cuts out what the old one already has
+            utt = self._new_utt(seg, now, float(frame_t[0]), carry=self.utts[utt.utt_id].locked + utt.unlocked)
+            self.seg_utt[seg] = utt
         if utt is None:
             cur = self.cur
-            capped = cur is not None and cur.state == 'open' and seg > cur.segs[-1] \
+            capped = cur is not None and cur.state != 'done' and seg > cur.segs[-1] \
                 and cur.last_T >= CAP_T_MIN and frame_t[0] <= cur.last_frame_t
             if capped and cur.last_frame_t - cur.t0 < MAX_UTT_S:
                 self._cap(cur, seg, float(frame_t[0]))
                 utt = cur
             else:
-                carry = []
                 if capped:  # long enough: end the sentence here, keep the overlap only to cut it out
                     self._cap(cur, seg, float(frame_t[0]))
                     cur.segs.pop()
+                carry = []
+                if cur is not None and frame_t[0] <= cur.last_frame_t:  # overlaps it (a cap, or the pre-roll)
                     carry = [w for w in cur.locked + cur.unlocked if w.t1 >= frame_t[0] - MATCH_TOL_S]
                 if cur is not None and cur.state == 'open':
                     out += self._close(cur, now)
-                utt = self._new_utt(seg, now, float(frame_t[0]))
-                utt.carry = carry
+                utt = self._new_utt(seg, now, float(frame_t[0]), carry=carry)
             self.seg_utt[seg] = utt
         if seg != utt.segs[-1] or utt.state == 'done' or (len(frame_t) < utt.last_T):
             return out          # a late tick of a capped or settled segment, or an older read
@@ -167,7 +179,7 @@ class Decoder:
 
         words = extract_words(msg, self.units, self.lookalikes)
         for w in words:
-            w.seg_id = seg
+            w.seg_id, w.cam_w = seg, w.w
         utt.seg_words[seg] = words
         prefix = utt.carry + utt.locked + [w for w in utt.unlocked if w.frozen]
         tail = words[cut(prefix, words, float(frame_t[0])):]
@@ -186,8 +198,9 @@ class Decoder:
                                    'utt_id': utt.utt_id, 'seg_id': seg, 'T': len(frame_t), 'n_words': len(words)}))
         return out
 
-    def _new_utt(self, seg, now, t0):
+    def _new_utt(self, seg, now, t0, carry=()):
         utt = Utt(self.next_id, seg, now, t0)
+        utt.carry = list(carry)
         self.next_id += 1
         self.utts[utt.utt_id] = utt
         self.cur = utt
@@ -292,6 +305,10 @@ class Decoder:
         """The n-best settles unlocked words; any still below threshold is not guessed."""
         for seg, nbest in utt.nbest.items():
             apply_nbest(utt.seg_words.get(seg, []), [w for w in utt.unlocked if w.seg_id == seg], nbest)
+        if self.emg is not None:
+            for w in utt.unlocked:
+                if w.emg is None:  # the n-best changed its text (or EMG had no say yet): score it now if it can
+                    w.emg = self.emg.support(w, now)
         out = self._lock_run(utt, now, ended=True)
         utt.state = 'done'
         utt.seg_words, utt.nbest, utt.carry = {}, {}, []   # only needed until now
@@ -341,15 +358,22 @@ class Decoder:
         return out
 
     def pump(self, now):
-        """Called every loop: close quiet utterances, time out cam.final, release words from the repair window."""
-        out = []
-        for utt in list(self.utts.values()):
+        """Called every loop: close quiet utterances, time out cam.final, release words from the repair window.
+
+        The voice speaks sentences in order: an utterance's words wait until every earlier one has sent its final
+        (the judge would otherwise hear the next sentence before the last word of this one, which can still lock
+        from cam.final). That holds a new sentence at most FINAL_WAIT_S after the previous one closed."""
+        out, earlier_done = [], True
+        for utt_id in sorted(self.utts):
+            utt = self.utts[utt_id]
             gap = now - utt.last_tick
             if utt.state == 'open' and (gap >= STALL_S or (gap >= END_GAP_S and utt.tail_quiet)):
                 out += self._close(utt, now)
             if utt.state == 'closing' and now - utt.closed_t >= FINAL_WAIT_S:
                 out += self._settle(utt, now)
-            out += self._release(utt, now)
+            if earlier_done:
+                out += self._release(utt, now)
+            earlier_done = earlier_done and utt.final_sent
         return out
 
     def _release(self, utt, now):
@@ -378,13 +402,14 @@ def cut(prefix, words, seg_start):
         return 0
     k = 0
     near = [p for p in prefix if p.t1 >= seg_start - MATCH_TOL_S]
-    sm = difflib.SequenceMatcher(a=[p.w for p in near], b=[w.w for w in words], autojunk=False)
+    # match on what the camera read: a locked word Claude or EMG changed ('bat' -> 'mat') is still read as 'bat'
+    sm = difflib.SequenceMatcher(a=[p.cam_w or p.w for p in near], b=[w.w for w in words], autojunk=False)
     for a, b, n in sm.get_matching_blocks():
         for i, j in zip(range(a, a + n), range(b, b + n)):
             if abs(near[i].mid - words[j].mid) <= MATCH_TOL_S:
                 k = max(k, j + 1)
     end = prefix[-1].t1
-    while k < len(words) and words[k].mid <= end:
+    while k < len(words) and (words[k].mid <= end or words[k].t0 <= end + FRAME_TOL_S):
         k += 1
     return k
 
@@ -426,6 +451,7 @@ def apply_nbest(seg_words, targets, nbest):
         best = max(v, key=v.get) if v else w.w
         if v.get(best, 0.0) > v.get(w.w, 0.0):
             w.alts = [x for x in w.alts if x[0] != best] + [(w.w, w.cam)]
-            w.w = best
+            # the old text's Claude weight and EMG support don't carry over (the decoder rescores the new text)
+            w.w, w.claude, w.emg, w.source = best, 0.0, None, 'camera'
         w.nbest = v.get(w.w, 0.0)
         w.cam = (1 - NBEST_W) * w.cam + NBEST_W * w.nbest

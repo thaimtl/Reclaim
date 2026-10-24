@@ -96,7 +96,7 @@ Each quotes the spec where it decides, and proposes where it is silent. Proposal
    regenerates every pass's ingredients, so the logger only needs the inputs (`cam.*`, `emg.raw`, `partner.text`)
    and the prompt shown. The recorder stores each clip's video with per-frame `bus.now()` (`time.perf_counter()`) stamps
    (`recorder/README.md`), and the camera reader already replays a recorded clip on its own clock
-   (`live/run.py --replay`, `live/source.py:resolve_recording`) [code]. So a session becomes training data by
+   (`lipread.run --replay CLIP --recorder-clock`, which keeps the recording's capture times) [code]. So a session becomes training data by
    running the camera reader over each clip into the logger, then replaying that log through the decoder and
    scoring `dec.lock` against the manifest's prompt (`fusion/evaluate.py`).
 5. **Claude timing.** The spec: 0.3 s repair window; later repairs fix captions only. Claude Opus at low effort may

@@ -70,7 +70,11 @@ def serve(dec, sub, pub, stop=lambda: False, poll_ms=POLL_MS):
     bad_total = 0
     while not stop():
         bad = []
-        msgs = newest_ticks(drain(sub, poll_ms, bad))
+        msgs = drain(sub, poll_ms, bad)
+        try:
+            msgs = newest_ticks(msgs)
+        except Exception as e:  # a seg_id that can't be a key: go through them all, the decoder sorts it out
+            bad.append(f'newest_ticks: {type(e).__name__}: {e}')
         now = bus.now()
         out = []
         for topic, msg in msgs:
@@ -90,7 +94,11 @@ def serve(dec, sub, pub, stop=lambda: False, poll_ms=POLL_MS):
             out.append(('timing.dec', {'stage': 'dec.bad_msg', 'ms': 0.0, 'count': len(bad), 'total': bad_total,
                                        'errors': bad[:10]}))
         for topic, msg in out:
-            pub.send(topic, msg)
+            try:
+                pub.send(topic, msg)
+            except Exception as e:  # a value msgpack can't pack (a bug upstream): drop that message, not the loop
+                traceback.print_exc()
+                print(f'fusion: could not send {topic}: {type(e).__name__}: {e}', file=sys.stderr)
 
 
 def main():

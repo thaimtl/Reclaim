@@ -7,6 +7,7 @@ checks that the second one reads the cache.
 import argparse
 import copy
 import json
+import os
 import threading
 import time
 from types import SimpleNamespace
@@ -14,6 +15,7 @@ from types import SimpleNamespace
 import zmq
 
 from bus.team import Pub, Sub
+from claude_service import brain as brain_mod
 from claude_service.brain import SCHEMA, SYSTEM, Brain
 from claude_service.service import TOPICS, run
 
@@ -28,7 +30,7 @@ def check(name, ok, detail=''):
 
 class FakeClient:
     """Stands in for anthropic.Anthropic(); replies with the queued JSON (or, given a function, with what it returns
-    for the request) and records every request."""
+    for the request; a SimpleNamespace is returned as the response itself) and records every request."""
 
     def __init__(self, replies):
         self.replies, self.calls = replies if callable(replies) else list(replies), []
@@ -37,6 +39,8 @@ class FakeClient:
     def create(self, **kw):
         self.calls.append(copy.deepcopy(kw))
         r = self.replies(kw) if callable(self.replies) else self.replies.pop(0)
+        if isinstance(r, SimpleNamespace):
+            return r
         text = json.dumps(r)
         usage = SimpleNamespace(input_tokens=10, cache_read_input_tokens=0, output_tokens=5)
         return SimpleNamespace(content=[SimpleNamespace(type='text', text=text)], stop_reason='end_turn',
@@ -91,10 +95,10 @@ def unit():
     check('three edits rejected', len(rejected) == 3)
     check('repair keeps its utterance', rep['utt_id'] == 7)
     check('repaired word can swap back', target['words'][2]['w'] == 'nervous' and 'nerve' in target['words'][2]['alts'])
-    check('new utterance untouched', b.words[0]['w'] == 'hi')
+    check('new utterance untouched', b.utts[8][0]['w'] == 'hi')
 
     b.next_request(0.6)
-    target = {'utt_id': 8, 'words': b.words, 'review': []}
+    target = {'utt_id': 8, 'words': b.utts[8], 'review': []}
     r, _ = b.ask()
     out, rejected = b.apply(r, target, 0.7)
     check('no repair without review', [t for t, _ in out] == ['claude.predict'] and len(rejected) == 1)
@@ -105,6 +109,132 @@ def unit():
                                                  and c['output_config']['effort'] == 'low' for c in calls))
     check('model', all(c['model'] == 'claude-opus-5-5' for c in calls))
     check('roles alternate', [m['role'] for m in calls[-1]['messages']] == ['user', 'assistant'] * 2 + ['user'])
+
+
+def late_lock():
+    """A late dec.lock for the previous utterance lands at its own index; reviews of it still apply."""
+    fake = FakeClient([reply(edits=[{'index': 2, 'from': 'vine', 'to': 'fine'}]), reply()])
+    b = Brain(fake)
+    b.locked(lock(1, ('i', []), ('feel', [])))
+    b.locked(lock(2, ('yes', ['jess'])))
+    b.locked(lock(1, ('vine', ['fine'])))  # late, after utterance 2 started
+    b.locked(lock(2, ('sure', [])))
+    check('late lock: indices per utterance', [w['w'] for w in b.utts[1]] == ['i', 'feel', 'vine']
+          and [w['w'] for w in b.utts[2]] == ['yes', 'sure'])
+    t1 = b.next_request(0.0)
+    check('late lock: oldest utterance reviewed first', t1['utt_id'] == 1 and t1['review'] == [0, 1, 2], t1['review'])
+    r, _ = b.ask()
+    out, rejected = b.apply(r, t1, 0.1)
+    rep = dict(out)['claude.repair']
+    check('late lock: repair hits the right word', rep['utt_id'] == 1 and not rejected
+          and rep['edits'] == [{'index': 2, 'from': 'vine', 'to': 'fine'}], rep)
+    check('late lock: other utterance still due', b.due(0.1, mouthing=False))
+    t2 = b.next_request(0.1)
+    check('late lock: then the newer one', t2['utt_id'] == 2 and t2['review'] == [0, 1], t2)
+    b = Brain(FakeClient([]))
+    for u in range(brain_mod.MAX_UTTS + 1):
+        b.locked(lock(u, ('a', [])))
+    check('late lock: bounded', len(b.utts) == brain_mod.MAX_UTTS and 0 not in b.utts)
+    b.locked(lock(0, ('late', [])))
+    check('late lock: dropped utterance ignored', 0 not in b.utts and b.utt_id == brain_mod.MAX_UTTS)
+
+
+def empty_reply():
+    """A refusal or an empty reply never leaves an empty assistant turn behind."""
+    empty = SimpleNamespace(content=[], stop_reason='refusal', model='claude-opus-5-5', usage=None)
+    blank = SimpleNamespace(content=[SimpleNamespace(type='text', text='')], stop_reason='end_turn',
+                            model='claude-opus-5-5', usage=None)
+    fake = FakeClient([empty, blank, reply()])
+    b = Brain(fake)
+    for k in range(3):
+        b.partner({'text': f'line {k}', 'is_final': True})
+        b.next_request(float(k))
+        r, log = b.ask()
+    ok = all(m['content'] for c in fake.calls for m in c['messages'])
+    check('empty reply: no empty turn sent', ok and r is not None, [len(c['messages']) for c in fake.calls])
+    roles = [m['role'] for m in b.messages]
+    check('empty reply: starts on user, no two assistants in a row', roles[0] == 'user'
+          and all(not (x == y == 'assistant') for x, y in zip(roles, roles[1:])), roles)
+    check('empty reply: refused turn dropped', 'line 0' not in str(b.messages), b.messages[0]['content'])
+
+
+def bad_words():
+    """Malformed dec.lock words keep their slot (indices stay the decoder's) and are never reviewed."""
+    b = Brain(FakeClient([reply(edits=[{'index': 3, 'from': 'vine', 'to': 'fine'}])]))
+    bad = b.locked({'utt_id': 1, 'words': ['hi', {'conf': 0.5}, {'w': 'a', 'alts': None, 'conf': 'x'},
+                                           {'w': 'vine', 'alts': ['fine', 3]}]})
+    check('bad words: counted, slots kept', bad == 1 and [w['w'] for w in b.utts[1]] == ['hi', '?', 'a', 'vine'])
+    try:
+        t = b.next_request(0.0)
+        r, _ = b.ask()
+        out, rejected = b.apply(r, t, 0.1)
+        ok = t['review'] == [0, 2, 3] and dict(out)['claude.repair']['edits'] == [{'index': 3, 'from': 'vine', 'to': 'fine'}]
+    except Exception as e:
+        ok = f'{type(e).__name__}: {e}'
+    check('bad words: request and repair still work', ok is True, ok)
+
+    class Once(Brain):  # next_request breaks once; the loop reports it and goes on
+        n = 0
+
+        def next_request(self, now):
+            self.n += 1
+            if self.n == 1:
+                raise RuntimeError('boom')
+            return super().next_request(now)
+
+    msgs = [('partner.text', {'text': 'hi', 'is_final': True}), ('dec.lock', {'utt_id': 1, 'words': 'x'})]
+    sent, b = [], Once(FakeClient(lambda kw: reply()))
+    sub = SimpleNamespace(recv=lambda timeout_ms: msgs.pop(0) if msgs else (None, None))
+    pub = SimpleNamespace(send=lambda t, m: sent.append((t, m)))
+    end = time.perf_counter() + 1.0
+    b.partner({'text': 'again', 'is_final': True})
+    run(b, sub, pub, stop=lambda: time.perf_counter() > end or any(t == 'claude.predict' for t, _ in sent))
+    errs = [m.get('error', '') for t, m in sent if t == 'timing.claude']
+    check('bad words: request error reported, loop goes on', any('request failed' in e for e in errs)
+          and any('bad message' in e for e in errs), errs)
+    b.partner({'text': 'later', 'is_final': True})
+    msgs.append(('dec.lock', {'utt_id': 2, 'words': [{'w': 'ok'}]}))
+    end = time.perf_counter() + 1.0
+    n0 = len(sent)
+    run(b, sub, pub, stop=lambda: time.perf_counter() > end or any(t == 'claude.predict' for t, _ in sent[n0:]))
+    check('bad words: later calls still made', any(t == 'claude.predict' for t, _ in sent[n0:]))
+
+
+def cadence():
+    """While mouthing, a call only when the unlocked words moved, and at most every PREDICT_EVERY_S."""
+    b = Brain(FakeClient([]))
+    b.last_request = 0.0
+    check('cadence: no call when nothing changed', not b.due(10.0, mouthing=True))
+    b.hyp({'unlocked': ['i', 'am']})
+    check('cadence: not before the interval', not b.due(1.0, mouthing=True))
+    check('cadence: call after new unlocked words', b.due(2.5, mouthing=True))
+    b.next_request(2.5)
+    check('cadence: request carries them', 'i am' in b.messages[-1]['content'])
+    b.hyp({'unlocked': ['i', 'am']})
+    check('cadence: same words again, no call', not b.due(10.0, mouthing=True))
+
+
+def trim():
+    """History stays bounded, starts on a user turn, and is append-only between trims."""
+    fake = FakeClient(lambda kw: reply())
+    b = Brain(fake)
+    for k in range(brain_mod.MAX_MESSAGES):
+        b.partner({'text': f'line {k}', 'is_final': True})
+        b.next_request(float(k))
+        b.ask()
+    lens = [len(c['messages']) for c in fake.calls]
+    check('trim: bounded', max(lens) <= brain_mod.MAX_MESSAGES and len(b.messages) <= brain_mod.MAX_MESSAGES, max(lens))
+    check('trim: starts on a user turn', all(c['messages'][0]['role'] == 'user' for c in fake.calls))
+    pairs = list(zip(fake.calls, fake.calls[1:]))
+    breaks = [k for k, (c, n) in enumerate(pairs) if c['messages'] != n['messages'][:len(c['messages'])]]
+    trims = [k for k, (c, n) in enumerate(pairs) if len(n['messages']) < len(c['messages'])]
+    check('trim: append-only between trims', breaks == trims and len(trims) >= 1, f'breaks {breaks}, trims {trims}')
+
+
+def requirements():
+    path = os.path.join(os.path.dirname(__file__), '..', 'claude_service', 'requirements.txt')
+    names = {l.split('>')[0].split('=')[0].strip() for l in open(path) if l.strip()}
+    check('requirements cover the bus', {'numpy', 'pyzmq', 'msgpack', 'anthropic'} <= names, names)
 
 
 def bus():
@@ -143,6 +273,8 @@ def bus():
         check('bus: predict after a judge line', ok1, [t for t, _ in got])
         pub_in.sock.send_multipart([b'dec.lock', b'not msgpack'])
         pub_in.send('dec.lock', {'words': []})  # no utt_id
+        pub_in.send('dec.lock', {'utt_id': 5, 'words': 'x'})  # words not a list
+        pub_in.send('dec.lock', {'utt_id': 6, 'words': [{'alts': None}]})  # word without 'w'
         pub_in.send('dec.lock', lock(1, ('vine', ['fine'])))
         ok2 = wait_for(lambda t, m: t == 'claude.repair' and m['edits'])
         check('bus: repair applied', ok2 and got[-1][1]['edits'] == [{'index': 0, 'from': 'vine', 'to': 'fine'}],
@@ -155,7 +287,7 @@ def bus():
         for s in (sub, listen, pub_in, out):
             s.close()
     errors = [m['error'] for t, m in got if t == 'timing.claude' and 'error' in m]
-    check('bus: bad messages reported, loop survives', len(errors) == 2 and all('bad message' in e for e in errors),
+    check('bus: bad messages reported, loop survives', len(errors) == 4 and all('bad message' in e for e in errors),
           errors)
     timings = [m for t, m in got if t == 'timing.claude' and 'error' not in m]
     check('bus: one timing per call', len(timings) == len(fake.calls), f'{len(timings)} vs {len(fake.calls)}')
@@ -193,6 +325,12 @@ if __name__ == '__main__':
     ap.add_argument('--live', action='store_true')
     args = ap.parse_args()
     unit()
+    late_lock()
+    empty_reply()
+    bad_words()
+    cadence()
+    trim()
+    requirements()
     bus()
     if args.live:
         live()

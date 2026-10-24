@@ -16,8 +16,10 @@ clip_t0 / clip_t1 on the recorder's bus.now() (time.perf_counter())). Two modes:
                       --set emg.SWAP_MARGIN=0.2 tunes fusion/emg.py too.
 
 Clocks. Live, frame_t (capture times) and t_pub are both the laptop's bus.now(), and so are the
-recorder's clip_t0 / clip_t1. When the camera replays a recorded clip, frame_t is the recording's video_ts: the
-recorder's clock, the same as clip_t0 / clip_t1, while t_pub is the replay's live clock. So clips are matched on
+recorder's clip_t0 / clip_t1. When the camera replays a recorded clip with `lipread.run --replay CLIP
+--recorder-clock`, frame_t is the recording's video_ts: the recorder's clock, the same as clip_t0 / clip_t1, while
+t_pub is the replay's live clock. (Without --recorder-clock the replay moves frame_t onto the live clock too, and
+no clip matches.) So clips are matched on
 frame time, and only delays need t_pub (below).
 
 Scoring. An utterance belongs to the clip whose [clip_t0, clip_t1] contains its start: dec.hyp's t0 (frame time

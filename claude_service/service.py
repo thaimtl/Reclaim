@@ -62,9 +62,12 @@ def run(brain, sub, pub, stop=lambda: False):
                 if topic == "partner.text":
                     brain.partner(msg)
                 elif topic == "dec.lock":
-                    brain.locked(msg)
-                elif topic == "dec.hyp" and msg.get("unlocked"):
-                    last_mouth = bus.now()
+                    if bad := brain.locked(msg):
+                        report(pub, f"bad message: {bad} malformed word(s) in dec.lock {msg['utt_id']}")
+                elif topic == "dec.hyp":
+                    brain.hyp(msg)
+                    if msg.get("unlocked"):
+                        last_mouth = bus.now()
             except Exception as e:  # one bad message must not stop the service
                 report(pub, f"bad message: {type(e).__name__}: {e}")
             timeout = 0
@@ -84,8 +87,12 @@ def run(brain, sub, pub, stop=lambda: False):
                 report(pub, f"reply failed: {type(e).__name__}: {e}")
             call = None
         if call is None and brain.due(now, now - last_mouth < MOUTHING_S):
-            target = brain.next_request(now)
-            call = Call(brain)
+            try:
+                target = brain.next_request(now)
+                call = Call(brain)
+            except Exception as e:
+                report(pub, f"request failed: {type(e).__name__}: {e}")
+                brain.events, brain.review = [], {}  # drop what broke it, or it fails again every loop
 
 
 def main():
