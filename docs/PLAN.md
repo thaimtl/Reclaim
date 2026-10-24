@@ -119,7 +119,7 @@ Fallback at every point: camera + Claude + voice works without EMG. If EMG isn't
 
 ## Recording sessions
 
-Prompts and procedure: [recording/](recording/). Sessions are recorded with the recording tool, which records the camera and Thai's EMG stream on one clock and steps through the prompts. All varied conversational sentences, mouth open, no sound, camera and EMG on one clock. The pads come off and go back on between sessions.
+Procedure: [RECORDING.md](../RECORDING.md); sentences: [recording/](recording/). Sessions are recorded with the recording tool (`recorder/`), which records the camera and Thai's EMG stream on one clock and steps through the prompts. All varied conversational sentences, mouth open, no sound, camera and EMG on one clock. The pads come off and go back on between sessions.
 
 | Session | Sentences | Use |
 | --- | --- | --- |

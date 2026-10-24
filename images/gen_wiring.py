@@ -1,14 +1,14 @@
 # Usage: python3 gen_wiring.py out.svg, then screenshot it at 2x in headless Chrome with light mode to make wiring.png.
 import sys
 
-W, H = 1200, 948
+W, H = 1200, 720
 FONT = '-apple-system, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif'
 P = 19
 Y0 = 100
 out = []
 a = out.append
 
-a(f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img" aria-label="Wiring diagram on a 400-hole breadboard: the Arduino Uno's 5V goes to the left plus column and GND to the left minus column, each of the 6 BioAmp boards takes VCC from the left plus column and GND from the left minus column, and each board's OUT pin goes to one of the Uno's A0 to A5 pins. The right rails and the middle rows are unused.">
+a(f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img" aria-label="Wiring diagram on a 400-hole breadboard: the Arduino Uno's 5V goes to the left plus column and GND to the left minus column, each of the 4 BioAmp boards takes VCC from the left plus column and GND from the left minus column, and each board's OUT pin goes to one of the Uno's A0 to A3 pins. The right rails and the middle rows are unused.">
   <style>
     .bg {{ fill: #FFFFFF; }}
     .part {{ fill: #F3F5F4; stroke: #1B2320; stroke-width: 1.6; }}
@@ -61,15 +61,15 @@ a(f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" 
   <rect class="bg" width="{W}" height="{H}"/>''')
 
 # Rail holes come in 5 groups of 5, with a one-hole gap between groups
-rail_rows = [Y0 + g * 6 * P + h * P for g in range(7) for h in range(5)]
-main_rows = [Y0 + r * P for r in range(41)]
+rail_rows = [Y0 + g * 6 * P + h * P for g in range(5) for h in range(5)]
+main_rows = [Y0 + r * P for r in range(30)]
 
 # Breadboard, laid out like the photo: rails, a-e, groove, f-j, rails
 LP, LN = 410, 429
 RP, RN = 702, 721
 MAIN_A = [474 + i * P for i in range(5)]
 MAIN_F = [580 + i * P for i in range(5)]
-BT, BB = 62, 904
+BT, BB = 62, 676
 
 def hole(x, y):
     a(f'  <rect class="hole" x="{x-2.5}" y="{y-2.5}" width="5" height="5"/>')
@@ -104,7 +104,7 @@ a(f'  <text class="sub" x="565" y="52" text-anchor="middle">rows unused</text>')
 a(f'  <text class="sub" x="711" y="52" text-anchor="middle">unused</text>')
 
 # Arduino Uno, turned so its power and analog header faces right and USB faces down
-UX, UY, UW, UH = 40, 60, 220, 440
+UX, UY, UW, UH = 40, 60, 220, 400
 PX = UX + UW - 6
 a(f'  <rect class="part" x="{UX}" y="{UY}" width="{UW}" height="{UH}" rx="10"/>')
 a(f'  <rect class="part" x="{UX+70}" y="{UY+UH-4}" width="60" height="34" rx="3"/>')
@@ -112,11 +112,9 @@ a(f'  <text class="h" x="{UX+20}" y="{UY+32}">Arduino Uno</text>')
 a(f'  <text class="sub" x="{UX+20}" y="{UY+52}">header edge facing right</text>')
 a(f'  <text class="sub" x="{UX+100}" y="{UY+UH+50}" text-anchor="middle">USB-B to laptop</text>')
 
-# 6 BioAmp boards, top to bottom A5..A0 so no two signal wires cross.
+# 4 BioAmp boards, top to bottom A3..A0 so no two signal wires cross.
 # Each board's VCC and GND line up with rail holes in one group.
 sites = {
-    "A5": "back of the right cheek",
-    "A4": "right side of the jaw",
     "A3": "left cheek, above the mouth",
     "A2": "right cheek, below the mouth",
     "A1": "left corner of the chin",
@@ -124,14 +122,14 @@ sites = {
 }
 KX, KW, KH = 810, 230, 96
 boards = []
-for i, ch in enumerate(["A5", "A4", "A3", "A2", "A1", "A0"]):
+for i, ch in enumerate(["A3", "A2", "A1", "A0"]):
     pv = rail_rows[i * 5 + 1]
     boards.append((ch, pv, pv + P, pv + 2 * P))
 
 pins = ["A5", "A4", "A3", "A2", "A1", "A0", None, "VIN", "GND", "GND", "5V", "3.3V", "RESET", "IOREF"]
-used = {"A0", "A1", "A2", "A3", "A4", "A5", "5V"}
+used = {"A0", "A1", "A2", "A3", "5V"}
 py = {}
-y = boards[0][3]
+y = boards[0][3] - 2 * 24
 gnd_seen = False
 for name in pins:
     if name is None:
@@ -157,13 +155,13 @@ def end(cls, x, y):
     a(f'  <circle class="dot-{cls}" cx="{x}" cy="{y}" r="4.5"/>')
 
 # Uno power into the last rail group, run along the bottom so it crosses no signal wire
-g5v, ggnd = rail_rows[32], rail_rows[31]
+g5v, ggnd = rail_rows[22], rail_rows[21]
 wire("w-5v", [(PX, py["5V"]), (278, py["5V"]), (278, g5v), (LP, g5v)])
 end("5v", LP, g5v)
 wire("w-gnd", [(PX, py["GND"]), (294, py["GND"]), (294, ggnd), (LN, ggnd)])
 end("gnd", LN, ggnd)
 
-cols = {"A4": 376, "A3": 360, "A2": 344, "A1": 328, "A0": 312}
+cols = {"A2": 376, "A1": 356, "A0": 336}
 for ch, pv, pg, po in boards:
     by = pv - 46
     a(f'  <rect class="part" x="{KX}" y="{by}" width="{KW}" height="{KH}" rx="6"/>')
@@ -180,14 +178,14 @@ for ch, pv, pg, po in boards:
     end("5v", LP, pv)
     wire("w-gnd", [(KX - 9, pg), (LN, pg)])
     end("gnd", LN, pg)
-    if ch == "A5":
+    if ch == "A3":
         wire("w-sig", [(KX - 9, po), (PX, po)])
     else:
         c = cols[ch]
         wire("w-sig", [(KX - 9, po), (c, po), (c, py[ch]), (PX, py[ch])])
 
 # Legend
-ly = H - 120
+ly = 600
 a(f'  <line class="w w-5v" x1="40" y1="{ly}" x2="70" y2="{ly}"/><text class="sub" x="78" y="{ly+4}">5V / VCC</text>')
 a(f'  <line class="w w-gnd" x1="40" y1="{ly+24}" x2="70" y2="{ly+24}"/><text class="sub" x="78" y="{ly+28}">GND</text>')
 a(f'  <line class="w w-sig" x1="40" y1="{ly+48}" x2="70" y2="{ly+48}"/><text class="sub" x="78" y="{ly+52}">OUT signal</text>')

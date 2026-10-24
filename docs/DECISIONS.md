@@ -14,7 +14,7 @@ The team settled the conflicts between the EMG plan and the earlier README, CLAU
 | 6 | Fixing mistakes | Claude through the Claude API (`claude-opus-5-5`, low effort), for the Anthropic track. Claude follows the whole conversation, both sides, and predicts likely words before Austin mouths them. No local LLM | Local Qwen-class model (EMG plan) |
 | 7 | When the voice speaks | Cartesia speaks in real time while Austin mouths, without waiting for the end of the sentence | Speaker confirms each sentence before playback (README, sponsor notes) |
 | 8 | What gets trained | Only the EMG model (SVR-1), plus the decoder's weights, gate and lock model fitted on Austin's recordings. Auto-AVSR is used as is; Claude is prompted | "No training" for free speech (README) |
-| 9 | Phrase picking | Quick phrases are dropped, so the 10-phrase classifier and the Jev context check go with them | Classifier top 3 + Jev (README) |
+| 9 | Phrase picking | Quick phrases are dropped, so the 10-phrase classifier, the phrase list (PHRASES.md) and the Jev context check go with them | Classifier top 3 + Jev (README, PHRASES.md) |
 | 10 | Recording | Three sessions of varied conversational sentences, mouth open, camera and EMG on one clock: sessions 1 and 2 (250 sentences each) train, session 3 (100 sentences, in demo conditions) is the test. Pads re-applied between sessions. Nothing from the pitch | ~2.5 h with closed-mouth sets (EMG plan); ~30 min of phrases (README) |
 | 11 | Compute | Everything runs on Austin's laptop (RTX 5060, 115 W), and all testing happens there | Thai's Mac reading the pads, linked over a hotspot (HARDWARE.md) |
 | 12 | Streaming lip reading | Evan builds it, following [EVAN_WORKFLOW.md](EVAN_WORKFLOW.md) | Evan to design it alone |

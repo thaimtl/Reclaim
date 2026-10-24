@@ -38,7 +38,7 @@ flowchart LR
 - Cartesia speaks each word in your cloned voice as soon as it locks, without waiting for the end of the sentence.
 - If the system can't tell what you said, it shows "Please repeat" instead of guessing.
 
-Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Plan and owners: [docs/PLAN.md](docs/PLAN.md). What changed and why: [docs/DECISIONS.md](docs/DECISIONS.md).
+Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Plan and owners: [docs/PLAN.md](docs/PLAN.md). What changed and why: [docs/DECISIONS.md](docs/DECISIONS.md). The rig: [HARDWARE.md](HARDWARE.md). Recording sessions: [RECORDING.md](RECORDING.md).
 
 ## What we demo
 
@@ -67,7 +67,7 @@ Two minutes, live, at our table.
 
 - This is a prototype, not a medical device.
 - Lip reading gets about 1 in 5 words wrong even on normal speaking video, and silent mouthing is harder; the EMG model and Claude are there to close that gap.
-- The EMG model is trained for one person (Austin), from three recording sessions.
+- The EMG model is trained for one person (Austin), from three recording sessions, see [RECORDING.md](RECORDING.md).
 - The voice runs a little behind the lips, because a word is spoken only once it is confident enough to lock.
 
 ## Built on

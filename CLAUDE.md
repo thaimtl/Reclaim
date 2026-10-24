@@ -1,7 +1,7 @@
 # Reclaim
 
 Cal Hacks 13.0 project, October 23 to 25, 2026: silent speech for people who lost their voice box.
-Read README.md and HARDWARE.md before answering.
+Read README.md, HARDWARE.md and docs/PLAN.md before answering; docs/ARCHITECTURE.md explains how the system works.
 
 Decisions already made, so don't re-litigate them without new evidence (details in docs/DECISIONS.md):
 - One mode: free speech in real time, open mouth, silent. Camera + EMG + Claude together; no separate camera or EMG mode, no closed-mouth speech, no quick phrases, no Jev.
@@ -16,6 +16,7 @@ Decisions already made, so don't re-litigate them without new evidence (details 
 - No pad on the throat, no AD8232, no ESP32 in the rig, and each board has its own REF pad.
 - Everything runs and is tested on Austin's laptop (RTX 5060), on battery whenever the pads are on skin: no charger while the Uno is connected (no USB isolator).
 - Parts talk over ZeroMQ on the laptop, with the message formats in docs/PLAN.md.
+- Recording: three sessions of varied sentences with camera + EMG, following RECORDING.md (prompts in docs/recording/). Run the signal check (.claude/skills/signal-check) every time pads go on.
 
 Never commit API keys or sponsor codes.
 Diagrams are Mermaid in Markdown.
