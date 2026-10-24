@@ -35,10 +35,12 @@ The Windows arduino-cli path has not been checked on a real machine.
 
 ## Running it
 
-`rig/signal_check.py` waits for Enter, so Claude can't drive it.
-Ask the user to run `PY rig/signal_check.py check.npz` in their own terminal, then say "done".
-It speaks each step, with `say` on macOS and the built-in speech engine on Windows, shows live filtered bars, and saves raw data plus a step label per sample.
-Tell them the pace first: one syllable or phrase per second, with a short pause between.
+Claude runs it, and the wearer follows the spoken cues.
+1. Tell the user the steps and the pace: one syllable or phrase per second, with a short pause between.
+2. Ask them to say "ready" once pads are on and the wearer is relaxed.
+3. Run `echo | PY rig/signal_check.py check.npz` with a 120 s timeout, where `echo |` presses Enter for the script.
+It speaks each step, with `say` on macOS and the built-in speech engine on Windows, and saves raw data plus a step label per sample.
+The live bars only show when a person runs it in their own terminal, which also works if the user prefers.
 To test other movements, edit `STEPS` in `rig/signal_check.py`, and keep `rest` steps between tasks.
 
 ## Reading it
