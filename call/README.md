@@ -48,7 +48,7 @@ ZeroMQ over TCP on the laptop's loopback (docs/TEAM_TASKS_AND_INTERFACES.md; no 
 | --- | --- | --- |
 | `tcp://127.0.0.1:5556` (`RECLAIM_CAM_PUB`) | camera reader (`lipread.run`) | `cam.tick`: only its `emotion` |
 | `tcp://127.0.0.1:5557` (`RECLAIM_DEC_PUB`) | Austin's decoder | `voice.say`: `utt_id`, `words` (the new words), `final`, `pace`, `effort`, and `offset` (where `words[0]` sits in the sentence, so a resent word is never spoken twice and a real repeat like "no no" is) |
-| `tcp://127.0.0.1:5558` (`RECLAIM_CALL_PUB`) | this service | publishes `partner.text`, `timing.voice`, `call.state` |
+| `tcp://127.0.0.1:5559` (`RECLAIM_CALL_PUB`) | this service | publishes `partner.text`, `timing.voice`, `call.state` |
 
 Times on the bus are `time.perf_counter()` (the team clock).
 

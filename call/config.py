@@ -14,7 +14,7 @@ except ImportError:  # pragma: no cover
 
 DEFAULT_CAM_PUB = 'tcp://127.0.0.1:5556'      # the camera reader (bus/__init__.py DEFAULT_CAM_PUB)
 DEFAULT_DEC_PUB = 'tcp://127.0.0.1:5557'      # Austin's decoder (voice.say)
-DEFAULT_CALL_PUB = 'tcp://127.0.0.1:5558'     # this service (partner.text, timing.voice, call.state)
+DEFAULT_CALL_PUB = 'tcp://127.0.0.1:5559'     # this service (partner.text, timing.voice, call.state)
 
 
 def _env(name, default=None):
@@ -44,7 +44,7 @@ class Config:
     media_token: str = field(default_factory=lambda: _env('MEDIA_TOKEN', secrets.token_urlsafe(16)), repr=False)
     # team bus (docs/TEAM_TASKS_AND_INTERFACES.md): ZeroMQ over TCP on the loopback, one port per publisher (no ipc://:
     # it doesn't work on Windows). We connect to the camera reader's (5556, bus.DEFAULT_CAM_PUB) and the decoder's
-    # (5557) publishers and bind our own (5558). Each env var overrides.
+    # (5557) publishers and bind our own (5559; 5558 is the Claude service). Each env var overrides.
     dec_pub: str = field(default_factory=lambda: _env('RECLAIM_DEC_PUB', DEFAULT_DEC_PUB))
     cam_pub: str = field(default_factory=lambda: _env('RECLAIM_CAM_PUB', DEFAULT_CAM_PUB))
     call_pub: str = field(default_factory=lambda: _env('RECLAIM_CALL_PUB', DEFAULT_CALL_PUB))
