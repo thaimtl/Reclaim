@@ -13,4 +13,4 @@ Decisions already made, so don't re-litigate them without new evidence:
 
 Never commit API keys or sponsor codes.
 Diagrams are Mermaid in Markdown.
-Commit and push straight to main, no branches or PRs.
+Every change goes through a PR. Pushing straight to main is blocked.
