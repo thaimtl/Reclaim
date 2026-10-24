@@ -1,7 +1,7 @@
 """SVR-1 and the real-time fusion around it (revised design, docs/SVR1_SPEC.md), in the visual language of the Varest
 method figure.
 
-    venv/bin/python figures/make_architecture.py   ->  figures/svr1_architecture.{pdf,png}
+    venv-svr/bin/python figures/make_architecture.py   ->  figures/svr1_architecture.{pdf,png}
 """
 import os
 

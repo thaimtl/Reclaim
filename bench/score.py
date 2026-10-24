@@ -11,7 +11,7 @@ Beam search with the LM uses our decoder (svr.decoders.BeamLMDecoder). For B0 th
 beam/LM transcript is Gaddy's own ctcdecode output; our decoder's output on the same B0
 log-probs is kept alongside it (beam_lm_svr) for the decoder parity check.
 
-    venv/bin/python -m bench.score B0_gaddy_exactenv_cpu B1_ours_cpu B1_ours_gpu
+    venv-svr/bin/python -m bench.score B0_gaddy_exactenv_cpu B1_ours_cpu B1_ours_gpu
 """
 import json
 import multiprocessing as mp

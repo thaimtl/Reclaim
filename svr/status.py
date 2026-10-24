@@ -1,6 +1,6 @@
 """One-screen status of a supervised training run.
 
-    venv/bin/python -m svr.status B1T
+    venv-svr/bin/python -m svr.status B1T
 """
 import glob
 import json

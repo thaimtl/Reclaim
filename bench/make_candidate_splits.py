@@ -1,6 +1,6 @@
 """Freeze the candidate sets for the look-alike and near-duplicate benchmarks (Berkeley test set).
 
-    venv/bin/python -m bench.make_candidate_splits
+    venv-svr/bin/python -m bench.make_candidate_splits
 
 Writes bench/splits/{homophene_10,homophene_50,nearduplicate_10}.json, in the same trial format as the
 phrase-ID splits (candidates + answer_index), so bench.score handles them unchanged.

@@ -12,7 +12,7 @@
 set -u
 cd "$(dirname "$0")/.."
 NAME=$1; BENCH_CHANNELS=$2; shift 2
-PY=venv/bin/python
+PY=${PY:-venv-svr/bin/python}; [ -x "$PY" ] || PY=venv/bin/python  # venv: cluster copies set up before venv-svr
 TRAINER=${TRAINER:-svr.train}
 MAX_RESTARTS=${MAX_RESTARTS:-5}
 OUT_ROOT=${OUT_ROOT:-checkpoints}

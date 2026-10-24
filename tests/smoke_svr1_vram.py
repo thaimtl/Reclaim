@@ -2,9 +2,10 @@
 
 The sampler is deterministic (seed, epoch), so every micro-batch is known in advance. Candidates: the 3 largest
 padded sizes (rows x longest input: activations, attention) and the 3 with the most rows (CTC, judge loss).
-Each runs at speed factor 0.8 (the longest augmentation), judge loss on, fwd + bwd + AdamW step.
+Each runs at speed factor 0.8 (the largest padded size the sampler allows: slower rows are clamped to it), judge and
+speaking losses on (evenly spaced stand-in alignments), fwd + bwd + AdamW step.
 
-    venv/bin/python -m tests.smoke_svr1_vram [svr.train_svr1 args...]
+    venv-svr/bin/python -m tests.smoke_svr1_vram [svr.train_svr1 args...]
 """
 import json
 import os
@@ -25,7 +26,7 @@ def main():
     torch.cuda.set_per_process_memory_fraction(min(1.0, cap))
     torch.backends.cuda.matmul.allow_tf32 = True
     keep = [int(c) for c in args.keep_channels.split(',')]
-    train = T.TrainData('train', use_artic=not args.no_artic)
+    train = T.TrainData('train', use_artic=not args.no_artic, preprocess=args.preprocess)
     maker = T.CandidateMaker()
     every = [(e, b) for e in range(args.epochs) for b in train.batches(args.seed, e, args.micro_batch_samples)]
     padded = lambda b: len(b) * max(train.lengths[k] for k in b)  # noqa: E731
@@ -35,12 +36,16 @@ def main():
     print(json.dumps({'gpu': torch.cuda.get_device_name(0), 'vram_cap_gb': round(cap * total / 2 ** 30, 1),
                       'attention': model.cfg.attention, 'parameters': sum(p.numel() for p in model.parameters()),
                       'micro_batches_scanned': len(every)}), flush=True)
+    for e, b in worst:  # stand-in alignments: letters evenly spread over the clip
+        for k in b:
+            n, f = len(train.targets[k]), train.lengths[k] // 8
+            train.align[k] = (np.arange(n) * f // max(n, 1)).astype(np.int64)
     worst_peak = 0.0
     for e, b in worst:
         torch.cuda.reset_peak_memory_stats()
         rng = np.random.default_rng(0)
-        losses = T.train_losses(model, train, b, rng, args, keep, 'cuda', maker, T.score_parts(args),
-                                force_speed=0.8, judge=True)
+        losses, _ = T.train_losses(model, train, b, rng, args, keep, 'cuda', maker, T.score_parts(args),
+                                   force_speed=0.8, judge=True)
         loss = sum(T.LOSS_WEIGHTS[k](args) * v for k, v in losses.items())
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)

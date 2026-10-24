@@ -28,13 +28,18 @@ Some sentences come with a delivery to hold, shown in amber above the sentence. 
 
 Only natural-pace sentences get a delivery (demo-pace in session 3), at most one each; the fast ones stay plain. That leaves 130 plain natural-pace and 50 fast sentences per training session.
 
+## Voice sample for the clone
+
+Separately from the sessions, record about 60 s of Austin's real voice, read aloud, for Frank's Cartesia voice clone; the silent sessions have no audio. Only with Austin's consent. Any quiet room and a decent microphone will do, with no pads needed. Read a few varied sentences in a normal, relaxed voice. Send the file to Frank directly. It never goes into git or the shared bucket.
+
 ## Why it's set up this way
 
 - **3 sessions:** pads land in slightly different spots each time, so varied sessions teach the model to cope with that shift, and session 3 checks it on a placement the model has never seen.
 - **Varied sentences, not a script:** the demo is a live call where the judge can ask anything.
 - **Shuffled order:** the recorder mixes sentences, fast-pace sentences and rest clips, so the model can't learn drift over a session, like pads drying out, instead of the words.
 - **Rest clips:** the model learns what is not speech (still face, swallowing, nodding).
-- **Deliveries:** the voice follows Austin's expression, pace and effort ([README](README.md#how-it-works)), so the demo has him smile or frown while he mouths and speak slowly, softly or emphatically. A smile changes the EMG too (site 1 sits near the smile muscles), so SVR-1 has to see it in training; the slow, soft and emphatic sentences cover the range its pace and effort cover live; and session 3's smiling and frowning sentences test it, and give the emotion tagger Austin's real expressions.
+- **Deliveries:** the voice follows Austin's expression, pace and effort ([README](README.md#how-it-works)), so the demo has him smile or frown while he mouths and speak slowly, softly or emphatically. A smile changes the EMG too (site 1 sits near the smile muscles), so SVR-1 has to see it in training; the slow, soft and emphatic sentences cover the range its pace and effort cover live; and session 3's smiling and frowning sentences test it, and give the emotion tagger Austin's real expressions. Fine-tuning reports session 3's results by pace, expression and effort, and pretraining already simulates these deliveries on Berkeley's data ([docs/SVR1_SPEC.md](docs/SVR1_SPEC.md#4-training)).
+- **Relaxed face at the start and end of each clip:** it gives the speaking detector clean edges, and gives the emotion tagger Austin's neutral face, which it needs for about 3 s at the start of the demo call too.
 - **Mouth open, no sound and no breath:** the way the demo is done, and what a laryngectomy patient can do.
 - **Camera and EMG together:** the fusion decoder and the locking model are tuned on recordings where the camera's reading, the EMG reading and the true sentence are all known.
 

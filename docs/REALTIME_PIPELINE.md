@@ -117,7 +117,7 @@ The closed-mouth mode, the fixed-phrase classifier and the jaw-clench gesture fr
 
 ### How SVR-1 learns
 
-SVR-1 first learns silent speech in general from 19 hours of Berkeley recordings: one speaker, 8 electrodes, open mouth. During that pretraining it also predicts tongue, lip and jaw positions computed from the audio of the voiced recordings, which teaches it the physics of speech. It learns from all 8 Berkeley channels with channels randomly dropped, then settles on our 4, and it sees signals that are sped up, slurred and filtered like our amplifier, so that our rig and Austin's pace are not a surprise. Partway through, it starts practising the grading job: for each training sentence it scores the true sentence against lip look-alikes and is rewarded when the true one wins.
+SVR-1 first learns silent speech in general from 19 hours of Berkeley recordings: one speaker, 8 electrodes, open mouth. During that pretraining it also predicts tongue, lip and jaw positions computed from the audio of the voiced recordings, which teaches it the physics of speech. It learns on Berkeley's channels at our 4 sites, filtered by our rig's own filter, and it sees signals that are sped up and slowed down, slurred, softer and stronger, under a held smile, and filtered like our amplifier, so that our rig, Austin's pace and his expressions are not a surprise. Partway through, it starts practising the grading job: for each training sentence it scores the true sentence against lip look-alikes and is rewarded when the true one wins.
 
 Because the live system reads partial sentences every 100 ms, SVR-1 also practises on beginnings of sentences, cut at random points with the matching beginning of the text.
 
@@ -167,7 +167,7 @@ Claude runs through the Claude API, as `claude-opus-5-5` at low effort. The rule
 
 ## The voice and the call
 
-The voice is Frank's part. It is Cartesia Sonic 3.6 with an Instant Voice Clone of Austin, made from his own recordings with his consent. For each sentence the system opens one streaming context on Cartesia's WebSocket and sends words as they lock and clear the repair window, marking each input as "more to come" so that the prosody flows across the pieces. Speed, volume and emotion go through `generation_config`: speed and volume from SVR-1's pace and effort, emotion from the camera's facial expression.
+The voice is Frank's part. It is Cartesia Sonic 3.6 with an Instant Voice Clone of Austin, made from his own recordings with his consent. For each sentence the system opens one streaming context on Cartesia's WebSocket and sends words as they lock and clear the repair window, marking each input as "more to come" so that the prosody flows across the pieces. Speed, volume and emotion are set per sentence through `generation_config` and changed within a sentence through inline `<speed>`, `<volume>` and `<emotion>` tags: speed and volume from SVR-1's pace and effort, which arrive with every word as numbers relative to Austin's normal (1.0), and emotion from the camera's facial expression.
 
 The audio goes straight into the Twilio call, so the judge hears Austin's voice on the phone. The call's incoming audio, the judge's voice, goes to Cartesia Ink, whose transcript feeds the captions and Claude. The phone network adds its usual delay in both directions, like any phone call; the dashboard shows the captions with the delay the system actually achieves.
 

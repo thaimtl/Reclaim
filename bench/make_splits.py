@@ -4,7 +4,7 @@ Run once with the B0 environment, from baseline_gaddy/silent_speech, so the open
 test set comes from Gaddy's own EMGDataset(test=True):
 
     cd baseline_gaddy/silent_speech
-    ../.venv/bin/python ../../bench/make_splits.py
+    ../.venv-svr/bin/python ../../bench/make_splits.py
 
 Writes bench/splits/{open_vocab_test,closed_vocab_silent,phrase_id_openvocab,phrase_id_closedvocab}.json.
 """

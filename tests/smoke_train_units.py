@@ -1,6 +1,6 @@
 """Unit-level smoke checks for svr.train (no full training).
 
-    venv/bin/python -m tests.smoke_train_units
+    venv-svr/bin/python -m tests.smoke_train_units
 """
 import copy
 import random

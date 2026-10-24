@@ -23,7 +23,8 @@ import time
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 WORK = os.environ.get('RECLAIM_WORKDIR', ROOT)  # datasets, checkpoints, results: outside the repo
 OUT = os.path.join(WORK, 'checkpoints', '_smoke')
-PY = os.path.join(WORK, 'venv', 'bin', 'python')
+PY = next((p for p in (os.path.join(WORK, v, 'bin', 'python') for v in ('venv-svr', 'venv')) if os.path.exists(p)),
+          sys.executable)
 BASE = ['--micro-batch-samples', '432000', '--epochs', '3', '--eval-limit', '3', '--beam-every', '1000',
         '--monitor-seconds', '5', '--step-log', '--out-root', OUT]
 LOSS_RTOL = 2e-3

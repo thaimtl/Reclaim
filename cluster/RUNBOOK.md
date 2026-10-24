@@ -1,96 +1,127 @@
-# Cluster runbook (night of day 1)
+# Cluster runbook: SVR-1 pretraining
 
-Give this file to the Claude session on the cluster (or follow it by hand). Read `CONTEXT.md` first.
-Clusters use PBS. Prefer Moira (H200) if a node is free, else Conrad (H100). One job per GPU.
+Give this file to the Claude session on the cluster, or follow it by hand. The design is in [docs/SVR1_SPEC.md](../docs/SVR1_SPEC.md): SVR-1 on Berkeley's data, re-filtered with `rig/filters.py`, on the rig's 4 sites (input slots 0, 1, 2, 5). This runbook covers stage 0 (inputs and targets) and stage 1 (pretraining `SVR1_4ch` and the baseline `G4`).
 
-## 0. Login and pull everything (once)
+Clusters use PBS. Prefer an H200 node if one is free, else an H100. One job per GPU.
+
+## 0. Set up or update the working copy (once)
+
+The working copy is a git checkout of the Reclaim repo with the data in git-ignored folders beside the code.
 
 ```bash
 hf auth login                      # token with access to the private bucket austinkomachi/Austin_CH
-mkdir -p $WORK && cd $WORK         # $WORK = a scratch/project directory with ~40 GB free
-hf buckets cp hf://buckets/austinkomachi/Austin_CH/repo/cluster/setup.sh ./setup.sh
-bash setup.sh $WORK/calhacks2026   # code + data + Gaddy checkpoints + both venvs + camera weights
+cd $WORK                           # a scratch/project directory with ~60 GB free
+curl -fsSLO https://raw.githubusercontent.com/thaimtl/Reclaim/main/cluster/setup.sh
+bash setup.sh $WORK/calhacks2026 main
 cd $WORK/calhacks2026
 ```
 
-If a step of `setup.sh` fails (package build, Google Drive quota, etc.), fix it and rerun; it is idempotent.
+`setup.sh` is idempotent. On a copy set up before (synced from the bucket, no `.git`), it turns the copy into a checkout of the branch, replacing the old code files and leaving the data folders alone. If a step fails (a package build, a quota), fix it and rerun.
 
-## 1. Smoke-test the EMG baselines (interactive GPU session, ~10 min each)
+The scripts use `venv-svr/bin/python`, or `venv/bin/python` on copies set up before the rename. Below, `PY` is whichever exists:
 
 ```bash
-bash cluster/smoke.sh G6_baseline --keep-channels 0,1,2,3,4,5 --micro-batch-samples 128000 --grad-accum 2
-bash cluster/smoke.sh B1T_exact --micro-batch-samples 128000 --grad-accum 2
+PY=venv-svr/bin/python; [ -x $PY ] || PY=venv/bin/python
 ```
 
-Each must print `SMOKE PASS`. It reports peak VRAM (worst micro-batch of the whole run) and peak RAM.
-Fix any failure in the code, rerun the smoke test, and push the fix (step 6).
+## 1. Inputs and targets (stage 0, CPU, about 30 minutes)
 
-## 2. Set PBS resources
-
-Edit `cluster/train_job.sh`: queue/account for the cluster, `ngpus=1`, `mem` = 1.5x the smoke-test peak RAM,
-`ncpus=4`, `walltime=12:00:00`. These baselines use Gaddy's batch size on purpose (~50k optimizer steps); do not
-raise the micro-batch for them.
-
-## 3. Launch the baselines
-
-Always submit through `cluster/submit.sh` (never `qsub -v ARGS=...` directly: qsub splits `-v` values on commas,
-which breaks `--keep-channels 0,1,2,3,4,5` and `8ch,6ch`). Queue/account flags go in `QSUB_OPTS`:
+Run on an interactive node with 16+ cores, before any training job:
 
 ```bash
-export QSUB_OPTS="-q <queue> -A <account>"     # whatever the cluster needs; reused by self-resubmits
-bash cluster/submit.sh G6_baseline 6ch --keep-channels 0,1,2,3,4,5 --micro-batch-samples 128000 --grad-accum 2
-bash cluster/submit.sh B1T_exact 8ch,6ch --micro-batch-samples 128000 --grad-accum 2
+$PY -m svr.precompute_svr1 cache     # rig/filters.py over every Berkeley recording -> data/preprocessed_causal/
+                                     # + data/svr1_targets/scale.json (per-session and target spreads)
 ```
 
-Plus one short evaluation-only job (Gaddy's released model fed our 6 channels):
+It prints the 8 per-slot target spreads (about 10 to 30). Then the articulator targets:
+
+- If `data/svr1_targets/sparc/` already exists (pulled from the bucket), skip to `align`.
+- Otherwise, run SPARC on a GPU, in any environment with `pip install speech-articulatory-coding soundfile`:
 
 ```bash
-bash cluster/baselines.sh B1_6ch
+python -m svr.precompute_svr1 sparc --device cuda
 ```
 
-Each training run takes roughly 1-3 h, checkpoints every 15 min, resubmits itself at the wall time, restarts
-itself after a crash (supervisor), and benchmarks itself when done.
-
-## 4. Smoke-test the camera chain (no recordings needed)
+Then, always, because it reads the new cache:
 
 ```bash
-bash third_party/lipflow/scripts/download-models.sh --samples
-venv-camera/bin/python -m camera.smoke third_party/lipflow/samples/2016-03-12.mov
+$PY -m svr.precompute_svr1 align     # -> data/svr1_targets/artic/ + stats.json
 ```
 
-Must print `CAMERA SMOKE PASS`. Likely fixes: BRAVEn LM file format from Google Drive, LipLearner checkpoint key
-names, raven's old espnet on Python 3.11, the Qwen model id (`--llm`).
+If SPARC blocks, don't wait: start `SVR1_4ch` with `--no-artic`, and say so in the results.
 
-## 5. Monitor (every ~30-45 min)
+## 2. Smoke tests (interactive GPU session, about 15 minutes each)
 
 ```bash
-venv/bin/python -m svr.status G6_baseline
-venv/bin/python -m svr.status B1T_exact
+bash cluster/smoke_svr1.sh SVR1_4ch
+bash cluster/smoke.sh G4 --keep-channels 0,1,2,5 --micro-batch-samples 128000 --grad-accum 2
+```
+
+Each must print `SMOKE PASS`. The SVR-1 smoke test runs the unit checks, a tiny run with forced alignments, partial-sentence cuts, a simulated crash and resume, the benchmark chain at 4 slots, and the peak VRAM of the worst micro-batches of the full run. Fix any failure in the code, rerun, and push the fix as a PR (step 6).
+
+## 3. PBS resources
+
+`cluster/train_job.sh` holds the defaults. Pass the queue, account and memory through `QSUB_OPTS`, with `mem` set to 1.5× the smoke test's peak RAM, for example:
+
+```bash
+export QSUB_OPTS="-q <queue> -A <account> -l select=1:ncpus=8:mem=<n>gb:ngpus=1:vntype=gpu"
+```
+
+Self-resubmits reuse these options.
+
+## 4. Launch
+
+Always submit through `cluster/svr1_sweep.sh`, which calls `cluster/submit.sh`. Never call `qsub -v ARGS=...` directly: qsub splits `-v` values on commas, which breaks `--keep-channels 0,1,2,5`.
+
+```bash
+bash cluster/svr1_sweep.sh list        # the commands
+bash cluster/svr1_sweep.sh SVR1_4ch    # main run: 150 epochs, ~61k steps
+bash cluster/svr1_sweep.sh G4          # Gaddy's architecture and recipe, same 4 slots and inputs
+```
+
+Then, if GPUs are free, the optional runs in order: `SVR1_8ch_pre` (8 slots with channel dropout, then `SVR1_8to4`, see the script), and the ablations `SVR1_no_judge`, `SVR1_no_prefix`, `SVR1_no_delivery`, `SVR1_no_artic`.
+
+Each run checkpoints every 15 minutes, resubmits itself at the wall time, restarts after a crash (`svr/supervise.sh`), and benchmarks itself at 4 slots when done.
+
+## 5. Monitor (every 30 to 45 minutes)
+
+```bash
+$PY -m svr.status SVR1_4ch
+$PY -m svr.status G4
 qstat -u $USER
+tail -3 checkpoints/SVR1_4ch/log.jsonl
 ```
 
-Report: epoch, train loss, dev WER (greedy and beam), GPU-hours, TFLOPS, VRAM, GPU util, CPU/RAM (Erbium).
-If a job crashed beyond the supervisor's restarts: read `checkpoints/<run>/train_stdout.log`, fix the code, rerun
-the relevant smoke test, resubmit with the same `cluster/submit.sh` command (it resumes from the last checkpoint).
+Report: epoch, losses (`train_letter`, `train_phone`, `train_artic`, `train_rate`, `train_speak`, `train_judge`, `train_cut_rows`), dev WER (greedy), dev homophene-10 top-1, GPU-hours, VRAM, GPU use, CPU and RAM.
 
-Expected: B1T_exact should land near Gaddy's 27% WER (test) / 28% (dev). G6_baseline is the 6-channel number SVR-1
-must beat.
+What to expect:
 
-## 6. Push results and fixes to the bucket
+- `train_speak` and `train_cut_rows` appear from epoch 21, after the first forced alignment. The line `epoch 21: forced alignments for N/M utterances` should cover nearly every utterance.
+- `train_cut_rows` should be about 0.3.
+- Dev WER is greedy, without a language model, at 4 slots. Gaddy and Klein's 4-site result is much worse than 8 sites, so compare `SVR1_4ch` with `G4`, not with the old 6- or 8-channel numbers.
+
+If a job crashes beyond the supervisor's restarts, read `checkpoints/<run>/train_stdout.log`, fix the code, rerun the smoke test, and resubmit with the same command. It resumes from the last checkpoint.
+
+## 6. Push results and fixes
+
+Results and checkpoints go to the bucket. Never use `--delete`.
 
 ```bash
 B=hf://buckets/austinkomachi/Austin_CH
 hf sync ./benchmark_results $B/results/benchmark_results
-for r in G6_baseline B1T_exact; do hf sync ./checkpoints/$r $B/checkpoints/$r --exclude "ckpt/*"; done
-for d in svr bench tests camera cluster; do hf sync ./$d $B/repo/$d --exclude "*__pycache__*"; done
+for r in SVR1_4ch G4; do hf sync ./checkpoints/$r $B/checkpoints/$r --exclude "ckpt/*"; done
+hf sync ./data/svr1_targets $B/data/svr1_targets
 ```
 
-Never use `--delete`.
+Code fixes go to the repo as a PR: commit on a new branch, push it, and open the PR. Main is protected.
 
-## 7. SVR-1
+## 7. After pretraining
 
-Code is in the bucket. `hf sync $B/repo .` and `hf sync $B/data ./data` (new: `data/lexicon/g2p_supplement.dict`),
-then follow `CONTEXT.md` section "SVR-1 status": SPARC targets -> `bash cluster/smoke_svr1.sh SVR1_full` ->
-`bash cluster/svr1_sweep.sh SVR1_full`, then the rest in priority order (`bash cluster/svr1_sweep.sh list`).
-Monitor with `venv/bin/python -m svr.status SVR1_full`. If the SPARC step blocks, start `SVR1_full` with
-`--no-artic` rather than waiting (and say so in the results).
+`checkpoints/SVR1_4ch/model.pt` is the start of fine-tuning on Austin's sessions 1 and 2. It carries `preprocess: causal` and Berkeley's `scale_target`, so fine-tuning and the live loop scale Austin's signal the same way:
+
+```bash
+$PY -m svr.finetune --name W_svr1 --init-from checkpoints/SVR1_4ch/model.pt      # sessions 1-2 -> test on 3
+$PY -m svr.finetune --name W_g4 --arch gaddy --init-from checkpoints/G4/model.pt  # the baseline, same data
+```
+
+These need the recordings in `recordings/session_0N/` (from Austin's laptop) and run on any single GPU.

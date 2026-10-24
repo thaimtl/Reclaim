@@ -1,12 +1,18 @@
-"""Precompute SVR-1's articulator targets for the Berkeley data. Two stages:
+"""Precompute SVR-1's inputs and targets for the Berkeley data. Three stages, in this order:
+
+0. cache  (main venv, CPU, ~20-40 min on 16 cores):
+       venv-svr/bin/python -m svr.precompute_svr1 cache
+   Re-filters every Berkeley recording with rig/filters.py (causal) into data/preprocessed_causal/ and writes the
+   scale statistics data/svr1_targets/scale.json (svr.data.compute_scale_stats). Run it once before any training
+   job, so parallel jobs do not all build the cache.
 
 1. sparc  (any env with `pip install speech-articulatory-coding soundfile`):
        python -m svr.precompute_svr1 sparc [--device cuda]
    SPARC acoustic-to-articulatory inversion (Cho et al. 2024; as used for EMG by Lee et al. 2025) on every voiced
    recording's audio (16 kHz): 12 EMA trajectories + loudness at 50 Hz -> data/svr1_targets/sparc/<session>/<idx>.npy
 
-2. align  (main venv):
-       venv/bin/python -m svr.precompute_svr1 align
+2. align  (main venv, after cache):
+       venv-svr/bin/python -m svr.precompute_svr1 align
    Resamples each voiced recording's SPARC output to its model frames (86.13 Hz, the length of the cached input).
    Silent recordings have no audio: their targets come from the voiced twin of the same sentence, aligned by dynamic
    time warping on per-frame EMG energy (Gaddy & Klein's idea of transferring voiced targets to silent EMG).
@@ -99,8 +105,10 @@ def resample_to(y, n):
 
 def stage_align():
     sys.path.insert(0, ROOT)
-    from svr.data import CACHE_ROOT, list_split
+    from svr.data import CACHE_ROOTS, build_cache, list_split
+    CACHE_ROOT = CACHE_ROOTS['causal']
     entries = list_split('train') + list_split('dev')
+    build_cache(entries, preprocess='causal')
     by_location = {}
     for s, i, info in entries:
         by_location.setdefault((info['book'], info['sentence_index']), []).append((s, i))
@@ -140,9 +148,14 @@ def stage_align():
 
 if __name__ == '__main__':
     stage = sys.argv[1] if len(sys.argv) > 1 else ''
-    if stage == 'sparc':
+    if stage == 'cache':
+        sys.path.insert(0, ROOT)
+        from svr.data import compute_scale_stats
+        st = compute_scale_stats()
+        print('scale targets per slot:', [round(v, 2) for v in st['target']], f'({len(st["sessions"])} sessions)')
+    elif stage == 'sparc':
         stage_sparc(sys.argv[sys.argv.index('--device') + 1] if '--device' in sys.argv else 'cuda')
     elif stage == 'align':
         stage_align()
     else:
-        sys.exit('usage: python -m svr.precompute_svr1 sparc|align')
+        sys.exit('usage: python -m svr.precompute_svr1 cache|sparc|align')
