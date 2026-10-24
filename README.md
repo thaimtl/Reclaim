@@ -17,7 +17,7 @@ Most rely on an electrolarynx, a handheld buzzer that sounds robotic and needs a
 |---|---|---|
 | Priority | Main goal | Stretch goal |
 | You do | Mouth any sentence | Mouth one of 10 set phrases |
-| Sensor | Webcam | 6 face electrode channels, no camera |
+| Sensor | Webcam | 4 face electrode channels, no camera |
 | Reads it | Auto-AVSR lip reading, then Claude fixes mistakes | Our classifier, then Jev picks using the conversation |
 | Voice | Cartesia, live in a cloned voice | 10 pre-made Cartesia clips |
 
@@ -40,7 +40,7 @@ If it isn't sure, the screen says "Please repeat" instead of guessing.
 
 ```mermaid
 flowchart LR
-    P[6 pad pairs] --> A[6 BioAmp<br/>amplifiers]
+    P[4 pad pairs] --> A[4 BioAmp<br/>amplifiers]
     A --> U[Arduino Uno]
     U --> C[Classifier<br/>top 3 phrases]
     C --> J{Jev<br/>context check}

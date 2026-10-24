@@ -5,7 +5,7 @@ import numpy as np
 import serial
 
 BAUD = 250000
-CHANNELS = 6
+CHANNELS = 4
 FRAME = 1 + 2 * CHANNELS
 
 

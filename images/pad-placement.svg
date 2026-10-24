@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 420" width="560" height="420" role="img" aria-label="Front view of a head and neck with four electrode pairs: A0 on the underside of the jaw, not the throat, A1 at the person's left chin corner, A2 on the person's right cheek below the mouth, and A3 on the person's left cheek above the mouth, plus two reference pads on the bone behind each ear.">
+  <style>
+    .bg { fill: #FFFFFF; }
+    .outline { fill: none; stroke: #1B2320; stroke-width: 1.6; }
+    .pad { fill: #B4521C; }
+    .pad-ref { fill: #FFFFFF; stroke: #1B2320; stroke-width: 2; }
+    .lead { stroke: #5B6A65; stroke-width: 1; }
+    .sig { fill: #B4521C; font: 600 12px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .ref { fill: #1B2320; font: 600 12px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .sub { fill: #5B6A65; font: 400 12px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0D1117; }
+      .outline { stroke: #E3EAE7; }
+      .pad { fill: #E58A52; }
+      .pad-ref { fill: #0D1117; stroke: #E3EAE7; }
+      .lead { stroke: #97A5A0; }
+      .sig { fill: #E58A52; }
+      .ref { fill: #E3EAE7; }
+      .sub { fill: #97A5A0; }
+    }
+  </style>
+  <rect class="bg" width="560" height="420"/>
+
+  <g transform="translate(40,0)">
+    <ellipse class="outline" cx="220" cy="110" rx="78" ry="95"/>
+    <ellipse class="outline" cx="140" cy="115" rx="10" ry="20"/>
+    <ellipse class="outline" cx="300" cy="115" rx="10" ry="20"/>
+    <path class="outline" d="M200,162 Q220,170 240,162"/>
+    <path class="outline" d="M186,196 L176,300"/>
+    <path class="outline" d="M254,196 L264,300"/>
+    <path class="outline" d="M36,370 C80,322 136,306 176,300 M264,300 C304,306 360,322 404,370"/>
+
+    <!-- A0 under the chin -->
+    <circle class="pad" cx="210" cy="207" r="6"/>
+    <circle class="pad" cx="230" cy="207" r="6"/>
+    <!-- A1 person's left chin corner (viewer's right) -->
+    <circle class="pad" cx="246" cy="194" r="6"/>
+    <circle class="pad" cx="258" cy="182" r="6"/>
+    <!-- A2 person's right cheek below the mouth (viewer's left) -->
+    <circle class="pad" cx="206" cy="188" r="6"/>
+    <circle class="pad" cx="193" cy="183" r="6"/>
+    <!-- A3 person's left cheek above the mouth (viewer's right) -->
+    <circle class="pad" cx="234" cy="148" r="6"/>
+    <circle class="pad" cx="248" cy="144" r="6"/>
+    <!-- 2 reference pads behind each ear -->
+    <circle class="pad-ref" cx="315" cy="108" r="6"/>
+    <circle class="pad-ref" cx="315" cy="126" r="6"/>
+    <circle class="pad-ref" cx="125" cy="108" r="6"/>
+    <circle class="pad-ref" cx="125" cy="126" r="6"/>
+
+    <line class="lead" x1="204" y1="208" x2="120" y2="240"/>
+    <text class="sig" x="114" y="238" text-anchor="end">A0</text>
+    <text class="sub" x="114" y="254" text-anchor="end">under the chin,</text>
+    <text class="sub" x="114" y="270" text-anchor="end">not the throat</text>
+
+    <line class="lead" x1="187" y1="184" x2="120" y2="196"/>
+    <text class="sig" x="114" y="194" text-anchor="end">A2</text>
+    <text class="sub" x="114" y="210" text-anchor="end">right cheek, below mouth</text>
+
+    <line class="lead" x1="264" y1="184" x2="340" y2="196"/>
+    <text class="sig" x="346" y="194">A1</text>
+    <text class="sub" x="346" y="210">left chin corner</text>
+
+    <line class="lead" x1="254" y1="144" x2="340" y2="140"/>
+    <text class="sig" x="346" y="136">A3</text>
+    <text class="sub" x="346" y="152">left cheek, above mouth</text>
+
+    <line class="lead" x1="321" y1="104" x2="340" y2="86"/>
+    <text class="ref" x="346" y="82">REF × 4</text>
+    <text class="sub" x="346" y="98">2 behind each ear</text>
+  </g>
+
+  <text class="sub" x="20" y="392">Front view, facing the person, so their left side is on the right.</text>
+  <text class="sub" x="20" y="410">A0 is on the soft underside of the jaw, above where it bends into the neck.</text>
+</svg>
