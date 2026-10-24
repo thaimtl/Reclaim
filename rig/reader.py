@@ -9,7 +9,8 @@ CHANNELS = 4
 FRAME = 1 + 2 * CHANNELS
 
 
-def frames(port):
+def frames(port, stats=None):
+    """Yield chunks of samples, shape (n, CHANNELS). If `stats` is a dict, stats['dropped'] counts dropped frames."""
     with serial.Serial(port, BAUD, timeout=0.1) as s:
         time.sleep(2)
         s.reset_input_buffer()
@@ -24,6 +25,8 @@ def frames(port):
                 n = buf[0] & 0x7F
                 if last is not None and n != (last + 1) & 0x7F:
                     print(f"dropped {(n - last - 1) & 0x7F} frames", file=sys.stderr)
+                    if stats is not None:
+                        stats["dropped"] = stats.get("dropped", 0) + ((n - last - 1) & 0x7F)
                 last = n
                 rows.append([buf[1 + 2 * i] << 5 | buf[2 + 2 * i] for i in range(CHANNELS)])
                 del buf[:FRAME]

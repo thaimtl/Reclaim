@@ -31,7 +31,7 @@ Nothing is trained on the pitch or on a script: the judge can ask anything.
 2. Switch all EMG preprocessing to Thai's causal filter (`rig/filters.py`), Berkeley pre-training data included: re-cache Berkeley through it, in order, instead of Gaddy's `filtfilt`.
 3. Add the speaking-or-not output and partial-sentence training.
 4. Train on the cluster: one full SVR-1 run plus a Gaddy-architecture baseline on the same 4 sites.
-5. The recording tool: camera + EMG together with the session prompts (see Recording sessions).
+5. The recording tool: done, `recorder/record.py` (camera + EMG + the session prompts, in `svr/recordings.py`'s format).
 6. Live EMG reader: subscribe to `emg.raw`, filter, run SVR-1 every 100 ms, compute pace and effort.
 7. Fusion decoder: the joint search over camera and EMG probabilities, with look-alike expansion, Claude's predicted words and the gate.
 8. Confidence locking: compute the lock ingredients per word, train the lock model on sessions 1 and 2, and set the dynamic threshold from Claude's predictability.
