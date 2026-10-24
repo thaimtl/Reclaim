@@ -24,6 +24,7 @@ Prizes:
 - Claude makes the product work at all.
 Lip reading gets about 1 in 5 words wrong, and Claude turns that rough text into the sentence the user meant.
 - Claude uses the partner's question as context, so "bills" becomes "pills" when someone asks about medicine.
+- Claude hears both sides of the conversation (the partner through Cartesia Ink) and predicts the words likely to come next, so the lip and muscle readers are pointed at the right words before the speaker starts.
 - Claude is held back on purpose.
 It only swaps look-alike words, never adds ideas, and says "Please repeat" instead of guessing.
 - Claude Code helped build the product too, and the brief asks about that, so mention it.
@@ -31,7 +32,7 @@ It only swaps look-alike words, never adds ideas, and says "Please repeat" inste
 ## Impact metrics to show
 
 - Word error rate before and after Claude, on the same clips.
-- Seconds from finishing mouthing a sentence to hearing it.
+- Delay from mouthing a word to seeing it in the captions and to hearing it.
 - How often the partner understands on the first try, compared with an electrolarynx.
 - How often Reclaim says "Please repeat".
 

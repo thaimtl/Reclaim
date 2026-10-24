@@ -9,7 +9,7 @@ Prize: Meta glasses for the winning team, up to 4 people.
 |---|---|---|
 | Problem and originality | Useful, clearly scoped, thoughtfully designed | Giving people back their voice after a laryngectomy |
 | Use of Cartesia | Core to the experience, responsive, natural voice | Without the voice there is no product |
-| Execution | Main flow works, edge cases handled | Speaker confirms before playback, "Please repeat" when unsure |
+| Execution | Main flow works, edge cases handled | Voice streams into a live phone call while the speaker mouths; "Please repeat" instead of guessing when unsure |
 | Impact and responsibility | Accessibility, privacy, responsible use | Clone only your own voice, with consent |
 
 ## What to emphasize
@@ -27,7 +27,7 @@ Stream Claude's fixed text into the Sonic WebSocket so speech starts before Clau
 
 - A voice clone is someone's identity.
 We clone only the user's own voice, from their own recordings, with their consent.
-- Nothing plays without the speaker confirming the sentence first.
+- Nothing is spoken until the system is confident in a word, and when it can't tell, it says "Please repeat" instead of guessing. The captions show exactly what was said and what was fixed.
 - Cartesia API keys stay on the server.
 If the dashboard calls Cartesia from the browser, mint a short-lived token on the server.
 

@@ -1,0 +1,1591 @@
+{
+ "description": "For each open-vocab test recording: its sentence + 9 other test sentences, shuffled.",
+ "n_candidates": 10,
+ "seed": 0,
+ "trials": [
+  {
+   "id": "silent_parallel_data/5-4_silent/216",
+   "candidates": [
+    "the hot water from the martians overthrow drifted downstream with me so that for the best part of a mile i could see little of either bank",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "presently he came upon a stile and crossing it followed a footpath northeastward",
+    "they have done a foolish thing said i fingering my wineglass",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "henderson he called you saw that shooting star last night",
+    "probably this is due to the relative strength of the earths gravitational energy on that last text their leaderwriter expanded very comfortingly",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "he saw this one pursue a man catch him up in one of its steely tentacles and knock his head against the trunk of a pine tree",
+    "after a while i left them and went on to the railway station to get as many morning papers as i could"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/340",
+   "candidates": [
+    "what news from the common said i",
+    "i too on my side began to move towards the pit",
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock with incredible tidings and caused no more disturbance than drunkards might have done",
+    "for a minute he scarcely realised what this meant and although the heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "and so forth",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "i found a little crowd of perhaps twenty people surrounding the huge hole in which the cylinder lay",
+    "i myself heard nothing of that",
+    "he read and reread the paper fearing the worst had happened to me",
+    "but its something more than a meteorite"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/31",
+   "candidates": [
+    "he heard footsteps running to and fro in the rooms and up and down stairs behind him",
+    "by byfleet station we emerged from the pine trees and found the country calm and peaceful under the morning sunlight",
+    "the authorities had reason to suppose from the size of the cylinders that at the outside there could not be more than five in each cylinderfifteen altogether",
+    "eh said one of the men turning",
+    "it was all so real and so familiar",
+    "remarkable story from woking",
+    "he turned stared bawled something about crawling out in a thing like a dish cover and ran on to the gate of the house at the crest",
+    "the light upon the railway puzzled me at first there were a black heap and a vivid glare and to the right of that a row of yellow oblongs",
+    "where are you going i asked",
+    "an enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples and ginger beer"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/306",
+   "candidates": [
+    "some of the refugees were exchanging news with the people on the omnibuses",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "xiii",
+    "they have done a foolish thing said i fingering my wineglass",
+    "the light upon the railway puzzled me at first there were a black heap and a vivid glare and to the right of that a row of yellow oblongs",
+    "the place was impassable",
+    "to get under water",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "the artilleryman jumped down the bank into the road and saluted",
+    "the soldiers were having the greatest difficulty in making them realise the gravity of their position"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/45",
+   "candidates": [
+    "by byfleet station we emerged from the pine trees and found the country calm and peaceful under the morning sunlight",
+    "he heard footsteps running to and fro in the rooms and up and down stairs behind him",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "the chances against anything manlike on mars are a million to one he said",
+    "it would seem that a number of men or animals had rushed across the lawn",
+    "that was it",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "the martians had been repulsed they were not invulnerable",
+    "such things i told myself could not be"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/64",
+   "candidates": [
+    "where are you going i asked",
+    "such things i told myself could not be",
+    "i looked again at the cylinder and ungovernable terror gripped me",
+    "he is not an insurance agent",
+    "but its something more than a meteorite",
+    "i saw astonishment giving place to horror on the faces of the people about me",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford",
+    "some of the refugees were exchanging news with the people on the omnibuses",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/24",
+   "candidates": [
+    "such things i told myself could not be",
+    "for my own part i had been feverishly excited all day",
+    "he heard footsteps running to and fro in the rooms and up and down stairs behind him",
+    "the hot water from the martians overthrow drifted downstream with me so that for the best part of a mile i could see little of either bank",
+    "beyond was a fringe of excitement and farther than that fringe the inflammation had not crept as yet",
+    "there his story became ejaculatory",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "i could not credit it",
+    "eh said one of the men turning",
+    "i stood over him waiting for the next flash"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/120",
+   "candidates": [
+    "this was the deputation",
+    "they have done a foolish thing said i fingering my wineglass",
+    "that was it",
+    "eh said one of the men turning",
+    "beyond was a fringe of excitement and farther than that fringe the inflammation had not crept as yet",
+    "suddenly he vanished and i could have fancied a faint shriek had reached me",
+    "where are you going i asked",
+    "at times i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all",
+    "the soldiers were having the greatest difficulty in making them realise the gravity of their position",
+    "the burning heather had been extinguished but the level ground towards ottershaw was blackened as far as one could see and still giving off vertical streamers of smoke"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/200",
+   "candidates": [
+    "for a minute he scarcely realised what this meant and although the heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "i know i did",
+    "i think they perceived that nothing was to be done for the present and had gone away to breakfast at hendersons house",
+    "remarkable story from woking",
+    "i could not credit it",
+    "after a while i left them and went on to the railway station to get as many morning papers as i could",
+    "suddenly he vanished and i could have fancied a faint shriek had reached me",
+    "what news from the common said i",
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer",
+    "that indeed was the general opinion"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/82",
+   "candidates": [
+    "i stood over him waiting for the next flash",
+    "the soldiers were having the greatest difficulty in making them realise the gravity of their position",
+    "the martians had been repulsed they were not invulnerable",
+    "the place was impassable",
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way back from the edge of the pit",
+    "the case appeared to be enormously thick and it was possible that the faint sounds we heard represented a noisy tumult in the interior",
+    "such things i told myself could not be",
+    "",
+    "i stopped short in the doorway",
+    "i should have started at once but my companion had been in active service and he knew better than that"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/218",
+   "candidates": [
+    "they are dangerous because no doubt they are mad with terror",
+    "at times i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all",
+    "he is not an insurance agent",
+    "for my own part i had been feverishly excited all day",
+    "eh said one of the men turning",
+    "presently he came upon a stile and crossing it followed a footpath northeastward",
+    "i looked again at the cylinder and ungovernable terror gripped me",
+    "i and my wife stood amazed",
+    "i know i did",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/167",
+   "candidates": [
+    "all night long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke whirled up to the starlit sky",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "those who have never seen a living martian can scarcely imagine the strange horror of its appearance",
+    "he heard the maxims rattle for a time and then become still",
+    "he fancied even then that the cooling of the body might account for this but what disturbed that idea was the fact that the ash was falling only from the end of the cylinder",
+    "he is not an insurance agent",
+    "this was the deputation",
+    "they are dangerous because no doubt they are mad with terror",
+    "but its something more than a meteorite",
+    "probably this is due to the relative strength of the earths gravitational energy on that last text their leaderwriter expanded very comfortingly"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/58",
+   "candidates": [
+    "the hot water from the martians overthrow drifted downstream with me so that for the best part of a mile i could see little of either bank",
+    "in spite of ogilvy i still believed that there were men in mars",
+    "beyond was a fringe of excitement and farther than that fringe the inflammation had not crept as yet",
+    "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "suddenly he vanished and i could have fancied a faint shriek had reached me",
+    "eh said one of the men turning",
+    "the intense excitement of the events had no doubt left my perceptive powers in a state of erethism",
+    "those who have never seen a living martian can scarcely imagine the strange horror of its appearance",
+    "he heard footsteps running to and fro in the rooms and up and down stairs behind him",
+    "where are you going i asked"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/172",
+   "candidates": [
+    "he heard the maxims rattle for a time and then become still",
+    "all night long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke whirled up to the starlit sky",
+    "presently he came upon a stile and crossing it followed a footpath northeastward",
+    "when half suffocated i raised my head above water the martians hood pointed at the batteries that were still firing across the river and as it advanced it swung loose what must have been the generator of the heatray",
+    "where are you going i asked",
+    "the place was impassable",
+    "by byfleet station we emerged from the pine trees and found the country calm and peaceful under the morning sunlight",
+    "it would seem that a number of men or animals had rushed across the lawn",
+    "for a minute he scarcely realised what this meant and although the heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "suddenly he vanished and i could have fancied a faint shriek had reached me"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/257",
+   "candidates": [
+    "what news from the common said i",
+    "the place was impassable",
+    "i found a little crowd of perhaps twenty people surrounding the huge hole in which the cylinder lay",
+    "i felt a tug at the reins",
+    "there his story became ejaculatory",
+    "besides that there was quite a heap of bicycles",
+    "that indeed was the general opinion",
+    "those who have never seen a living martian can scarcely imagine the strange horror of its appearance",
+    "then suddenly the white flashes of the heatray came leaping towards me",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/123",
+   "candidates": [
+    "x",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians",
+    "people were fighting savagely for standingroom in the carriages even at two oclock",
+    "i did not know it but that was the last civilised dinner i was to eat for very many strange and terrible days",
+    "he is not an insurance agent",
+    "remarkable story from woking",
+    "they are dangerous because no doubt they are mad with terror",
+    "it hardly seemed a fair fight to me at that time",
+    "",
+    "that indeed was the general opinion"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/42",
+   "candidates": [
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "i myself heard nothing of that",
+    "what news from the common said i",
+    "then suddenly the white flashes of the heatray came leaping towards me",
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "leatherhead is about twelve miles from maybury hill",
+    "it was all so real and so familiar",
+    "for a minute he scarcely realised what this meant and although the heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "xii"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/21",
+   "candidates": [
+    "i should have started at once but my companion had been in active service and he knew better than that",
+    "leatherhead is about twelve miles from maybury hill",
+    "i stood over him waiting for the next flash",
+    "the soldiers were having the greatest difficulty in making them realise the gravity of their position",
+    "iv",
+    "people were fighting savagely for standingroom in the carriages even at two oclock",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "he became alarmed at the news in this and went again to waterloo station to find out if communication were restored",
+    "xiii",
+    "he read and reread the paper fearing the worst had happened to me"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/171",
+   "candidates": [
+    "the light upon the railway puzzled me at first there were a black heap and a vivid glare and to the right of that a row of yellow oblongs",
+    "i saw astonishment giving place to horror on the faces of the people about me",
+    "by byfleet station we emerged from the pine trees and found the country calm and peaceful under the morning sunlight",
+    "the case appeared to be enormously thick and it was possible that the faint sounds we heard represented a noisy tumult in the interior",
+    "those who have never seen a living martian can scarcely imagine the strange horror of its appearance",
+    "presently he came upon a stile and crossing it followed a footpath northeastward",
+    "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock with incredible tidings and caused no more disturbance than drunkards might have done",
+    "to get under water",
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way back from the edge of the pit"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/262",
+   "candidates": [
+    "he became alarmed at the news in this and went again to waterloo station to find out if communication were restored",
+    "the shell burst clean in the face of the thing",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "but its something more than a meteorite",
+    "they seemed very helpless in that pit of theirs",
+    "i stood over him waiting for the next flash",
+    "suddenly he vanished and i could have fancied a faint shriek had reached me",
+    "that was it"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/153",
+   "candidates": [
+    "people were fighting savagely for standingroom in the carriages even at two oclock",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "they seemed very helpless in that pit of theirs",
+    "what news from the common said i",
+    "i myself heard nothing of that",
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock with incredible tidings and caused no more disturbance than drunkards might have done",
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer",
+    "i and my wife stood amazed",
+    "the intense excitement of the events had no doubt left my perceptive powers in a state of erethism",
+    "the martians had been repulsed they were not invulnerable"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/273",
+   "candidates": [
+    "the artilleryman jumped down the bank into the road and saluted",
+    "the authorities had reason to suppose from the size of the cylinders that at the outside there could not be more than five in each cylinderfifteen altogether",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "probably this is due to the relative strength of the earths gravitational energy on that last text their leaderwriter expanded very comfortingly",
+    "eh said one of the men turning",
+    "those who have never seen a living martian can scarcely imagine the strange horror of its appearance",
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock with incredible tidings and caused no more disturbance than drunkards might have done",
+    "then suddenly the white flashes of the heatray came leaping towards me",
+    "presently he came upon a stile and crossing it followed a footpath northeastward",
+    "the hot water from the martians overthrow drifted downstream with me so that for the best part of a mile i could see little of either bank"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/226",
+   "candidates": [
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "he read and reread the paper fearing the worst had happened to me",
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way back from the edge of the pit",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "where are you going i asked",
+    "all night long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke whirled up to the starlit sky",
+    "but its something more than a meteorite",
+    "i know i did",
+    "the intense excitement of the events had no doubt left my perceptive powers in a state of erethism"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/374",
+   "candidates": [
+    "he became alarmed at the news in this and went again to waterloo station to find out if communication were restored",
+    "the chances against anything manlike on mars are a million to one he said",
+    "the shell burst clean in the face of the thing",
+    "i did not know it but that was the last civilised dinner i was to eat for very many strange and terrible days",
+    "fearful massacres in the thames valley",
+    "to get under water",
+    "the burning heather had been extinguished but the level ground towards ottershaw was blackened as far as one could see and still giving off vertical streamers of smoke",
+    "and so forth",
+    "those who have never seen a living martian can scarcely imagine the strange horror of its appearance",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton and esher"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/117",
+   "candidates": [
+    "such things i told myself could not be",
+    "i saw astonishment giving place to horror on the faces of the people about me",
+    "i looked again at the cylinder and ungovernable terror gripped me",
+    "he turned stared bawled something about crawling out in a thing like a dish cover and ran on to the gate of the house at the crest",
+    "i and my wife stood amazed",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians",
+    "after a while i left them and went on to the railway station to get as many morning papers as i could",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "suddenly he vanished and i could have fancied a faint shriek had reached me"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/50",
+   "candidates": [
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford",
+    "between us and leatherhead however lay the third cylinder with its guarding giants",
+    "that was it",
+    "and so forth",
+    "after a while i left them and went on to the railway station to get as many morning papers as i could",
+    "leatherhead is about twelve miles from maybury hill",
+    "besides that there was quite a heap of bicycles",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "the hot water from the martians overthrow drifted downstream with me so that for the best part of a mile i could see little of either bank",
+    "what news from the common said i"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/189",
+   "candidates": [
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton and esher",
+    "they are dangerous because no doubt they are mad with terror",
+    "i did not know it but that was the last civilised dinner i was to eat for very many strange and terrible days",
+    "iv",
+    "it hardly seemed a fair fight to me at that time",
+    "i too on my side began to move towards the pit",
+    "to get under water",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford",
+    "at times i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/47",
+   "candidates": [
+    "they have done a foolish thing said i fingering my wineglass",
+    "and so forth",
+    "suddenly he vanished and i could have fancied a faint shriek had reached me",
+    "the chances against anything manlike on mars are a million to one he said",
+    "the authorities had reason to suppose from the size of the cylinders that at the outside there could not be more than five in each cylinderfifteen altogether",
+    "between us and leatherhead however lay the third cylinder with its guarding giants",
+    "eh said one of the men turning",
+    "those who have never seen a living martian can scarcely imagine the strange horror of its appearance",
+    "such things i told myself could not be",
+    "when half suffocated i raised my head above water the martians hood pointed at the batteries that were still firing across the river and as it advanced it swung loose what must have been the generator of the heatray"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/263",
+   "candidates": [
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way back from the edge of the pit",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "he heard footsteps running to and fro in the rooms and up and down stairs behind him",
+    "remarkable story from woking",
+    "i too on my side began to move towards the pit",
+    "he saw this one pursue a man catch him up in one of its steely tentacles and knock his head against the trunk of a pine tree",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "i myself heard nothing of that",
+    "i stopped at the group of people",
+    "i and my wife stood amazed"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/135",
+   "candidates": [
+    "",
+    "the martians had been repulsed they were not invulnerable",
+    "i stood over him waiting for the next flash",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "i saw astonishment giving place to horror on the faces of the people about me",
+    "the shell burst clean in the face of the thing",
+    "remarkable story from woking",
+    "suddenly he vanished and i could have fancied a faint shriek had reached me",
+    "between us and leatherhead however lay the third cylinder with its guarding giants",
+    "those who have never seen a living martian can scarcely imagine the strange horror of its appearance"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/163",
+   "candidates": [
+    "what news from the common said i",
+    "i stood over him waiting for the next flash",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "the intense excitement of the events had no doubt left my perceptive powers in a state of erethism",
+    "i remember i felt an extraordinary persuasion that i was being played with that presently when i was upon the very verge of safety this mysterious deathas swift as the passage of lightwould leap after me from the pit about the cylinder and strike me down",
+    "he is not an insurance agent",
+    "i know i did",
+    "i and my wife stood amazed",
+    "i felt a tug at the reins",
+    "these hilllike forms grew lower and broader even as we stared"
+   ],
+   "answer_index": 2
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/222",
+   "candidates": [
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "youll hear more yet i said and went on to my home",
+    "remarkable story from woking",
+    "the horse took the bit between his teeth and bolted",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "x",
+    "where are you going i asked",
+    "but its something more than a meteorite",
+    "i stopped at the group of people",
+    "people were fighting savagely for standingroom in the carriages even at two oclock"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/231",
+   "candidates": [
+    "at times i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all",
+    "between us and leatherhead however lay the third cylinder with its guarding giants",
+    "this was the deputation",
+    "he turned stared bawled something about crawling out in a thing like a dish cover and ran on to the gate of the house at the crest",
+    "it would seem that a number of men or animals had rushed across the lawn",
+    "eh said one of the men turning",
+    "for a minute he scarcely realised what this meant and although the heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "he is not an insurance agent",
+    "such things i told myself could not be",
+    "i felt a tug at the reins"
+   ],
+   "answer_index": 2
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/301",
+   "candidates": [
+    "youll hear more yet i said and went on to my home",
+    "the artilleryman jumped down the bank into the road and saluted",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton and esher",
+    "they have done a foolish thing said i fingering my wineglass",
+    "the martians had been repulsed they were not invulnerable",
+    "iv",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "then suddenly the white flashes of the heatray came leaping towards me",
+    "suddenly he vanished and i could have fancied a faint shriek had reached me",
+    "for a minute he scarcely realised what this meant and although the heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/13",
+   "candidates": [
+    "i know i did",
+    "i should have started at once but my companion had been in active service and he knew better than that",
+    "xii",
+    "for my own part i had been feverishly excited all day",
+    "he fancied even then that the cooling of the body might account for this but what disturbed that idea was the fact that the ash was falling only from the end of the cylinder",
+    "the horse took the bit between his teeth and bolted",
+    "between us and leatherhead however lay the third cylinder with its guarding giants",
+    "by byfleet station we emerged from the pine trees and found the country calm and peaceful under the morning sunlight",
+    "after a while i left them and went on to the railway station to get as many morning papers as i could",
+    "he heard the maxims rattle for a time and then become still"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/46",
+   "candidates": [
+    "i think they perceived that nothing was to be done for the present and had gone away to breakfast at hendersons house",
+    "remarkable story from woking",
+    "for my own part i had been feverishly excited all day",
+    "all night long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke whirled up to the starlit sky",
+    "he became alarmed at the news in this and went again to waterloo station to find out if communication were restored",
+    "i looked again at the cylinder and ungovernable terror gripped me",
+    "such things i told myself could not be",
+    "the artilleryman jumped down the bank into the road and saluted",
+    "then suddenly the white flashes of the heatray came leaping towards me",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/80",
+   "candidates": [
+    "x",
+    "i did not know it but that was the last civilised dinner i was to eat for very many strange and terrible days",
+    "",
+    "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "then the door behind him opened and the man who lodged across the landing came in dressed only in shirt trousers and slippers his braces loose about his waist his hair disordered from his pillow",
+    "iv",
+    "he heard footsteps running to and fro in the rooms and up and down stairs behind him",
+    "i stood over him waiting for the next flash",
+    "there his story became ejaculatory",
+    "that indeed was the general opinion"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/49",
+   "candidates": [
+    "i looked again at the cylinder and ungovernable terror gripped me",
+    "at times i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all",
+    "the horse took the bit between his teeth and bolted",
+    "the artilleryman jumped down the bank into the road and saluted",
+    "probably this is due to the relative strength of the earths gravitational energy on that last text their leaderwriter expanded very comfortingly",
+    "the intense excitement of the events had no doubt left my perceptive powers in a state of erethism",
+    "suddenly he vanished and i could have fancied a faint shriek had reached me",
+    "they have done a foolish thing said i fingering my wineglass",
+    "by byfleet station we emerged from the pine trees and found the country calm and peaceful under the morning sunlight",
+    "xiii"
+   ],
+   "answer_index": 2
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/274",
+   "candidates": [
+    "it was all so real and so familiar",
+    "people were fighting savagely for standingroom in the carriages even at two oclock",
+    "these hilllike forms grew lower and broader even as we stared",
+    "the horse took the bit between his teeth and bolted",
+    "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "the martians and their appliances were altogether invisible save for that thin mast upon which their restless mirror wobbled",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians",
+    "xii",
+    "he became alarmed at the news in this and went again to waterloo station to find out if communication were restored",
+    "the chances against anything manlike on mars are a million to one he said"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/118",
+   "candidates": [
+    "the light upon the railway puzzled me at first there were a black heap and a vivid glare and to the right of that a row of yellow oblongs",
+    "xii",
+    "eh said one of the men turning",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "then suddenly the white flashes of the heatray came leaping towards me",
+    "he heard the maxims rattle for a time and then become still",
+    "xiii",
+    "he saw this one pursue a man catch him up in one of its steely tentacles and knock his head against the trunk of a pine tree",
+    "these hilllike forms grew lower and broader even as we stared",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/277",
+   "candidates": [
+    "the artilleryman jumped down the bank into the road and saluted",
+    "i stopped short in the doorway",
+    "those who have never seen a living martian can scarcely imagine the strange horror of its appearance",
+    "i found a little crowd of perhaps twenty people surrounding the huge hole in which the cylinder lay",
+    "the martians had been repulsed they were not invulnerable",
+    "it would seem that a number of men or animals had rushed across the lawn",
+    "youll hear more yet i said and went on to my home",
+    "an enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples and ginger beer",
+    "at times i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all",
+    "i could not credit it"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/3",
+   "candidates": [
+    "that indeed was the general opinion",
+    "but its something more than a meteorite",
+    "he heard the maxims rattle for a time and then become still",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton and esher",
+    "leatherhead is about twelve miles from maybury hill",
+    "the place was impassable",
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer",
+    "the artilleryman jumped down the bank into the road and saluted",
+    "eh said one of the men turning",
+    "it would seem that a number of men or animals had rushed across the lawn"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/208",
+   "candidates": [
+    "he became alarmed at the news in this and went again to waterloo station to find out if communication were restored",
+    "for a minute he scarcely realised what this meant and although the heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "i did not know it but that was the last civilised dinner i was to eat for very many strange and terrible days",
+    "i remember i felt an extraordinary persuasion that i was being played with that presently when i was upon the very verge of safety this mysterious deathas swift as the passage of lightwould leap after me from the pit about the cylinder and strike me down",
+    "the place was impassable",
+    "it would seem that a number of men or animals had rushed across the lawn",
+    "there his story became ejaculatory",
+    "remarkable story from woking",
+    "an enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples and ginger beer",
+    "these hilllike forms grew lower and broader even as we stared"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/183",
+   "candidates": [
+    "then suddenly the white flashes of the heatray came leaping towards me",
+    "it hardly seemed a fair fight to me at that time",
+    "presently he came upon a stile and crossing it followed a footpath northeastward",
+    "he fancied even then that the cooling of the body might account for this but what disturbed that idea was the fact that the ash was falling only from the end of the cylinder",
+    "the shell burst clean in the face of the thing",
+    "for a minute he scarcely realised what this meant and although the heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "he heard footsteps running to and fro in the rooms and up and down stairs behind him",
+    "",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "they have done a foolish thing said i fingering my wineglass"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/190",
+   "candidates": [
+    "people were fighting savagely for standingroom in the carriages even at two oclock",
+    "i felt a tug at the reins",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians",
+    "the martians had been repulsed they were not invulnerable",
+    "it would seem that a number of men or animals had rushed across the lawn",
+    "the martians and their appliances were altogether invisible save for that thin mast upon which their restless mirror wobbled",
+    "he heard footsteps running to and fro in the rooms and up and down stairs behind him",
+    "that indeed was the general opinion",
+    "where are you going i asked"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/184",
+   "candidates": [
+    "people were fighting savagely for standingroom in the carriages even at two oclock",
+    "it was all so real and so familiar",
+    "what news from the common said i",
+    "he fancied even then that the cooling of the body might account for this but what disturbed that idea was the fact that the ash was falling only from the end of the cylinder",
+    "for my own part i had been feverishly excited all day",
+    "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "at times i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "the chances against anything manlike on mars are a million to one he said",
+    "i myself heard nothing of that"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/53",
+   "candidates": [
+    "the chances against anything manlike on mars are a million to one he said",
+    "people were fighting savagely for standingroom in the carriages even at two oclock",
+    "there his story became ejaculatory",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "i could not credit it",
+    "that was it",
+    "what news from the common said i",
+    "the burning heather had been extinguished but the level ground towards ottershaw was blackened as far as one could see and still giving off vertical streamers of smoke",
+    "henderson he called you saw that shooting star last night"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/155",
+   "candidates": [
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer",
+    "they are dangerous because no doubt they are mad with terror",
+    "the burning heather had been extinguished but the level ground towards ottershaw was blackened as far as one could see and still giving off vertical streamers of smoke",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "henderson he called you saw that shooting star last night",
+    "between us and leatherhead however lay the third cylinder with its guarding giants",
+    "an enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples and ginger beer",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford",
+    "the artilleryman jumped down the bank into the road and saluted",
+    "i stopped short in the doorway"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/111",
+   "candidates": [
+    "i myself heard nothing of that",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "i stopped at the group of people",
+    "henderson he called you saw that shooting star last night",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton and esher",
+    "they are dangerous because no doubt they are mad with terror",
+    "eh said one of the men turning",
+    "at times i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all",
+    "for my own part i had been feverishly excited all day",
+    "the horse took the bit between his teeth and bolted"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/274",
+   "candidates": [
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock with incredible tidings and caused no more disturbance than drunkards might have done",
+    "these hilllike forms grew lower and broader even as we stared",
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "an enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples and ginger beer",
+    "then the door behind him opened and the man who lodged across the landing came in dressed only in shirt trousers and slippers his braces loose about his waist his hair disordered from his pillow",
+    "i and my wife stood amazed",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "all night long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke whirled up to the starlit sky",
+    "i felt a tug at the reins"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/43",
+   "candidates": [
+    "between us and leatherhead however lay the third cylinder with its guarding giants",
+    "i felt a tug at the reins",
+    "x",
+    "i could not credit it",
+    "it was all so real and so familiar",
+    "i should have started at once but my companion had been in active service and he knew better than that",
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer",
+    "then the door behind him opened and the man who lodged across the landing came in dressed only in shirt trousers and slippers his braces loose about his waist his hair disordered from his pillow",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "probably this is due to the relative strength of the earths gravitational energy on that last text their leaderwriter expanded very comfortingly"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/55",
+   "candidates": [
+    "eh said one of the men turning",
+    "he heard footsteps running to and fro in the rooms and up and down stairs behind him",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "i could not credit it",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "i should have started at once but my companion had been in active service and he knew better than that",
+    "the hot water from the martians overthrow drifted downstream with me so that for the best part of a mile i could see little of either bank",
+    "",
+    "i stopped at the group of people",
+    "he is not an insurance agent"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/1",
+   "candidates": [
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer",
+    "youll hear more yet i said and went on to my home",
+    "i too on my side began to move towards the pit",
+    "xii",
+    "x",
+    "i know i did",
+    "people were fighting savagely for standingroom in the carriages even at two oclock",
+    "the light upon the railway puzzled me at first there were a black heap and a vivid glare and to the right of that a row of yellow oblongs",
+    "it hardly seemed a fair fight to me at that time"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/3",
+   "candidates": [
+    "the soldiers were having the greatest difficulty in making them realise the gravity of their position",
+    "in spite of ogilvy i still believed that there were men in mars",
+    "between us and leatherhead however lay the third cylinder with its guarding giants",
+    "the case appeared to be enormously thick and it was possible that the faint sounds we heard represented a noisy tumult in the interior",
+    "the horse took the bit between his teeth and bolted",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "i found a little crowd of perhaps twenty people surrounding the huge hole in which the cylinder lay",
+    "then the door behind him opened and the man who lodged across the landing came in dressed only in shirt trousers and slippers his braces loose about his waist his hair disordered from his pillow",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "people were fighting savagely for standingroom in the carriages even at two oclock"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/228",
+   "candidates": [
+    "that was it",
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock with incredible tidings and caused no more disturbance than drunkards might have done",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "the horse took the bit between his teeth and bolted",
+    "people were fighting savagely for standingroom in the carriages even at two oclock",
+    "when half suffocated i raised my head above water the martians hood pointed at the batteries that were still firing across the river and as it advanced it swung loose what must have been the generator of the heatray",
+    "i stopped at the group of people",
+    "leatherhead is about twelve miles from maybury hill",
+    "an enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples and ginger beer",
+    "i know i did"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/28",
+   "candidates": [
+    "fearful massacres in the thames valley",
+    "for a minute he scarcely realised what this meant and although the heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "for my own part i had been feverishly excited all day",
+    "the place was impassable",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "he is not an insurance agent",
+    "i stopped short in the doorway",
+    "i could not credit it",
+    "between us and leatherhead however lay the third cylinder with its guarding giants"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/212",
+   "candidates": [
+    "he heard the maxims rattle for a time and then become still",
+    "in spite of ogilvy i still believed that there were men in mars",
+    "this was the deputation",
+    "he became alarmed at the news in this and went again to waterloo station to find out if communication were restored",
+    "that was it",
+    "those who have never seen a living martian can scarcely imagine the strange horror of its appearance",
+    "the artilleryman jumped down the bank into the road and saluted",
+    "he saw this one pursue a man catch him up in one of its steely tentacles and knock his head against the trunk of a pine tree",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/1",
+   "candidates": [
+    "probably this is due to the relative strength of the earths gravitational energy on that last text their leaderwriter expanded very comfortingly",
+    "they are dangerous because no doubt they are mad with terror",
+    "the hot water from the martians overthrow drifted downstream with me so that for the best part of a mile i could see little of either bank",
+    "i felt a tug at the reins",
+    "i looked again at the cylinder and ungovernable terror gripped me",
+    "i found a little crowd of perhaps twenty people surrounding the huge hole in which the cylinder lay",
+    "some of the refugees were exchanging news with the people on the omnibuses",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "the martians and their appliances were altogether invisible save for that thin mast upon which their restless mirror wobbled",
+    "xiii"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/14",
+   "candidates": [
+    "xii",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "presently he came upon a stile and crossing it followed a footpath northeastward",
+    "the chances against anything manlike on mars are a million to one he said",
+    "that was it",
+    "youll hear more yet i said and went on to my home",
+    "leatherhead is about twelve miles from maybury hill",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians",
+    "for my own part i had been feverishly excited all day",
+    "the martians had been repulsed they were not invulnerable"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/127",
+   "candidates": [
+    "x",
+    "i did not know it but that was the last civilised dinner i was to eat for very many strange and terrible days",
+    "i myself heard nothing of that",
+    "he became alarmed at the news in this and went again to waterloo station to find out if communication were restored",
+    "for a minute he scarcely realised what this meant and although the heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "that was it",
+    "the horse took the bit between his teeth and bolted",
+    "i saw astonishment giving place to horror on the faces of the people about me",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "i know i did"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/114",
+   "candidates": [
+    "the intense excitement of the events had no doubt left my perceptive powers in a state of erethism",
+    "i stopped at the group of people",
+    "an enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples and ginger beer",
+    "then the door behind him opened and the man who lodged across the landing came in dressed only in shirt trousers and slippers his braces loose about his waist his hair disordered from his pillow",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "that indeed was the general opinion",
+    "suddenly he vanished and i could have fancied a faint shriek had reached me",
+    "i should have started at once but my companion had been in active service and he knew better than that",
+    "they are dangerous because no doubt they are mad with terror",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/155",
+   "candidates": [
+    "this was the deputation",
+    "besides that there was quite a heap of bicycles",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians",
+    "i know i did",
+    "the soldiers were having the greatest difficulty in making them realise the gravity of their position",
+    "they have done a foolish thing said i fingering my wineglass",
+    "at times i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all",
+    "where are you going i asked",
+    "the authorities had reason to suppose from the size of the cylinders that at the outside there could not be more than five in each cylinderfifteen altogether",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/162",
+   "candidates": [
+    "the martians had been repulsed they were not invulnerable",
+    "they are dangerous because no doubt they are mad with terror",
+    "i stopped short in the doorway",
+    "there his story became ejaculatory",
+    "the shell burst clean in the face of the thing",
+    "i too on my side began to move towards the pit",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "for a minute he scarcely realised what this meant and although the heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "probably this is due to the relative strength of the earths gravitational energy on that last text their leaderwriter expanded very comfortingly",
+    "xiii"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/211",
+   "candidates": [
+    "it would seem that a number of men or animals had rushed across the lawn",
+    "the place was impassable",
+    "probably this is due to the relative strength of the earths gravitational energy on that last text their leaderwriter expanded very comfortingly",
+    "i too on my side began to move towards the pit",
+    "i stopped at the group of people",
+    "to get under water",
+    "it was all so real and so familiar",
+    "the case appeared to be enormously thick and it was possible that the faint sounds we heard represented a noisy tumult in the interior",
+    "the artilleryman jumped down the bank into the road and saluted",
+    "when half suffocated i raised my head above water the martians hood pointed at the batteries that were still firing across the river and as it advanced it swung loose what must have been the generator of the heatray"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/110",
+   "candidates": [
+    "the soldiers were having the greatest difficulty in making them realise the gravity of their position",
+    "youll hear more yet i said and went on to my home",
+    "where are you going i asked",
+    "it was all so real and so familiar",
+    "he read and reread the paper fearing the worst had happened to me",
+    "remarkable story from woking",
+    "they have done a foolish thing said i fingering my wineglass",
+    "for my own part i had been feverishly excited all day",
+    "i stopped at the group of people",
+    "that indeed was the general opinion"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/99",
+   "candidates": [
+    "he fancied even then that the cooling of the body might account for this but what disturbed that idea was the fact that the ash was falling only from the end of the cylinder",
+    "leatherhead is about twelve miles from maybury hill",
+    "the soldiers were having the greatest difficulty in making them realise the gravity of their position",
+    "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "eh said one of the men turning",
+    "i and my wife stood amazed",
+    "in spite of ogilvy i still believed that there were men in mars",
+    "it hardly seemed a fair fight to me at that time",
+    "",
+    "i remember i felt an extraordinary persuasion that i was being played with that presently when i was upon the very verge of safety this mysterious deathas swift as the passage of lightwould leap after me from the pit about the cylinder and strike me down"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/8",
+   "candidates": [
+    "after a while i left them and went on to the railway station to get as many morning papers as i could",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford",
+    "xii",
+    "i think they perceived that nothing was to be done for the present and had gone away to breakfast at hendersons house",
+    "that was it",
+    "the case appeared to be enormously thick and it was possible that the faint sounds we heard represented a noisy tumult in the interior",
+    "he is not an insurance agent",
+    "presently he came upon a stile and crossing it followed a footpath northeastward",
+    "youll hear more yet i said and went on to my home",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/153",
+   "candidates": [
+    "i saw astonishment giving place to horror on the faces of the people about me",
+    "henderson he called you saw that shooting star last night",
+    "those who have never seen a living martian can scarcely imagine the strange horror of its appearance",
+    "i too on my side began to move towards the pit",
+    "x",
+    "xiii",
+    "they are dangerous because no doubt they are mad with terror",
+    "they have done a foolish thing said i fingering my wineglass",
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer",
+    "they seemed very helpless in that pit of theirs"
+   ],
+   "answer_index": 2
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/99",
+   "candidates": [
+    "it hardly seemed a fair fight to me at that time",
+    "the horse took the bit between his teeth and bolted",
+    "the shell burst clean in the face of the thing",
+    "it would seem that a number of men or animals had rushed across the lawn",
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way back from the edge of the pit",
+    "leatherhead is about twelve miles from maybury hill",
+    "there his story became ejaculatory",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "that indeed was the general opinion",
+    "all night long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke whirled up to the starlit sky"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/98",
+   "candidates": [
+    "youll hear more yet i said and went on to my home",
+    "besides that there was quite a heap of bicycles",
+    "xiii",
+    "eh said one of the men turning",
+    "the artilleryman jumped down the bank into the road and saluted",
+    "by byfleet station we emerged from the pine trees and found the country calm and peaceful under the morning sunlight",
+    "where are you going i asked",
+    "they seemed very helpless in that pit of theirs",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton and esher",
+    "for my own part i had been feverishly excited all day"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/58",
+   "candidates": [
+    "he fancied even then that the cooling of the body might account for this but what disturbed that idea was the fact that the ash was falling only from the end of the cylinder",
+    "i think they perceived that nothing was to be done for the present and had gone away to breakfast at hendersons house",
+    "the artilleryman jumped down the bank into the road and saluted",
+    "i could not credit it",
+    "between us and leatherhead however lay the third cylinder with its guarding giants",
+    "after a while i left them and went on to the railway station to get as many morning papers as i could",
+    "all night long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke whirled up to the starlit sky",
+    "remarkable story from woking",
+    "to get under water",
+    "he heard the maxims rattle for a time and then become still"
+   ],
+   "answer_index": 2
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/122",
+   "candidates": [
+    "for my own part i had been feverishly excited all day",
+    "presently he came upon a stile and crossing it followed a footpath northeastward",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "that indeed was the general opinion",
+    "he heard footsteps running to and fro in the rooms and up and down stairs behind him",
+    "by byfleet station we emerged from the pine trees and found the country calm and peaceful under the morning sunlight",
+    "after a while i left them and went on to the railway station to get as many morning papers as i could",
+    "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton and esher",
+    "i did not know it but that was the last civilised dinner i was to eat for very many strange and terrible days"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/227",
+   "candidates": [
+    "x",
+    "those who have never seen a living martian can scarcely imagine the strange horror of its appearance",
+    "i too on my side began to move towards the pit",
+    "to get under water",
+    "i could not credit it",
+    "they are dangerous because no doubt they are mad with terror",
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians",
+    "i stopped at the group of people"
+   ],
+   "answer_index": 2
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/359",
+   "candidates": [
+    "then the door behind him opened and the man who lodged across the landing came in dressed only in shirt trousers and slippers his braces loose about his waist his hair disordered from his pillow",
+    "fearful massacres in the thames valley",
+    "henderson he called you saw that shooting star last night",
+    "they seemed very helpless in that pit of theirs",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "the hot water from the martians overthrow drifted downstream with me so that for the best part of a mile i could see little of either bank",
+    "i think they perceived that nothing was to be done for the present and had gone away to breakfast at hendersons house",
+    "an enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples and ginger beer",
+    "i stopped at the group of people",
+    "i could not credit it"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/258",
+   "candidates": [
+    "iv",
+    "i could not credit it",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "the soldiers were having the greatest difficulty in making them realise the gravity of their position",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "to get under water",
+    "the place was impassable",
+    "i stood over him waiting for the next flash",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "he fancied even then that the cooling of the body might account for this but what disturbed that idea was the fact that the ash was falling only from the end of the cylinder"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/148",
+   "candidates": [
+    "x",
+    "he heard footsteps running to and fro in the rooms and up and down stairs behind him",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "i stopped at the group of people",
+    "i stood over him waiting for the next flash",
+    "the light upon the railway puzzled me at first there were a black heap and a vivid glare and to the right of that a row of yellow oblongs",
+    "the martians and their appliances were altogether invisible save for that thin mast upon which their restless mirror wobbled",
+    "but its something more than a meteorite",
+    "when half suffocated i raised my head above water the martians hood pointed at the batteries that were still firing across the river and as it advanced it swung loose what must have been the generator of the heatray",
+    "the burning heather had been extinguished but the level ground towards ottershaw was blackened as far as one could see and still giving off vertical streamers of smoke"
+   ],
+   "answer_index": 2
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/106",
+   "candidates": [
+    "i felt a tug at the reins",
+    "i stopped at the group of people",
+    "the case appeared to be enormously thick and it was possible that the faint sounds we heard represented a noisy tumult in the interior",
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock with incredible tidings and caused no more disturbance than drunkards might have done",
+    "the burning heather had been extinguished but the level ground towards ottershaw was blackened as far as one could see and still giving off vertical streamers of smoke",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton and esher",
+    "they seemed very helpless in that pit of theirs",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians",
+    "the chances against anything manlike on mars are a million to one he said",
+    "and so forth"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/205",
+   "candidates": [
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way back from the edge of the pit",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "",
+    "he read and reread the paper fearing the worst had happened to me",
+    "i saw astonishment giving place to horror on the faces of the people about me",
+    "where are you going i asked",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "i stopped short in the doorway",
+    "i too on my side began to move towards the pit",
+    "these hilllike forms grew lower and broader even as we stared"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/315",
+   "candidates": [
+    "he heard footsteps running to and fro in the rooms and up and down stairs behind him",
+    "i know i did",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians",
+    "he turned stared bawled something about crawling out in a thing like a dish cover and ran on to the gate of the house at the crest",
+    "people were fighting savagely for standingroom in the carriages even at two oclock",
+    "an enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples and ginger beer",
+    "i and my wife stood amazed",
+    "the intense excitement of the events had no doubt left my perceptive powers in a state of erethism",
+    "i looked again at the cylinder and ungovernable terror gripped me",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/56",
+   "candidates": [
+    "fearful massacres in the thames valley",
+    "he saw this one pursue a man catch him up in one of its steely tentacles and knock his head against the trunk of a pine tree",
+    "i found a little crowd of perhaps twenty people surrounding the huge hole in which the cylinder lay",
+    "it was all so real and so familiar",
+    "the case appeared to be enormously thick and it was possible that the faint sounds we heard represented a noisy tumult in the interior",
+    "i think they perceived that nothing was to be done for the present and had gone away to breakfast at hendersons house",
+    "these hilllike forms grew lower and broader even as we stared",
+    "i remember i felt an extraordinary persuasion that i was being played with that presently when i was upon the very verge of safety this mysterious deathas swift as the passage of lightwould leap after me from the pit about the cylinder and strike me down",
+    "this was the deputation",
+    "an enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples and ginger beer"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/251",
+   "candidates": [
+    "i too on my side began to move towards the pit",
+    "by byfleet station we emerged from the pine trees and found the country calm and peaceful under the morning sunlight",
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer",
+    "fearful massacres in the thames valley",
+    "i myself heard nothing of that",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton and esher",
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way back from the edge of the pit",
+    "he heard the maxims rattle for a time and then become still",
+    "the hot water from the martians overthrow drifted downstream with me so that for the best part of a mile i could see little of either bank",
+    "i felt a tug at the reins"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/61",
+   "candidates": [
+    "this was the deputation",
+    "remarkable story from woking",
+    "that indeed was the general opinion",
+    "the horse took the bit between his teeth and bolted",
+    "by byfleet station we emerged from the pine trees and found the country calm and peaceful under the morning sunlight",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton and esher",
+    "xiii",
+    "the light upon the railway puzzled me at first there were a black heap and a vivid glare and to the right of that a row of yellow oblongs"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/1",
+   "candidates": [
+    "that indeed was the general opinion",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians",
+    "i myself heard nothing of that",
+    "xii",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford",
+    "the case appeared to be enormously thick and it was possible that the faint sounds we heard represented a noisy tumult in the interior",
+    "they seemed very helpless in that pit of theirs",
+    "for my own part i had been feverishly excited all day",
+    "to get under water"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/134",
+   "candidates": [
+    "between us and leatherhead however lay the third cylinder with its guarding giants",
+    "i too on my side began to move towards the pit",
+    "i looked again at the cylinder and ungovernable terror gripped me",
+    "the martians had been repulsed they were not invulnerable",
+    "at times i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all",
+    "i should have started at once but my companion had been in active service and he knew better than that",
+    "when half suffocated i raised my head above water the martians hood pointed at the batteries that were still firing across the river and as it advanced it swung loose what must have been the generator of the heatray",
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way back from the edge of the pit",
+    "probably this is due to the relative strength of the earths gravitational energy on that last text their leaderwriter expanded very comfortingly",
+    "for my own part i had been feverishly excited all day"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/104",
+   "candidates": [
+    "but its something more than a meteorite",
+    "and so forth",
+    "he heard the maxims rattle for a time and then become still",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "that was it",
+    "he saw this one pursue a man catch him up in one of its steely tentacles and knock his head against the trunk of a pine tree",
+    "the martians and their appliances were altogether invisible save for that thin mast upon which their restless mirror wobbled",
+    "suddenly he vanished and i could have fancied a faint shriek had reached me",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "between us and leatherhead however lay the third cylinder with its guarding giants"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/238",
+   "candidates": [
+    "that indeed was the general opinion",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way back from the edge of the pit",
+    "people were fighting savagely for standingroom in the carriages even at two oclock",
+    "after a while i left them and went on to the railway station to get as many morning papers as i could",
+    "the case appeared to be enormously thick and it was possible that the faint sounds we heard represented a noisy tumult in the interior",
+    "the martians and their appliances were altogether invisible save for that thin mast upon which their restless mirror wobbled",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton and esher",
+    "it hardly seemed a fair fight to me at that time"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/33",
+   "candidates": [
+    "in spite of ogilvy i still believed that there were men in mars",
+    "the martians had been repulsed they were not invulnerable",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "they are dangerous because no doubt they are mad with terror",
+    "the soldiers were having the greatest difficulty in making them realise the gravity of their position",
+    "there his story became ejaculatory",
+    "that was it",
+    "they seemed very helpless in that pit of theirs",
+    "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "then suddenly the white flashes of the heatray came leaping towards me"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/119",
+   "candidates": [
+    "remarkable story from woking",
+    "beyond was a fringe of excitement and farther than that fringe the inflammation had not crept as yet",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "for my own part i had been feverishly excited all day",
+    "i stood over him waiting for the next flash",
+    "i and my wife stood amazed",
+    "then the door behind him opened and the man who lodged across the landing came in dressed only in shirt trousers and slippers his braces loose about his waist his hair disordered from his pillow",
+    "i remember i felt an extraordinary persuasion that i was being played with that presently when i was upon the very verge of safety this mysterious deathas swift as the passage of lightwould leap after me from the pit about the cylinder and strike me down",
+    "after a while i left them and went on to the railway station to get as many morning papers as i could",
+    "they seemed very helpless in that pit of theirs"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/290",
+   "candidates": [
+    "by byfleet station we emerged from the pine trees and found the country calm and peaceful under the morning sunlight",
+    "beyond was a fringe of excitement and farther than that fringe the inflammation had not crept as yet",
+    "between us and leatherhead however lay the third cylinder with its guarding giants",
+    "they seemed very helpless in that pit of theirs",
+    "the martians had been repulsed they were not invulnerable",
+    "but its something more than a meteorite",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "these hilllike forms grew lower and broader even as we stared",
+    "i remember i felt an extraordinary persuasion that i was being played with that presently when i was upon the very verge of safety this mysterious deathas swift as the passage of lightwould leap after me from the pit about the cylinder and strike me down",
+    "it hardly seemed a fair fight to me at that time"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/144",
+   "candidates": [
+    "this was the deputation",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "for my own part i had been feverishly excited all day",
+    "these hilllike forms grew lower and broader even as we stared",
+    "by byfleet station we emerged from the pine trees and found the country calm and peaceful under the morning sunlight",
+    "between us and leatherhead however lay the third cylinder with its guarding giants",
+    "the intense excitement of the events had no doubt left my perceptive powers in a state of erethism",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton and esher",
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock with incredible tidings and caused no more disturbance than drunkards might have done",
+    "they have done a foolish thing said i fingering my wineglass"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/142",
+   "candidates": [
+    "besides that there was quite a heap of bicycles",
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer",
+    "they are dangerous because no doubt they are mad with terror",
+    "i stopped short in the doorway",
+    "i should have started at once but my companion had been in active service and he knew better than that",
+    "they have done a foolish thing said i fingering my wineglass",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "i looked again at the cylinder and ungovernable terror gripped me",
+    "henderson he called you saw that shooting star last night",
+    "youll hear more yet i said and went on to my home"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/56",
+   "candidates": [
+    "he turned stared bawled something about crawling out in a thing like a dish cover and ran on to the gate of the house at the crest",
+    "eh said one of the men turning",
+    "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "beyond was a fringe of excitement and farther than that fringe the inflammation had not crept as yet",
+    "an enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples and ginger beer",
+    "leatherhead is about twelve miles from maybury hill",
+    "the place was impassable",
+    "what news from the common said i",
+    "the horse took the bit between his teeth and bolted",
+    "the martians had been repulsed they were not invulnerable"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/162",
+   "candidates": [
+    "i should have started at once but my companion had been in active service and he knew better than that",
+    "beyond was a fringe of excitement and farther than that fringe the inflammation had not crept as yet",
+    "eh said one of the men turning",
+    "the burning heather had been extinguished but the level ground towards ottershaw was blackened as far as one could see and still giving off vertical streamers of smoke",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "i stood over him waiting for the next flash",
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock with incredible tidings and caused no more disturbance than drunkards might have done",
+    "the intense excitement of the events had no doubt left my perceptive powers in a state of erethism",
+    "this was the deputation",
+    "x"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/261",
+   "candidates": [
+    "i should have started at once but my companion had been in active service and he knew better than that",
+    "henderson he called you saw that shooting star last night",
+    "the chances against anything manlike on mars are a million to one he said",
+    "he turned stared bawled something about crawling out in a thing like a dish cover and ran on to the gate of the house at the crest",
+    "it hardly seemed a fair fight to me at that time",
+    "and so forth",
+    "between us and leatherhead however lay the third cylinder with its guarding giants",
+    "these hilllike forms grew lower and broader even as we stared",
+    "the artilleryman jumped down the bank into the road and saluted",
+    "that was it"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/75",
+   "candidates": [
+    "for my own part i had been feverishly excited all day",
+    "where are you going i asked",
+    "between us and leatherhead however lay the third cylinder with its guarding giants",
+    "the authorities had reason to suppose from the size of the cylinders that at the outside there could not be more than five in each cylinderfifteen altogether",
+    "the chances against anything manlike on mars are a million to one he said",
+    "all night long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke whirled up to the starlit sky",
+    "then the door behind him opened and the man who lodged across the landing came in dressed only in shirt trousers and slippers his braces loose about his waist his hair disordered from his pillow",
+    "he fancied even then that the cooling of the body might account for this but what disturbed that idea was the fact that the ash was falling only from the end of the cylinder",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford",
+    "the case appeared to be enormously thick and it was possible that the faint sounds we heard represented a noisy tumult in the interior"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/264",
+   "candidates": [
+    "the martians had been repulsed they were not invulnerable",
+    "fearful massacres in the thames valley",
+    "this was the deputation",
+    "i looked again at the cylinder and ungovernable terror gripped me",
+    "i did not know it but that was the last civilised dinner i was to eat for very many strange and terrible days",
+    "the intense excitement of the events had no doubt left my perceptive powers in a state of erethism",
+    "i stood over him waiting for the next flash",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford",
+    "it hardly seemed a fair fight to me at that time",
+    "and so forth"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/73",
+   "candidates": [
+    "the case appeared to be enormously thick and it was possible that the faint sounds we heard represented a noisy tumult in the interior",
+    "all night long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke whirled up to the starlit sky",
+    "they are dangerous because no doubt they are mad with terror",
+    "they have done a foolish thing said i fingering my wineglass",
+    "i looked again at the cylinder and ungovernable terror gripped me",
+    "youll hear more yet i said and went on to my home",
+    "he saw this one pursue a man catch him up in one of its steely tentacles and knock his head against the trunk of a pine tree",
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way back from the edge of the pit",
+    "",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/239",
+   "candidates": [
+    "i looked again at the cylinder and ungovernable terror gripped me",
+    "the shell burst clean in the face of the thing",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton and esher",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "eh said one of the men turning",
+    "to get under water",
+    "i stopped short in the doorway",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "he is not an insurance agent"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/50",
+   "candidates": [
+    "remarkable story from woking",
+    "at times i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all",
+    "iv",
+    "to get under water",
+    "i felt a tug at the reins",
+    "i looked again at the cylinder and ungovernable terror gripped me",
+    "then suddenly the white flashes of the heatray came leaping towards me",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "this was the deputation",
+    "he became alarmed at the news in this and went again to waterloo station to find out if communication were restored"
+   ],
+   "answer_index": 1
+  }
+ ]
+}

@@ -1,0 +1,1582 @@
+{
+ "description": "Each open-vocab test recording with 9 near-duplicates: 1-2 words replaced by random non-look-alike corpus words. Simulates a fixed set of similar rehearsed sentences.",
+ "n_candidates": 10,
+ "seed": 0,
+ "trials": [
+  {
+   "id": "silent_parallel_data/5-4_silent/216",
+   "candidates": [
+    "henderson he called circle saw that shooting star last little",
+    "henderson he bridegroom you saw that shooting star feeling night",
+    "henderson he called moral saw that shooting star last whom",
+    "henderson he called you saw impossibility shooting star last night",
+    "henderson he called you saw that shooting star last night",
+    "henderson sound pause you saw that shooting star last night",
+    "henderson he called you saw kent shooting star last night",
+    "henderson he called you knot that widespread star last night",
+    "whither he called you saw that east star last night",
+    "henderson he called you saw that shooting echoes bars night"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/340",
+   "candidates": [
+    "he read and speak the paper fearing the worst had happened to me",
+    "he read and reread the paper fearing the foolish had happened to me",
+    "he read and reread the paper fearing the worst had happened to overthrown",
+    "he read and reread the dr fearing the worst experience happened to me",
+    "he soothing and reread the paper fearing orange worst had happened to me",
+    "he monstrous and reread expiring paper fearing the worst had happened to me",
+    "he understand and reread the paper fearing the worst had happened crumpled me",
+    "he read and reread the paper fearing the worst had happened to me",
+    "he fists and reread the paper fearing the worst had happened to things",
+    "he read and reread the paper fearing the worst had happened to million"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/31",
+   "candidates": [
+    "he heard footsteps running to and fro in left rooms and up and down proceed behind him",
+    "he heard footsteps running to and towns in the rooms and up and down stairs behind him",
+    "he heard footsteps good to and fro solid the rooms and up and down stairs behind him",
+    "he heard footsteps running to and fro in the rooms and up and down stairs behind him",
+    "he heard footsteps running to and fro in the rooms hurry up and down stairs behind him",
+    "he heard part running to and fro in the rooms calmly up and down stairs behind him",
+    "he heard footsteps running to and aid in the rooms drank up and down stairs behind him",
+    "he heard footsteps running to and fro in stage rooms and up and down stairs behind manager",
+    "he heard trains running to and fro in the rooms and up and down stairs behind him",
+    "he heard footsteps running unsuccessful and fro in the rooms and up and down stairs behind him"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/306",
+   "candidates": [
+    "some eaten the refugees were exchanging news with the striding on the omnibuses",
+    "some of the refugees were exchanging bottom with the people on the omnibuses",
+    "some of the begin were exchanging news with the people on the omnibuses",
+    "alpha paces the refugees were exchanging news with the people on the omnibuses",
+    "some of the refugees were exchanging news with the people on the omnibuses",
+    "some planets the refugees were exchanging news with the people on the omnibuses",
+    "some of the refugees were exchanging news with the straight on the omnibuses",
+    "some of the refugees were exchanging news with the people altered the omnibuses",
+    "some of the refugees were exchanging news delay the people on the omnibuses",
+    "some of rough refugees were exchanging news with the people on the omnibuses"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/45",
+   "candidates": [
+    "such things troops geese myself could not be",
+    "such things i told gathering halted not be",
+    "keep things i told myself could not be",
+    "such things i told myself could not be",
+    "such things refusal told afraid could not be",
+    "such things i told myself maxims not be",
+    "such things quick told myself de not be",
+    "such things sufficiently told myself could not be",
+    "such unlikely i told inevitably could not be",
+    "such second aside told myself could not be"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/64",
+   "candidates": [
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs force out of halliford",
+    "openshaw the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came precious sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of stopping",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western think came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward quite of halliford",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward feeling of halliford",
+    "at the then time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky repulsive into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the difficulty and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford",
+    "at the same time represented of their fighting machines similarly armed with tubes crossed the river communicate two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford",
+    "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road asleep runs northward confirm of halliford"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/24",
+   "candidates": [
+    "the hot water from the martians overthrow drifted downstream with me so that for the best part of a mile i could see little of either rain",
+    "the hot water knee the martians overthrow drifted downstream with me so that for the best part of a mile i could see little of either bank",
+    "agency hot water from the martians overthrow drifted downstream with descended so that for the best part of a mile i could see little of either bank",
+    "the hot water from the martians overthrow drifted downstream with me so that for the best part of a mile i could see little of either bank",
+    "the hot water from the martians overthrow drifted downstream eventually me so that for the best part of a mile i could see little of either bank",
+    "heath hot water from the martians overthrow drifted downstream with me so that for the best part of a mile i could see little of either bank",
+    "the hot water from the martians overthrow drifted downstream with me so that for the best part of a mile i could see little of either safely",
+    "the hot water from the martians overthrow drifted downstream with me so that for spread best part of a mile i could see little of either astronomical",
+    "the hot water from the martians whirled drifted downstream with me so that for the best part place a mile i could see little of either bank",
+    "the hot water from the martians capture drifted downstream with me so that for the best part of a mile i could see little of either bank"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/120",
+   "candidates": [
+    "the soldiers were having the greatest gravel in making them realise the gravity of their position",
+    "the soldiers were having the greatest difficulty in making supper realise turning gravity of their position",
+    "the soldiers were having the greatest difficulty in making them gleam the round of their position",
+    "the soldiers were having the greatest difficulty in making them realise the gravity of their risen",
+    "the soldiers were having the greatest difficulty in making them realise the gravity of their position",
+    "the soldiers were having the greatest difficulty in mr them realise the gravity of their position",
+    "coffee soldiers england having the greatest difficulty in making them realise the gravity of their position",
+    "the soldiers were having europe greatest difficulty in making them realise the gravity of their position",
+    "the soldiers were having the metal difficulty in making them realise the gravity themselves their position",
+    "the arrangements were having the greatest difficulty in making them realise the gravity of their position"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/200",
+   "candidates": [
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns saved rapidly larger as they drew nearer",
+    "their fore bodies glittered in the sun as they swept swiftly forward upon familiar guns growing rapidly larger as they drew nearer",
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing satisfied larger as they drew nearer",
+    "their armoured bodies glittered in the sun as they heavily swiftly forward upon the guns growing rapidly larger as they drew nearer",
+    "their armoured bodies glittered in the sun as they swept swiftly forward chain the guns growing rapidly expression as they drew nearer",
+    "their armoured bodies glittered in the sun as they burly swiftly forward upon bridges guns growing rapidly larger as they drew nearer",
+    "their armoured bodies camp in the sun as they swept swiftly forward upon the guns replace rapidly larger as they drew nearer",
+    "their armoured bodies glittered in the sun as they swept soothing forward upon the guns sturdy rapidly larger as they drew nearer",
+    "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer",
+    "their feared bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/82",
+   "candidates": [
+    ""
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/218",
+   "candidates": [
+    "presently he came upon a stile and savagely it followed a footpath hand",
+    "presently he came upon a stile and crossing it followed a footpath cyclists",
+    "presently he came upon a invariably and crossing it followed a footpath him",
+    "presently he came ride a stile and crossing it astronomer a footpath northeastward",
+    "presently he came paper a stile and crossing it followed a footpath northeastward",
+    "place he came blowing a stile and crossing it followed a footpath northeastward",
+    "presently he came upon a back and crossing it followed a footpath northeastward",
+    "presently terror came upon a stile and crossing it restless a footpath northeastward",
+    "presently he came upon a stile and crossing it followed a footpath northeastward",
+    "presently he came upon a stile and crossing it followed remarks footpath northeastward"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/167",
+   "candidates": [
+    "all night long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke whirled up to the starlit sky",
+    "all night long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke flickering up to the starlit tout",
+    "all night long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and embankment and again a puff of greenishwhite smoke whirled up to the starlit sky",
+    "all ascended long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke whirled up to the crowded sky",
+    "all night long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever account again a puff of greenishwhite smoke whirled up to the starlit sky",
+    "all night long the martians were hammering and stirring sleepless indefatigable at work upon movement machines they were making ready and ever and again a unlikely of greenishwhite smoke whirled up to the starlit sky",
+    "all night long the martians fireplace solitary and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke whirled up to the starlit sky",
+    "battery night long the martians were hammering and smashed sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke whirled up to the starlit sky",
+    "all night attic the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke whirled up to the starlit sky",
+    "all night long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke cupboard up to the starlit sky"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/58",
+   "candidates": [
+    "eh said one thus the men turning",
+    "fastening said one of the men turning",
+    "eh said taking of gunners men turning",
+    "eh said one incrustation the men cant",
+    "eh said one understand the assistant turning",
+    "eh said one of the men turning",
+    "downstairs said one of the men turning",
+    "eh said rising thence the men turning",
+    "eh said one of the men shrieking",
+    "iron said one of the men turning"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/172",
+   "candidates": [
+    "suddenly he vanished and i could have oxygen a faint shriek had lover me",
+    "suddenly he vanished and i could have fancied a faint shriek had reached theirs",
+    "suddenly he vanished and i impression have fancied a faint shriek had reached bulky",
+    "suddenly he vanished and i could have fancied date smoky shriek had reached me",
+    "suddenly he vanished and i could have fancied editions faint enough had reached me",
+    "suddenly he vanished and i could have fancied a faint shriek had reached me",
+    "suddenly he scarcely and i could have fancied a faint shriek had reached me",
+    "capital he vanished and i could have fancied a faint shriek had reached me",
+    "suddenly he vanished excellent i could have fancied a faint shriek had reached threatened",
+    "suddenly he vanished and i could have developments a faint shriek had reached me"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/257",
+   "candidates": [
+    "there his story became general",
+    "there beams story became madam",
+    "there shriek story became ejaculatory",
+    "there springing chosen became ejaculatory",
+    "chain his stagger became ejaculatory",
+    "there his story became little",
+    "there his story became proceeded",
+    "there his story became ejaculatory",
+    "there looks story became youth",
+    "there pierced goose became ejaculatory"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/123",
+   "candidates": [
+    "he is not an insurance thousands",
+    "he is not an insurance agent",
+    "he is not feature insurance after",
+    "he finding not an insurance stent",
+    "he is not an or agent",
+    "he is chosen an insurance agent",
+    "he is not an street agent",
+    "he is not an insurance lighted",
+    "he is not fiery insurance miracle",
+    "he is not an preparations agent"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/42",
+   "candidates": [
+    "it was all so real fence so familiar",
+    "it was all so alarm and so familiar",
+    "it was all ash real and so familiar",
+    "it was all so real and so familiar",
+    "it impressions insight so real and so familiar",
+    "it was all so france and so familiar",
+    "picked was all bark real and so familiar",
+    "it bars all so real and frantic familiar",
+    "it was all wandering real and so familiar",
+    "pinpoint was all so real coiling so familiar"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/21",
+   "candidates": [
+    "i should have started at once but my companion had been in active weapon and he knew better than that",
+    "i should have started at seems but my companion had been in active service and he knew better than that",
+    "i should have started at once but my companion had been in active service and he knew better than that",
+    "i should have started at dried but my companion had been in active service and he knew better than that",
+    "church should have started at limited but my companion had been in active service and he knew better than that",
+    "i should have started at once but my companion had been in active service and he knew better than pierced",
+    "i should folded started at once but my companion had been in active service and he knew better than that",
+    "i fortune have started duke once but my companion had been in active service and he knew better than that",
+    "i should have started at once but my companion had been in active service and he knew better unlikely that",
+    "i should husbands started at once but my companion had been in active service and he knew better than that"
+   ],
+   "answer_index": 2
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/171",
+   "candidates": [
+    "secret entered upon the railway puzzled me at first there were a black heap and a vivid glare and to the right of that a row of yellow oblongs",
+    "the hastened upon the railway puzzled me at first there were a black heap and a vivid glare and to the interrupted of that a row of yellow oblongs",
+    "the light upon the railway puzzled me at reaction there were a black heap and a vivid glare and to the right of that a row of yellow oblongs",
+    "the light upon the railway puzzled me gasped first there were a black heap and a concerns glare and to the right of that a row of yellow oblongs",
+    "the light upon the railway puzzled me at lee there speak a black heap and a vivid glare and to the right of that a row of yellow oblongs",
+    "mccarthy light upon the railway puzzled me at first treasure were a black heap and a vivid glare and to the right of that a row of yellow oblongs",
+    "the light upon the railway puzzled me at first there were a black heap and appears vivid wonderfully and to the right of that a row of yellow oblongs",
+    "the light upon the railway puzzled me at first there were a friend heap and a vivid glare and to the right of that a row of yellow oblongs",
+    "the light upon the railway puzzled me at first there were a black heap and a vivid glare and to the right of that a row of yellow oblongs",
+    "the light upon the railway puzzled me at first there were a black heap and a vivid glare and to the decline of that shoulder row of yellow oblongs"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/262",
+   "candidates": [
+    "they seemed smoked helpless in that above of theirs",
+    "they seemed very helpless in that pit of reader",
+    "inert seemed very helpless in that pit of theirs",
+    "they seemed very helpless in vague pit of theirs",
+    "names seemed very helpless in that pit of theirs",
+    "they seemed very helpless in that pit turning theirs",
+    "they seemed very helpless in that pit of theirs",
+    "they seemed folks helpless in that pit of suicide",
+    "they seemed very helpless in gigantic pit of theirs",
+    "they seemed very helpless lest slip pit of theirs"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/153",
+   "candidates": [
+    "i myself heard nothing of reports",
+    "i myself heard nothing of that",
+    "i slightly result nothing of that",
+    "i myself heard nothing bush that",
+    "i myself masses nothing mostly that",
+    "i myself exceptional felony of that",
+    "i myself heard nothing of plush",
+    "i myself heard skin of that",
+    "lose settle heard nothing of that",
+    "i myself watch approaching of that"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/273",
+   "candidates": [
+    "the authorities had reason to suppose from the size of fathers cylinders that at the outside there could not born more than five in each cylinderfifteen altogether",
+    "the authorities had reason to suppose confess the size of the cylinders that at the outside there could not be more than five in each cylinderfifteen altogether",
+    "the authorities had reason to suppose from the size of the cylinders that at the outside square could not be more than five in each restless altogether",
+    "the authorities inquiry reason to suppose from the size of the cylinders that at the outside there could doctors be more than five in each cylinderfifteen altogether",
+    "the authorities had reason to suppose from the size of the cylinders that at the outside there could tops be more than five in each cylinderfifteen altogether",
+    "the authorities had reason to suppose from the creeping of the cylinders that at the outside there could not be more than five in each cylinderfifteen altogether",
+    "the authorities planet reason to suppose from the size of the cylinders that has the outside there could not be more than five in each cylinderfifteen altogether",
+    "the authorities had reason to suppose from the size of the cylinders that at the outside there could not be more than five in each cylinderfifteen altogether",
+    "the authorities had reason to suppose from the throw of the cylinders that shillings the outside there could not be more than five in each cylinderfifteen altogether",
+    "the authorities had reason to suppose from the size of the cylinders that at the outside there could not be lids than allow in each cylinderfifteen altogether"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/226",
+   "candidates": [
+    "but its something more than midst meteorite",
+    "jet its something more than obliged meteorite",
+    "but its something more than a plate",
+    "but its happy more than a meteorite",
+    "blank its something more than a meteorite",
+    "but its something more name a cedars",
+    "but its something more than a meteorite",
+    "killed its headlines more than a meteorite",
+    "usually its subject more than a meteorite",
+    "cruel its bedrooms more than a meteorite"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/374",
+   "candidates": [
+    "fearful south occupation the thames valley",
+    "fearful massacres in the refused valley",
+    "muffled massacres in the thames valley",
+    "fearful massacres in restore thames valley",
+    "fearful massacres slight the thames eastward",
+    "fearful moral in colleague thames valley",
+    "fearful massacres dated the thames valley",
+    "fearful massacres in the thames valley",
+    "fearful massacres in the thames stiff",
+    "fearful touch in the thames valley"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/117",
+   "candidates": [
+    "at the end of finds i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians",
+    "at the end of it i sat tempering nuts with a subject regretting ogilvys rashness and yards the shortsighted timidity of the martians",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing blew shortsighted timidity of the martians",
+    "at the end of it scent sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the footsteps",
+    "brother the hydraulic of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys streaming and denouncing the foremost timidity of the martians",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys manor and denouncing the shortsighted timidity of the martians",
+    "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness silly denouncing the shortsighted timidity of the martians"
+   ],
+   "answer_index": 2
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/50",
+   "candidates": [
+    "besides that there was quite a averse of bicycles",
+    "besides that there bawled quite a gave of bicycles",
+    "besides that there was quite unforeseen heap of bicycles",
+    "besides that there was feeding questioning heap of bicycles",
+    "besides that intention was quite a antagonists of bicycles",
+    "besides amusing there was quite a heap of bicycles",
+    "shutters that there was quite a outer of bicycles",
+    "besides that there was quite a heap of bicycles",
+    "hedge that passing was quite a heap of bicycles",
+    "besides that there was quite intervals heap of bicycles"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/189",
+   "candidates": [
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black flung jerk forward an inch or so",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound westward saw the black mark jerk forward an inch or so",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw remark black mark jerk forward an inch or so",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and persuaded the black mark jerk forward an inch or so",
+    "even then he scarcely understood cope this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "even then he widow understood what this indicated until he heard a muffled grating sound apex saw the black mark jerk forward an inch or so",
+    "form gravitational he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "even then footsteps scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so",
+    "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark ray forward an inch or so"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/47",
+   "candidates": [
+    "and looking forth",
+    "and so parade",
+    "quite so forth",
+    "names had forth",
+    "valley so forth",
+    "allowance so forth",
+    "and so handful",
+    "and so forth",
+    "thoughtless so house",
+    "assistance so forth"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/263",
+   "candidates": [
+    "he saw this traced pursue a man catch him up in one of impunity steely tentacles and knock his head against the trunk of a pine tree",
+    "he saw this one pursue a man arranged papers up in one of its steely tentacles and knock his head against the trunk of a pine tree",
+    "he saw this one pursue a man catch him up in one of its steely tentacles and knock his head against the trunk of a pine tree",
+    "he saw this one pursue a man catch him up in one of its steely group and knock his head against the trunk of a pine tree",
+    "he saw this one pursue a man catch him up in one of its steely tentacles and knock his paragraph against the trunk of a pine tree",
+    "he saw this one pursue a man catch him up in one of its steely tentacles and heart his head against the trunk of a pine tree",
+    "he saw this one pursue a man catch him up in one doubt its steely tentacles and knock his head against the trunk of a pine tree",
+    "he saw this one herself a man catch him up in one of its steely tentacles and knock his head against the trunk of a pine tree",
+    "he saw this one pursue a man catch gone up in one of its steely tentacles milking knock his head against the trunk of a pine tree",
+    "he saw this one pursue a man catch him up in one bed its steely tentacles and knock stride head against the trunk of a pine tree"
+   ],
+   "answer_index": 2
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/135",
+   "candidates": [
+    "i saw forty giving place to horror on the faces of the people about kind",
+    "i saw observed giving place to horror on the faces of flicker people about me",
+    "i saw gave giving place pierced horror on the faces of the people about me",
+    "i saw astonishment giving place to horror on the faces of the people about me",
+    "i saw unforeseen giving place to horror on the tell of the people about me",
+    "i saw astonishment giving place to horror on ventured faces of the buy about me",
+    "i saw astonishment giving place to horror on available faces shapes the people about me",
+    "i irene astonishment giving place to riverside on the faces of the people about me",
+    "i saw astonishment giving place to horror on the faces of the people about went",
+    "i saw astonishment giving place to arrival on the faces expiring the people about me"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/163",
+   "candidates": [
+    "illustration now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "every now and gathering particular would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "every now and then people would glance nervously across the wey at the mingling towards chertsey but everything over there was still",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "every now and whirl people would glance nervously across the wey at the meadows towards chertsey but everything over there was spared",
+    "every now and then people discovery glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "every now and then people would glance nervously across the wey scream the meadows towards chertsey but everything over existence was still",
+    "every now rights then people would glance nervously across the wey at the meadows policeman chertsey but everything over there was still",
+    "every now and then people college glance nervously across the wey at the meadows towards chertsey but everything over there was still",
+    "every now and then people would glance nervously across the wey at the meadows towards chertsey child everything over there was still"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/222",
+   "candidates": [
+    "then abruptly he sat down before the table put his head on his arms and began to recovered and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a was boy keenly a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him slain",
+    "then abruptly he sat down before wired table put his head on his arms and began to sob and weep like a little boy in a rear passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "then abruptly he sat down before the table put across head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "calmly abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and threshold like a little boy in a perfect passion of emotion while i with a curious disturbance of my own recent despair stood beside him wondering",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy blundered a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering",
+    "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my position recent despair stood beside him wondering"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/231",
+   "candidates": [
+    "this was the pair",
+    "months murmured the deputation",
+    "this was the deputation",
+    "offered was helen deputation",
+    "this was the returning",
+    "this narrative the authority",
+    "this was the peeped",
+    "this they intermittently deputation",
+    "check was off deputation",
+    "this among the deputation"
+   ],
+   "answer_index": 2
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/301",
+   "candidates": [
+    "then suddenly the white surrey of the heatray came leaping towards me",
+    "then face the white flashes of the heatray came leaping towards me",
+    "then suddenly the white flashes of the becoming came leaping towards me",
+    "then lank the white flashes of the heatray else leaping towards me",
+    "then suddenly printed white flashes of the heatray came leaping towards me",
+    "then suddenly the white flashes stagger the heatray came leaping towards me",
+    "then suddenly the white flashes of the heatray give leaping towards me",
+    "then suddenly the white flashes of the hardened came leaping towards me",
+    "then suddenly the white flashes of the heatray came leaping chin me",
+    "then suddenly the white flashes of the heatray came leaping towards me"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/13",
+   "candidates": [
+    "between us and leatherhead however lay seated third cylinder disappeared its guarding giants",
+    "between us and leatherhead however lay the third cylinder with its sit giants",
+    "between us and leatherhead however sleep the third thin with its guarding giants",
+    "between us existence leatherhead however lay dispose third cylinder with its guarding giants",
+    "between us and leatherhead however better the third bought with its guarding giants",
+    "between us and leatherhead however gun the third cylinder with exactly guarding giants",
+    "between us and letters advanced lay the third cylinder with its guarding giants",
+    "between act and leatherhead however lay the third cylinder with dowry guarding giants",
+    "between us and leatherhead however lay the struggle cylinder with its guarding giants",
+    "between us and leatherhead however lay the third cylinder with its guarding giants"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/46",
+   "candidates": [
+    "column france from woking",
+    "remarkable story from woking",
+    "trifling story lake woking",
+    "read story from bush",
+    "remarkable wiped from generally",
+    "mad story from fight",
+    "keeping story from woking",
+    "remarkable vaguely from woking",
+    "remarkable story from link",
+    "remarkable island from loved"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/80",
+   "candidates": [
+    "animal",
+    "blasted",
+    "chain",
+    "cabs",
+    "adjacent",
+    "safely",
+    "discharged",
+    "beating",
+    "iv",
+    "sun"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/49",
+   "candidates": [
+    "respect horse took the bit glimpse his teeth and bolted",
+    "the horse took the bit between decline teeth and bolted",
+    "the horse took logical bit between limbs teeth and bolted",
+    "the enter took the bit between his teeth and bolted",
+    "the horse lysander the bit between his opposition and bolted",
+    "the touched took the bit between his teeth inquire bolted",
+    "the horse peering the bit between his teeth and bolted",
+    "the horse took the bit between his teeth and bolted",
+    "the horse took the wandered between his teeth and bolted",
+    "the horse took the bit between his teeth brushed bolted"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/274",
+   "candidates": [
+    "the martians and their appliances were altogether invisible save for that ours mast upon which vanishing restless mirror wobbled",
+    "the martians and their appliances were altogether downstairs save for that thin mast dundee which their restless mirror wobbled",
+    "the martians and their appliances were altogether invisible save for that thin mast upon which their restless held wobbled",
+    "the martians and their india were altogether invisible save for that thin mast upon which discovery restless mirror wobbled",
+    "the martians and their appliances were altogether invisible save for that thin mast upon which their reasons mirror wobbled",
+    "rushed martians and their appliances were altogether invisible save for that thin mast innocence which their restless mirror wobbled",
+    "the martians and their appliances were altogether invisible save for that thin mast upon which their restless mirror wobbled",
+    "the martians and their appliances were altogether invisible save for that thin mast upon which their restless mirror lives",
+    "the martians and their appliances were altogether driver save for that thin mast upon furnished their restless mirror wobbled",
+    "the martians and their appliances were fair invisible save for that thin mast upon which their restless mirror wobbled"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/118",
+   "candidates": [
+    "these hilllike forms levers lower and him even as we stared",
+    "these hilllike forms grew lower and broader even as we stared",
+    "these hilllike forms grew lower and broader even as indicated stared",
+    "these hilllike forms grew lower tire broader even as we stared",
+    "these hilllike dramatic grew lower and broader even as we stared",
+    "these hilllike legs grew lower and broader even as transition stared",
+    "these hilllike forms leading lower and broader even as we stared",
+    "these hilllike hanged grew lower and broader even as we stared",
+    "these hilllike forms grew lower crate broader even as we stared",
+    "these hilllike forms articulate lower and broader even able we stared"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/277",
+   "candidates": [
+    "it would seem that a number of men or animals had rushed across the lawn",
+    "it would seem that a number of clockwork or animals had rushed across beautifully lawn",
+    "it would seem that a number of men or animals had rushed across the harrow",
+    "it suspicions seem that a number of men or animals had rushed across the lawn",
+    "it would seem that a number of income or animals had hang across the lawn",
+    "it would seem goodnight a number of men or animals concussion rushed across the lawn",
+    "it would seem that a number of men torrent animals had degree across the lawn",
+    "it would seem that a number of men or animals had rushed calamity the lawn",
+    "it would seem that a number of men or thickness had rushed across the soaked",
+    "helping would seem that a number of men or animals had aloysius across the lawn"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/3",
+   "candidates": [
+    "leatherhead is about twelve miles useless local hill",
+    "leatherhead pa about twelve miles from maybury hill",
+    "come is about twelve miles from maybury hill",
+    "altogether is about twelve sending from maybury hill",
+    "leatherhead is about twelve miles from maybury hill",
+    "offer is about twelve miles from maybury hill",
+    "leatherhead is easier bushes miles from maybury hill",
+    "horsham patch about twelve miles from maybury hill",
+    "leatherhead is about oh miles from elapsed hill",
+    "leatherhead is about twelve worlds from detour hill"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/208",
+   "candidates": [
+    "follows became alarmed at the news in this christmas went again to waterloo station to find out if communication were restored",
+    "he enlarged alarmed at the news in pillars and went again to waterloo station to find out if communication were restored",
+    "he became alarmed explained the news in this and went again to framework station to find out if communication were restored",
+    "he became alarmed at the news in this and went again to waterloo station to find out if communication were restored",
+    "he became alarmed restored the news in this and went again to waterloo station to find out if communication were restored",
+    "he became alarmed at the news in this and went again to waterloo paid to find out if communication were restored",
+    "he became alarmed at the tug in this and went again to waterloo station to find out if communication were restored",
+    "he became alarmed at the news in this and went lucy to waterloo station to find out if communication were restored",
+    "he became alarmed at tie news in this and went again to waterloo station to find out if communication were restored",
+    "he became alarmed at the news stilled this and went again to waterloo station to find out if communication sending restored"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/183",
+   "candidates": [
+    "for a minute he scarcely rejoin what this meant and although the heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "for a minute he scarcely realised what this meant and although the date was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "for a minute he scarcely realised what this meant and although breakfast heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "for a minute he scarcely realised what this meant and although the heat was excessive he clambered sit into the pit signed to the bulk to see the thing more clearly",
+    "for a proceed he scarcely realised what this meant and although the heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "for a minute he scarcely realised what this meant and century the heat was excessive he clambered down into the pit close to the bulk to wreckage the thing more clearly",
+    "for a minute he scarcely realised what this meant and although the heat was excessive appearance clambered down into the pit close to the bulk to see the thing more clearly",
+    "for a minute he scarcely realised what this meant and although the heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "for a minute he scarcely rug what this meant and although endeavored heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly",
+    "for a minute he scarcely realised what this meant and although the heat was excessive he clambered dashed into the pit close to the bulk to see despair thing more clearly"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/190",
+   "candidates": [
+    "people were fighting savagely for standingroom in the carriages even at two oclock",
+    "people were fighting savagely for standingroom in the carriages even excitedly any oclock",
+    "people were fighting savagely for standingroom in the mostly even at two oclock",
+    "plot were fighting savagely for standingroom in the carriages even at two oclock",
+    "people opened fighting savagely for standingroom in the carriages even at two words",
+    "people were fighting savagely for standingroom in the carriages even at equally oclock",
+    "people field fighting savagely for standingroom in the carriages even fine two oclock",
+    "people were downstairs savagely for eyewitness in the carriages even at two oclock",
+    "people links fighting savagely for standingroom in hollow carriages even at two oclock",
+    "driving were fighting savagely for standingroom in the carriages even at supper oclock"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/184",
+   "candidates": [
+    "he fancied even then that the cooling of the body might account for this but what disturbed that idea was the fact that the ash was falling only from the guilt of the cylinder",
+    "mars fancied even then that the cooling of the body might account for this but what disturbed that idea was the fact that holder ash was falling only from the end of the cylinder",
+    "he fancied even then that the cooling of the body might account for this but what disturbed immediate heeled was the fact that the ash was falling only from the end of the cylinder",
+    "he fancied even then that the cooling of the body might account for this but what disturbed that idea was the fact that the ash was falling grasp from the end of the cylinder",
+    "he fancied even then that the cooling of the body might account for this but what disturbed that idea was the fact that the ash was falling only from the end of the cylinder",
+    "he fancied even then that the cooling of the body might account for this but blandly disturbed that idea was the fact that the ash was falling only from the end of the cylinder",
+    "he fancied even then that the trivial of the body might ceremony for this but what disturbed that idea was the fact that the ash was falling only from the end of the cylinder",
+    "he fancied even then that the cooling of the body might account for this but what disturbed that idea was the fact that the ash was falling only from the end of the attempted",
+    "he fancied even then that the cooling of the body might account for this but what disturbed that idea was toller fact that the ash was falling only from the end insight the cylinder",
+    "he fancied even then that the cooling of the body might account for this but what disturbed that idea was the fact that the ash was falling only from the end of the drew"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/53",
+   "candidates": [
+    "the burning heather had been extinguished but the level ground towards ottershaw was blackened as far as one could see and still giving iron vertical streamers of smoke",
+    "the burning heather had been extinguished but the level ground towards ottershaw was blackened as far as one could see and still giving off vertical streamers of smoke",
+    "the burning heather had been extinguished but the level ground towards ottershaw was blackened as far as one could see and still giving off vertical fall of smoke",
+    "the burning heather had been extinguished but the level ground towards ottershaw was blackened as far as one could see and still giving drive vertical streamers of smoke",
+    "the burning heather had been extinguished but the level ground towards ottershaw was blackened as far as one could see and still giving off vertical streamers now smoke",
+    "the burning heather had been ship but the level ground towards ottershaw was blackened as far as one could see and still draught off vertical streamers of smoke",
+    "the burning heather had been months but the level ground towards ottershaw was blackened as far as one could see and still giving off vertical streamers of smoke",
+    "the hired heather had been extinguished but the level ground towards ottershaw was blackened as far as one could see and still giving off vertical streamers of smoke",
+    "the burning heather had been extinguished but the level ground towards ottershaw was blackened as far as one could see and still giving off vertical swear of solution",
+    "distances burning heather had been extinguished but the level ground towards ottershaw was blackened as far as covent could see and still giving off vertical streamers of smoke"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/155",
+   "candidates": [
+    "wherever stopped short in the doorway",
+    "i stopped short in the doorway",
+    "i stopped short in affairs doorway",
+    "i stopped short in the inky",
+    "i stopped short in the definite",
+    "i occupied short in the doorway",
+    "i stopped short sake the earthquake",
+    "i stopped short in the hats",
+    "lose stopped short in the doorway",
+    "i stopped hiss in the write"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/111",
+   "candidates": [
+    "they are dangerous because no suspecting they are mad with plentiful",
+    "they are dangerous because no story they are mad with glasses",
+    "they are dangerous because alter doubt they are charred with terror",
+    "they are dangerous because no doubt heat are mad remaining terror",
+    "they are dangerous because circle doubt they kitchen mad with terror",
+    "they are dangerous because no doubt they are mad ditches successful",
+    "they are dangerous hay no doubt they are mad forth terror",
+    "they are dangerous because no doubt desperate are mad with terror",
+    "they are circumstances because no doubt they are look with terror",
+    "they are dangerous because no doubt they are mad with terror"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/274",
+   "candidates": [
+    "date and my wife stood amazed",
+    "i and my wife stood amazed",
+    "i and word wife stood amazed",
+    "painful and my wife stood amazed",
+    "i vital my wife stood amazed",
+    "i and my wife convincing amazed",
+    "i and investigation wife stood amazed",
+    "i and my stick stood amazed",
+    "i and race wife advanced amazed",
+    "i and while wife stood amazed"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/43",
+   "candidates": [
+    "i felt a print at the reins",
+    "opening felt a tug at the reins",
+    "i creature solved tug at the reins",
+    "i felt deep tug at the reins",
+    "i felt a tug blundered the reins",
+    "i felt a tug at the reins",
+    "pots felt a tug possible the reins",
+    "i felt a tug void twentieth reins",
+    "i felt a tug ominous the reins",
+    "averse felt a tug at the reins"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/55",
+   "candidates": [
+    "i previous at the group of received",
+    "i stopped at the group of people",
+    "i word worked the group of people",
+    "i stopped at the group of crest",
+    "i stopped beyond the group invent people",
+    "lot stopped at the group of people",
+    "i stopped at company group painful people",
+    "i stopped at pallid group of type",
+    "i stopped at the height pains people",
+    "i stopped at the simultaneously of people"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/1",
+   "candidates": [
+    "tobacco",
+    "assured",
+    "guttering",
+    "fields",
+    "arrest",
+    "x",
+    "ought",
+    "multitude",
+    "unbroken",
+    "reserve"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/3",
+   "candidates": [
+    "i found a little crowd of perhaps twenty denied dull the huge hole in which the cylinder lay",
+    "i found nocturnal little crowd of perhaps twenty people surrounding the huge hole in which the cylinder lay",
+    "i found a little crowd of perhaps twenty people surrounding the huge hole in which the cylinder lay",
+    "i found a little crowd of office twenty people surrounding the huge hole in which the cylinder lay",
+    "i found a weak crowd of perhaps twenty people surrounding the huge hole in which the cylinder lay",
+    "mark singing a little crowd of perhaps twenty people surrounding the huge hole in which the cylinder lay",
+    "i found goods little crowd of perhaps twenty people surrounding the huge hole in which the cylinder decline",
+    "i found a little stream of perhaps twenty people surrounding the huge hole in which the cylinder shortly",
+    "stronger found a little crowd of perhaps twenty people surrounding clever huge hole in which the cylinder lay",
+    "pocket found a little crowd of perhaps twenty people surrounding the huge hole in which the cylinder lay"
+   ],
+   "answer_index": 2
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/228",
+   "candidates": [
+    "when half suffocated i detonation my head above water the martians hood pointed at the batteries that were still firing across the river and as it advanced it swung loose what must have trunk the generator of the heatray",
+    "when half suffocated i raised my head above water the martians hood pointed at the batteries that were still firing across the river and positions it advanced it swung loose what must have been the generator of the heatray",
+    "when half suffocated i command my head above water clay martians hood pointed at the batteries that were still firing across the river and as it advanced it swung loose what must have been the generator of the heatray",
+    "when half suffocated i raised my head above water the martians hood pointed at the batteries that were still firing across the river and as it advanced it swung loose what must have been the generator of the heatray",
+    "when half suffocated i markings my head above water the martians hood pointed at the batteries that were still firing across the river and as it advanced it swung loose what must have been the generator of the heatray",
+    "when half suffocated i raised my head above water the martians hood pointed at the batteries that were still firing across the river and as stopped advanced it swung loose what must have been the generator of the heatray",
+    "when half suffocated i raised my head above water the martians hood pointed at the batteries that were still firing across the river and as star advanced it swung loose what must have been the generator of firing heatray",
+    "when half suffocated i raised my head above water the martians hood pointed at the batteries that were still visible across the river and as it advanced it swung loose what must have been the generator gables the heatray",
+    "when half suffocated i raised my head above water the martians hood pointed at the batteries that were still firing across the river and milk lamps advanced it swung loose what must have been the generator of the heatray",
+    "when half suffocated i raised my head above water the martians hood pointed at the batteries that were still firing across the situation and as it advanced it swung loose what must distance been the generator of the heatray"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/28",
+   "candidates": [
+    "preserve preserve not credit it",
+    "i could not credit it",
+    "i could not credit amazing",
+    "i articulate unlocking credit it",
+    "i could not ugly depressed",
+    "courage could fought credit it",
+    "i could not sheets unable",
+    "neighbour could not credit it",
+    "i gypsies not credit streamer",
+    "impressions could shrunk credit it"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/212",
+   "candidates": [
+    "that was odd",
+    "each was whip",
+    "that was rested",
+    "that lamp it",
+    "that draw it",
+    "grotesque glove it",
+    "that was cover",
+    "form our it",
+    "that monotonous it",
+    "that was it"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/1",
+   "candidates": [
+    "hot",
+    "loss",
+    "sudden",
+    "drug",
+    "crying",
+    "forced",
+    "xiii",
+    "avoid",
+    "suite",
+    "saw"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/14",
+   "candidates": [
+    "arrested my own part i had been feverishly excited all day",
+    "for my wading part i had been feverishly excited useful day",
+    "for wished own part i had been feverishly excited all day",
+    "for my own part bottom had been feverishly excited all day",
+    "for my own part i had been feverishly excited all day",
+    "for my own part extremely had been feverishly excited all day",
+    "for my own part i had been feverishly young all day",
+    "for my oily part i had been feverishly excited all day",
+    "for my own part i had been feverishly excited all obliged",
+    "for mysterious own part i had been feverishly excited treble day"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/127",
+   "candidates": [
+    "clean towering i did",
+    "i interview i did",
+    "chimney know i did",
+    "officers the i did",
+    "i know met did",
+    "i latter i did",
+    "i know i did",
+    "i engineer blasted did",
+    "i know watch did",
+    "horrible know i did"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/114",
+   "candidates": [
+    "the intense eleven of the events had no doubt left my perceptive powers in a state of erethism",
+    "the intense excitement of the events moonshine no doubt happily my perceptive powers in a state of erethism",
+    "the intense excitement of the events had no doubt left loss perceptive attempt in a state of erethism",
+    "the intense excitement of the events social no short left my perceptive powers in a state of erethism",
+    "the intense excitement lysander the events had no doubt left my perceptive powers in a state of erethism",
+    "the intense excitement of the events had no doubt left my perceptive powers in clearer state of erethism",
+    "the intense excitement of the events had no doubt left my perceptive powers in a state of erethism",
+    "the intense excitement of the events had no method left my officers powers in a state of erethism",
+    "the intense excitement of the gravel had no doubt left my perceptive powers in a state of erethism",
+    "the intense excitement of the events had no doubt left my perceptive moments in a state of causing"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/155",
+   "candidates": [
+    "people came panting along under heavy burdens one husband and wife were young carrying a small outhouse door between them with some of their household goods piled thereon",
+    "people came panting memory under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "people came panting along under heavy burdens one husband and wife were even carrying a borne outhouse door between them with some of their household goods piled thereon",
+    "people came stop along under heavy burdens one husband and wife were even tire a small outhouse door between them with some of their household goods piled thereon",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small dangers door between them with some of their household goods piled thereon",
+    "people came panting along under heavy burdens brandy husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "people dated panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon",
+    "people came panting quietly under heavy burdens one husband and wife were even carrying a small joint door between them with some of their household goods piled thereon",
+    "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled brief"
+   ],
+   "answer_index": 2
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/162",
+   "candidates": [
+    "probably this is due to the relative strength of the earths gravitational energy on that last text their leaderwriter expanded appearance comfortingly",
+    "clean this is due to the relative strength of the earths gravitational energy on that last text their leaderwriter expanded very comfortingly",
+    "probably this is due to the relative strength of the earths gravitational energy on that pink text their leaderwriter expanded very point",
+    "probably this cat due to the relative strength of the earths gravitational energy on that last text their leaderwriter expanded very parts",
+    "probably this is due to the relative strength of the earths gravitational energy on deserved last text their leaderwriter expanded very comfortingly",
+    "probably this is due to the relative strength of the earths gravitational energy on that last text their leaderwriter error very comfortingly",
+    "probably this is due to the relative strength of the earths gravitational energy on that last text their leaderwriter expanded very comfortingly",
+    "probably this is due to the relative strength of the earths freely energy on that last text their leaderwriter expanded very comfortingly",
+    "probably this is due to the relative strength of the earths gravitational energy on keeping last text their leaderwriter expanded very comfortingly",
+    "probably this is due to the relative strength of the ruefully gravitational search on that last text their leaderwriter expanded very comfortingly"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/211",
+   "candidates": [
+    "to get denied candle",
+    "pillow profession under water",
+    "to suffer placed water",
+    "flame logical under water",
+    "to extreme under water",
+    "to clatter under appointment",
+    "to straight under water",
+    "clouds get occasionally water",
+    "to get under water",
+    "trifling stabbed under water"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/110",
+   "candidates": [
+    "they have done a foolish thing said i fingering my speckled",
+    "they have done a foolish thing said pray fingering my wineglass",
+    "they glare done a foolish thing said i fingering realise wineglass",
+    "they lens done a foolish thing said i fingering my wineglass",
+    "they have done a must thing said i fingering resembling wineglass",
+    "they have done a foolish thing said stems fingering my wineglass",
+    "they have persuade carried foolish thing said i fingering my wineglass",
+    "disappointed have done a foolish thing said i fingering my wineglass",
+    "they have done a foolish thing said i fingering my wineglass",
+    "they have done a foolish thing said i arthurs my wineglass"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/99",
+   "candidates": [
+    "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "we were far foot the range of the heatray there and had it not been for the silent desertion of some of dust houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "we were far beyond the range of the heatray stood and had it not been for the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses the stirring returning of packing in others and the knot of soldiers standing arrival the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "we were far beyond the range of the heatray there and had it not been sit the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over departure railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "we were far beyond the range of the heatray there and had it not been there the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses the stirring movement of first in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing rug the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday",
+    "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses also stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like wrecked other sunday",
+    "we were far beyond the range perfectly the heatray there and had it not been for the joy desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/8",
+   "candidates": [
+    "i think they perceived that nothing was to bulk done for the present and had gone away to breakfast at hendersons house",
+    "i think they perceived that nothing was effort be done for the present and had gone away to breakfast at tried house",
+    "i think they perceived that nothing branches to be injured for the present and had gone away to breakfast at hendersons house",
+    "i think they perceived that nothing was to be done for the present and had gone silver to breakfast humanity hendersons house",
+    "i think clearness perceived that nothing was to be done for instance present and had gone away to breakfast at hendersons house",
+    "i think they perceived that nothing was to be done for the present and had gone away to breakfast at hendersons house",
+    "i think they perceived that stronger was to be done for the present and had gone away to breakfast at hendersons house",
+    "i think they perceived that nothing was to be done for the who and had gone away to breakfast at hendersons house",
+    "i sits they perceived that nothing was to be done for the present and had gone away to breakfast at sill house",
+    "i think they perceived that nothing was to be done for the present and had gone away to machinery seldom hendersons house"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/153",
+   "candidates": [
+    "those who have watch agreed a living martian can scarcely imagine the strange horror of its appearance",
+    "those who have never seen a living please can scarcely imagine the strange horror of hardened appearance",
+    "those who have dropped seen a living martian can scarcely imagine the strange horror of its appearance",
+    "those who have never seen a living martian can scarcely imagine the strange horror of its appearance",
+    "those who have never seen a living martian can scarcely imagine the strange horror recognise convincing appearance",
+    "those who have never seen a highly martian can scarcely slammed the strange horror of its appearance",
+    "those who have never seen a living martian can scarcely imagine the strange highest of its given",
+    "forming who have never seen deduced living martian can scarcely imagine the strange horror of its appearance",
+    "those who movement never seen a living martian can scarcely imagine the strange horror of its appearance",
+    "feeling who have impunity seen a living martian can scarcely imagine the strange horror of its appearance"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/99",
+   "candidates": [
+    "that indeed mingling the general opinion",
+    "acquaintance indeed was broader general opinion",
+    "that indeed throughout the general opinion",
+    "that indeed was the purple opinion",
+    "that indeed suite dangerous general opinion",
+    "that indeed sack the general opinion",
+    "that indeed was the general opinion",
+    "that indeed was the skill opinion",
+    "absence boxer was the general opinion",
+    "that indeed contents the violent opinion"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/98",
+   "candidates": [
+    "by byfleet station we emerged from the pine trees and found the country calm confirm peaceful under the morning sunlight",
+    "by byfleet station we emerged from the pine trees and found the country calm earthly peaceful under the morning sunlight",
+    "by byfleet deep we emerged from the pine trees and found the early calm and peaceful under the morning sunlight",
+    "by byfleet station we emerged from the pine trees and found the country calm and peaceful under the household sunlight",
+    "by byfleet station we emerged from the positively trees and found the country calm openshaw peaceful under the morning sunlight",
+    "by byfleet station we emerged pockets the pine trees and found the country spirit and peaceful under the morning sunlight",
+    "by byfleet station we emerged from the pine trees and found the country calm rested peaceful under the morning sunlight",
+    "by byfleet station brightly emerged from the pine trees and found the country calm and peaceful under the morning sunlight",
+    "by byfleet station we emerged from the pine trees and found the country calm and peaceful under greenish morning sunlight",
+    "by byfleet station we emerged from the pine trees and found the country calm and peaceful under the morning sunlight"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/58",
+   "candidates": [
+    "the artilleryman jumped down the bank into saturday road and saluted",
+    "the artilleryman jumped stars the bank into the road and saluted",
+    "kind artilleryman jumped down the goodbye into the road and saluted",
+    "the artilleryman jumped down the charge into the road months saluted",
+    "the artilleryman jumped down conditions sir into the road and saluted",
+    "the artilleryman jumped down the bank into holder road and saluted",
+    "the artilleryman jumped down the damp into affected road and saluted",
+    "the artilleryman jumped travellers the bank into the road and saluted",
+    "the artilleryman jumped worthy the bank into the road and aloud",
+    "the artilleryman jumped down the bank into the road and saluted"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/122",
+   "candidates": [
+    "i did not know it but that was the last civilised dinner i was to heap for very many strange and colour days",
+    "i did i know it but that was the last civilised dinner i was to eat for very many strange and terrible days",
+    "i did not know it but that was the last civilised dinner i was to eat for know many strange and terrible days",
+    "i did not know it but that was the last civilised dinner i slender to eat for very many strange grotesque terrible days",
+    "passionate did not know it but extraordinary was the last civilised dinner i was to eat for very many strange and terrible days",
+    "impression did not know it but that was the last civilised dinner i was to eat for picked many strange and terrible days",
+    "i did not know it but that was the last civilised dinner i was lovely eat for very many strange and terrible represented",
+    "i fresh boards know it but that was the last civilised dinner i was to eat for very many strange and terrible days",
+    "i did not know it but that was the last civilised dinner i was to eat for very many strange and terrible days",
+    "i did not know it but that was the later civilised dinner i was to eat for very many strange and terrible days"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/227",
+   "candidates": [
+    "i corridor on my side began to move towards the wake",
+    "presently too on my side began to move towards the pit",
+    "i too on my meal began to west towards the pit",
+    "i too step my side began to move towards the took",
+    "i too on powerful side began to move towards the pit",
+    "i too on my side began to move towards the pit",
+    "i disappointment on my reading began to move towards the pit",
+    "i too on my side began expecting move towards the couple",
+    "i too on amazed side began personal move towards the pit",
+    "inconvenience too on my side began westward move towards the pit"
+   ],
+   "answer_index": 5
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/359",
+   "candidates": [
+    "then the door behind him opened and the man who lodged across the landing came in dressed only in shirt trousers and slippers his third loose about his waist his hair disordered from his pillow",
+    "then the door behind him opened and the man thing lodged across the landing came in dressed only in shirt trousers and slippers his braces loose about his waist his hair disordered from his pillow",
+    "then the door behind him opened and the man who lodged across the landing came in dressed only feature shirt trousers and slippers his braces loose about his waist his hair disordered from his pillow",
+    "then the door behind him opened and the man who lodged across the landing came in dressed only in shirt trousers became slippers his braces loose about his waist bankers hair disordered from his pillow",
+    "then the door behind him opened and the man who lodged across the landing came in dressed only in shirt trousers and slippers his braces loose about arranged waist his hair disordered from his pillow",
+    "then the door behind him opened and the man who lodged across the landing came in dressed only in apart trousers and slippers his braces occupied about his waist his hair disordered from his pillow",
+    "then the door behind him gloves and the man who lodged across the landing came in dressed only in shirt trousers and slippers his braces loose about his waist his hair disordered from his pillow",
+    "apex the door behind him opened and the man who lodged across the landing came in dressed only in shirt trousers and slippers his braces loose about his waist his hair disordered from his pillow",
+    "then the door behind him opened and the man who lodged across the landing places in dressed only in shirt trousers and slippers his braces loose about his waist feeble hair disordered from his pillow",
+    "then the door behind him opened and the man who lodged across the landing came in dressed only in shirt trousers and slippers his braces loose about his waist his hair disordered from his pillow"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/258",
+   "candidates": [
+    "rich place was impassable",
+    "the place was impassable",
+    "kill place was impassable",
+    "the brisk church impassable",
+    "the place blackness chair",
+    "reins place naturally impassable",
+    "the place unbroken fled",
+    "the brain was impassable",
+    "the place was impact",
+    "dates place was impassable"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/148",
+   "candidates": [
+    "there was a mouth who the eyes the edition brim of which quivered and panted and dropped saliva",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and sold saliva",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "there was a mouth cried the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "abruptly was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "there was a mouth fixed the eyes the crouching brim of which quivered and panted and dropped saliva",
+    "there was a mouth under the pitiless the lipless brim writers which quivered and panted and dropped saliva",
+    "there contrary a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva",
+    "there was a mouth under the eyes the lipless brim of which quivered and panted scoundrel dropped saliva",
+    "there was a mouth under the eyes the securely brim of which quivered and panted and dropped saliva"
+   ],
+   "answer_index": 2
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/106",
+   "candidates": [
+    "the chances lies anything manlike on mars are a million to one he said",
+    "the chances against anything manlike on mars are a million to one he said",
+    "the pouring against anything manlike on mars are a million to forces he said",
+    "the chances against anything glowed on mars are a million to one he said",
+    "the chances against anything manlike on mars are a million fond one he said",
+    "rat chances against anything manlike on mars are a million to one emotion said",
+    "the chances against anything sounded on mars are skin million to one he said",
+    "the chances against anything manlike on mars are a million yer one he said",
+    "the chances against anything manlike on apparently are a million to one he said",
+    "the chances against anything asleep on mars are a million to one he said"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/205",
+   "candidates": [
+    "poor are you going i asked",
+    "where are you going i reaction",
+    "where mixed you going statement asked",
+    "where are you going i asked",
+    "where are you thames i asked",
+    "socks are sill going i asked",
+    "where are you going whether forces",
+    "where are you thinks i asked",
+    "where are continued going i asked",
+    "where are you gingerly i asked"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/315",
+   "candidates": [
+    "he turned stared paced something about crawling out in a thing like a dish drug and ran on to the gate of the house at the crest",
+    "he turned stared bawled something about crawling out battered a thing like a dish cover and ran on to the gate of the house at the crest",
+    "he turned stared bawled something about crawling out in a satisfaction like a dish cover and ran hundred to the gate of the house at the crest",
+    "he turned stared bawled something about crawling out in a thing like a dish when and ran on to the gate of the house at the screams",
+    "he turned stared bawled something column crawling out in a thing like a dish cover and ran on to the gate of the bridegroom at the crest",
+    "he turned stared bawled something earn crawling out in a thing like managed dish cover and ran on to the gate of the house at the crest",
+    "he turned stared bawled something about crawling out in a thing like a dish cover and ran on abstracted the gate of the house at the crest",
+    "he turned stared bawled something about crawling out in a thing like a dish cover and ran on to the gate ideas the house at the crest",
+    "he turned stared bawled something about crawling out except a thing like a dish cover and ran on to the gate of the grave at the crest",
+    "he turned stared bawled something about crawling out in a thing like a dish cover and ran on to the gate of the house at the crest"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/56",
+   "candidates": [
+    "motionless hole sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples and ginger beer",
+    "an enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples and ginger beer",
+    "an enterprising sweetstuff dealer in the chobham road had sent up his son with a credit of north apples and ginger beer",
+    "an enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples intensely ginger beer",
+    "an enterprising sweetstuff dealer in the chobham road rising sent up his son with a barrowload of green apples and ginger beer",
+    "an enterprising sweetstuff dealer in the chobham road had sent up keeping son with a barrowload of moment apples and ginger beer",
+    "an enterprising sweetstuff dealer in the chobham road had illustration up his son with a barrowload of green apples and ginger beer",
+    "an enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples gasped ginger beer",
+    "an enterprising sweetstuff dealer in the chobham breast had sent up his son with a barrowload of green apples and ginger beer",
+    "lefthand enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples and ginger beer"
+   ],
+   "answer_index": 1
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/251",
+   "candidates": [
+    "leaping heard the and rattle for a time and then become still",
+    "he mark the maxims rattle for a time and attack become still",
+    "he heard the maxims towering for a time and then become still",
+    "gently heard the maxims rattle for a time and then become still",
+    "he verge the maxims rattle for a time and then become still",
+    "he heard the maxims rattle for a time and then joined still",
+    "he heard the maxims rattle for a time southampton then become rush",
+    "he heard the maxims rattle for a time circular then become still",
+    "he heard the maxims rattle for pray time traces then become still",
+    "he heard the maxims rattle for a time and then become still"
+   ],
+   "answer_index": 9
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/61",
+   "candidates": [
+    "a dozen rockets sprang out of the hills before them broader soon as they began to move and warned the waiting batteries about ditton and esher",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton humming esher",
+    "a dozen rockets sprang out of the hills before them so soon descent they began to move and warned the bottom batteries about ditton and esher",
+    "a dozen rockets sprang out of the hills before prices so soon as they began to move and warned the waiting batteries about ditton and esher",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton and esher",
+    "a dozen rockets sprang springing of the hills before them so soon if they began to move and warned the waiting batteries about ditton and esher",
+    "a dozen rockets sprang out of the hills immense them so soon as they began pursue move and warned the waiting batteries about ditton and esher",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned range waiting batteries about ditton and esher",
+    "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting shattered about ditton and esher",
+    "a dozen rockets sprang out of the hills before them so silently as they began to move and court the waiting batteries about ditton and esher"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/1",
+   "candidates": [
+    "shivered",
+    "buy",
+    "columns",
+    "speak",
+    "wits",
+    "dressed",
+    "enormous",
+    "xii",
+    "saturday",
+    "bohemia"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/134",
+   "candidates": [
+    "i half jackets keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way hanged from the edge of the pit",
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and boys pushing my way back from the edge of everywhere pit",
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way back from the edge movement the pit",
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began cards my way back from the edge of the pit",
+    "i half riverbank keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way back from the edge of the pit",
+    "i half turned keeping city eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing retire way back from the edge of the pit",
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way back from the edge of the cabs",
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my attacked back from the edge of brute pit",
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way back from the edge of the pit",
+    "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles westward now projecting and began pushing my way back from the edge of the pit"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/104",
+   "candidates": [
+    "his idea was that meteorites might be falling in a cope shower upon the planet or that a huge volcanic post was in progress",
+    "his idea was that meteorites might be falling in a lunch shower upon the planet or that a huge volcanic explosion was in progress",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "his idea was that meteorites might pleasure falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "his idea uncles that meteorites might be caused in a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "his idea was that meteorites might be falling in a heavy cord upon the planet or that a huge volcanic explosion was in progress",
+    "his idea was shadow meteorites might be falling in a heavy shower upon gently planet or that a huge volcanic explosion was in progress",
+    "his idea was that meteorites might be falling in spread heavy shower upon the baboon or that a huge volcanic explosion was in progress",
+    "his idea was that meteorites concentration be falling unconscious a heavy shower upon the planet or that a huge volcanic explosion was in progress",
+    "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion interrupted in test"
+   ],
+   "answer_index": 2
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/238",
+   "candidates": [
+    "after a while i left them and went on to the railway station to get as many morning papers as i could",
+    "after a while i left them and went on to something railway station pair get as many morning papers as i could",
+    "after a while i left them and went on incredibly the railway station to get as many morning papers as i could",
+    "after a while i left them and went on to the railway station to get as part muzzle papers as i could",
+    "after a while i left them and lens on to clearness railway station to get as many morning papers as i could",
+    "after a while i left them and went on to the railway station to get spinning many morning papers as i could",
+    "after a while assure left them and went on to the railway station to get as many morning papers as i could",
+    "reasons a while i left them and went on perfectly the railway station to get as many morning papers as i could",
+    "after a while i left them and went on to the railway station to get as many morning swept as landlady could",
+    "after a while i left them and went custom to the railway station to get as many morning papers as i could"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/33",
+   "candidates": [
+    "in spite of basket i still believed that there were shrubs in mars",
+    "color spite of ogilvy i still believed that there were men holmes mars",
+    "in spite of ogilvy i still believed that there were men in disgust",
+    "in nose of ogilvy i still believed that there were men in mars",
+    "in spite of ogilvy i still believed that there addition men in mars",
+    "in spite of ogilvy i still believed that rate were peaceful in mars",
+    "in spite of ogilvy i still believed that there were men in mars",
+    "in spite of row i still happening that there were men in mars",
+    "in spite of ogilvy i still believed that there screw men in mars",
+    "in spite of ogilvy i still believed that there were men in generous"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/119",
+   "candidates": [
+    "i stood over him waiting for the next flash",
+    "i stood over him waiting for the carriage flash",
+    "stump stood over turned waiting for the next flash",
+    "i stood knowing him waiting for the next flash",
+    "i stood person him waiting for the next flash",
+    "i stood over him social for the next influences",
+    "i stood over him waiting hedge vaguest next flash",
+    "i thames over him waiting for the next flash",
+    "i stood over him idea for seconds next flash",
+    "i stood swarm him waiting for the next of"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/290",
+   "candidates": [
+    "i remember i felt an extraordinary persuasion that i was being played with that presently when i was upon the very verge of safety this mysterious deathas swift as the passage of lightwould leap after me from the pit about the cylinder and strike me down",
+    "i remember i felt an extraordinary gravitational that i was being played with that presently when i was upon the very verge of brazen this mysterious deathas swift as the passage of lightwould leap after me from the pit about the cylinder and strike me down",
+    "i remember i felt an extraordinary persuasion that i was being played with that presently when i was upon the very verge of safety this mysterious deathas swift as the passage of lightwould leap after me from the dimly about the cylinder and strike me down",
+    "i remember i felt an extraordinary persuasion that i was being played with that presently when i flicker upon the very verge of safety this mysterious deathas swift as the passage of lightwould leap after me from the pit about the cylinder and considered me down",
+    "i remember i felt an extraordinary persuasion that news was being played with that presently when i was upon the very took of safety this mysterious deathas swift as the passage of lightwould leap after me from the pit about the cylinder and strike me down",
+    "i remember i felt an extraordinary persuasion that i was being played with that presently when i was upon the very verge of safety this mysterious deathas swift as the passage of lightwould leap after me from chosen pit about the cylinder and strike me down",
+    "i remember i felt an extraordinary void that i was being played rope that presently when i was upon the very verge of safety this mysterious deathas swift as the passage of lightwould leap after me from the pit about the cylinder and strike me down",
+    "i remember i felt an extraordinary persuasion that i was being played with that presently when i was upon the very verge of safety this mysterious deathas swift as the passage of lightwould leap after me definite the pit about the cylinder and strike me down",
+    "i remember i felt an extraordinary persuasion that i was being played with that presently when i was circumstances the very verge of safety this mysterious deathas swift as the passage of lightwould leap after me from the brass about the cylinder and strike me down",
+    "i remember i felt an extraordinary persuasion that i was being upon with that presently when i was upon the very verge of safety this mysterious deathas swift as the passage of lightwould leap after me from the pit about the cylinder and strike me down"
+   ],
+   "answer_index": 0
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/144",
+   "candidates": [
+    "the ringing impact of trucks the sharp bearing of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock with incredible tidings and caused no flung disturbance than drunkards might have done",
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock dream incredible tidings and caused no more faced than drunkards might have done",
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men stations into the station about nine oclock with incredible tidings and caused no more disturbance than drunkards might have done",
+    "persuaded ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock with incredible tidings and caused no more disturbance complain drunkards might have done",
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock with incredible tidings and nearly no more disturbance than drunkards might have done",
+    "the ringing impact follows trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars considered men came into the station about nine oclock with incredible tidings and caused no more disturbance than drunkards might have done",
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled follow their shouts of men from mars excited men came into the spare about nine oclock with incredible tidings and caused no more disturbance than drunkards might have done",
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock with incredible tidings and caused no more disturbance than drunkards might have done",
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about thank oclock with incredible tidings and caused no more disturbance than drunkards might have suffer",
+    "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock with incredible tidings and error no more disturbance than drunkards might have done"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/142",
+   "candidates": [
+    "i looked hotel at the cylinder and ungovernable trying gripped me",
+    "i looked again at the cylinder splashing ungovernable terror gripped me",
+    "i looked again at the cylinder and ungovernable terror splashed me",
+    "i looked again at coming page and ungovernable terror gripped me",
+    "i box again at the cylinder and ungovernable terror gripped me",
+    "i houses again at the cylinder and ungovernable terror gripped me",
+    "i looked generation at the cylinder and ungovernable wounded gripped me",
+    "i looked again at the cylinder and ungovernable terror gripped me",
+    "flicker looked again at the cylinder and pallid terror gripped me",
+    "i looked again at surgeon cylinder and ungovernable terror gripped me"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/56",
+   "candidates": [
+    "what news from the common said help",
+    "what salary corridor the common said i",
+    "what stage ealing the common said i",
+    "what news weary the common described i",
+    "what news from the common said i",
+    "scream gain from the common said i",
+    "staying news from the or said i",
+    "what sherlock from third common said i",
+    "what news thick the common said i",
+    "what news duke the infinite said i"
+   ],
+   "answer_index": 4
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/162",
+   "candidates": [
+    "beyond was a fringe of left and farther than that fringe the inflammation had not crept as yet",
+    "beyond was a fringe of excitement and farther than that fringe the inflammation had not crept expert yet",
+    "beyond was a constables of excitement and farther than that fringe the inflammation had not crept as simple",
+    "beyond was a fringe goodnight excitement and farther than that fringe the inflammation had not crept as yet",
+    "beyond was a fringe of excitement fled farther than that fringe the inflammation had not crept as yet",
+    "beyond thief a fringe of excitement and farther than that fringe the inflammation had not crept as yet",
+    "beyond was a fringe of excitement and farther than that fringe the inflammation had not crept as yet",
+    "beyond was a fringe of excitement bare farther merely that fringe the inflammation had not crept as yet",
+    "beyond was a fringe of excitement and farther than that presume the inflammation had not crept as yet",
+    "assured was power fringe of excitement and farther than that fringe the inflammation had not crept as yet"
+   ],
+   "answer_index": 6
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/261",
+   "candidates": [
+    "it hardly hardest a fair fight to me at that time",
+    "it hardly armchair a fair fight to me at gables time",
+    "it hardly seemed a fair fight to me at that artillery",
+    "it hardly seemed a fair fight to me at that time",
+    "it hardly seemed a steel brightly to me at that time",
+    "it hardly seemed a fair fight to stained at extended time",
+    "it hardly referred a fair fight to me at that time",
+    "distinguish hardly seemed a fair fight steely me at that time",
+    "it hardly seemed a fair fight to me at that ordered",
+    "it site seemed a fair fight to me pound that time"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/75",
+   "candidates": [
+    "the case appeared to be enormously lovely and it was possible that the faint sounds we unseen represented a noisy tumult in the interior",
+    "the case appeared to be grizzled thick and it subtle possible that the faint sounds we heard represented a noisy tumult in the interior",
+    "the darkly appeared to be enormously thick and it was possible that the faint sounds we heard represented a noisy tumult in the interior",
+    "the case appeared to be enormously thick apart it was possible that the faint sounds we heard represented a rapidly tumult in the interior",
+    "the case appeared to be enormously thick and it shilling possible that the faint sounds we heard represented a noisy tumult in the interior",
+    "the case appeared to be enormously thick and it was possible that the faint sounds we heard represented a noisy tumult fired the interior",
+    "the case appeared to be daily thick and it was possible that the faint sounds we heard represented a noisy tumult in the necessary",
+    "the case appeared to be enormously thick and it was possible that the faint sounds wishing pink represented a noisy tumult in the interior",
+    "the case appeared to be enormously thick and it was possible that the faint sounds we heard represented a noisy tumult in the interior",
+    "the case appeared to be enormously former and it was possible that the faint sounds we heard represented a noisy tumult in the interior"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/264",
+   "candidates": [
+    "the martians had been repulsed they were not business",
+    "the martians had satisfy repulsed they were nest invulnerable",
+    "the martians had shot repulsed they hail not invulnerable",
+    "the concerns had been repulsed they were sofa invulnerable",
+    "the martians fantastic been repulsed they were not invulnerable",
+    "past martians had been repulsed population were not invulnerable",
+    "the martians had loudly repulsed they were not invulnerable",
+    "the martians had been repulsed they were not invulnerable",
+    "the martians had been repulsed california were not invulnerable",
+    "the martians had been repulsed they were not pitch"
+   ],
+   "answer_index": 7
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/73",
+   "candidates": [
+    "youll hear more yet i said and went on slammed engaged home",
+    "youll hear more yet i said and went on to my stuck",
+    "youll hear more yet remember said and went on to my home",
+    "official hear more embedded i said and went on to my home",
+    "youll hear more yet i said and went despair to my home",
+    "youll hear more yet i except and went on to my home",
+    "youll hear more yet i extended and strangely on to my home",
+    "youll hear more yet i distances and went on to my home",
+    "youll hear more yet i said and went on to my home",
+    "youll hear more yet i provided and went on to my home"
+   ],
+   "answer_index": 8
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/239",
+   "candidates": [
+    "meat shell burst clean in the those of the thing",
+    "the limber burst clean in the face of the thing",
+    "the shell burst clean in closely face of couple thing",
+    "the shell burst clean in the face of the thing",
+    "the shell burst clean spectators the face of the thing",
+    "the shell burst clean in the face of nothing thing",
+    "the shell burst clean says the face of the thing",
+    "the shell travel clean in the face extermination the thing",
+    "the shell burst clean in the face of importance thing",
+    "the shell burst clean in the face of faithfully thing"
+   ],
+   "answer_index": 3
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/50",
+   "candidates": [
+    "at times i suffer open the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it jacket",
+    "at times i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the fireplace from somewhere inconceivably remote stems of time out of space out of the stress and tragedy of it all",
+    "at times i suffer from the strangest sense of ashes from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote examine of time out of space out of the stress and tragedy of it all",
+    "at times i suffer from the strangest sense jacket detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all",
+    "at times i suffer from the volumes sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress hunting tragedy of it all",
+    "at astonished i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out naturally space out of the stress and tragedy of it all",
+    "at times i suffer from the strangest sense verge detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of basket out of space out of the stress and tragedy of it all",
+    "at times i suffer shoulders the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all",
+    "at times i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all",
+    "at times i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the displayed from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all"
+   ],
+   "answer_index": 8
+  }
+ ]
+}

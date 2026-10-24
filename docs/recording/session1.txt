@@ -1,0 +1,250 @@
+s1_001	Hi, it's nice to meet you.
+s1_002	Thanks for calling me today.
+s1_003	Can you hear me okay?
+s1_004	I'm doing pretty well, how about you?
+s1_005	My name is Austin and I study computer science.
+s1_006	I'm calling from the hackathon right now.
+s1_007	It's been a long day but a good one.
+s1_008	We barely slept last night.
+s1_009	I had pizza for dinner again.
+s1_010	Do you want to grab coffee later?
+s1_011	I think the weather is getting colder.
+s1_012	It rained all morning here.
+s1_013	I'll be there in about ten minutes.
+s1_014	Let me check my calendar first.
+s1_015	That sounds like a great plan.
+s1_016	I'm not sure I understand the question.
+s1_017	Could you say that one more time?
+s1_018	I really appreciate your help.
+s1_019	We built this in less than two days.
+s1_020	My team is sitting right next to me.
+s1_021	I love working on hard problems.
+s1_022	This is my first time at this event.
+s1_023	I'm a little nervous but excited.
+s1_024	What do you do for work?
+s1_025	How long have you been a judge here?
+s1_026	I grew up in a small town.
+s1_027	My family lives far away from here.
+s1_028	I miss my mom's cooking.
+s1_029	I usually wake up at seven.
+s1_030	I go to the gym three times a week.
+s1_031	My favorite food is ramen.
+s1_032	I don't really like spicy food.
+s1_033	Can we meet after lunch tomorrow?
+s1_034	The bus was late this morning.
+s1_035	I forgot my charger at home.
+s1_036	My phone battery is almost dead.
+s1_037	Please send me the link when you can.
+s1_038	I'll text you the address.
+s1_039	We should take a short break.
+s1_040	I need a glass of water.
+s1_041	It's way too loud in here.
+s1_042	The room is pretty crowded today.
+s1_043	Everyone here seems really friendly.
+s1_044	I met a lot of interesting people.
+s1_045	We talked about music for an hour.
+s1_046	I play the piano a little bit.
+s1_047	I used to play basketball in high school.
+s1_048	My brother is better at sports than me.
+s1_049	I have two sisters and one brother.
+s1_050	Our dog is named Max.
+s1_051	We adopted him from a shelter.
+s1_052	He loves going to the beach.
+s1_053	I want to travel to Japan next year.
+s1_054	Have you ever been to Europe?
+s1_055	I visited Canada last summer.
+s1_056	The flight took almost six hours.
+s1_057	I fell asleep on the plane.
+s1_058	The food at the airport was terrible.
+s1_059	I'd like to order a large coffee.
+s1_060	Can I get that with oat milk?
+s1_061	How much does this cost?
+s1_062	That's a lot cheaper than I expected.
+s1_063	I paid for it with my card.
+s1_064	Keep the change.
+s1_065	I'm saving money for a new laptop.
+s1_066	My old computer is really slow.
+s1_067	The screen is cracked in one corner.
+s1_068	I need to fix my bike this weekend.
+s1_069	The back tire keeps going flat.
+s1_070	I bought a new pair of shoes.
+s1_071	They fit perfectly.
+s1_072	I'm looking for a black jacket.
+s1_073	Do you have this in a bigger size?
+s1_074	I think that color looks good on you.
+s1_075	Let's pick a movie to watch tonight.
+s1_076	I've already seen that one twice.
+s1_077	The ending was a big surprise.
+s1_078	I cried at the end of that movie.
+s1_079	That show is really funny.
+s1_080	I watch it every Friday night.
+s1_081	I'm reading a book about space.
+s1_082	The library closes at nine.
+s1_083	I need to return these books.
+s1_084	I have an exam on Monday.
+s1_085	I studied for six hours yesterday.
+s1_086	Math was always my best subject.
+s1_087	I'm terrible at drawing.
+s1_088	I want to learn how to cook.
+s1_089	Can you teach me that recipe?
+s1_090	Add a pinch of salt and pepper.
+s1_091	Bake it for about twenty minutes.
+s1_092	The bread smells amazing.
+s1_093	Pass me the butter please.
+s1_094	I'll make breakfast tomorrow.
+s1_095	Do you want eggs or pancakes?
+s1_096	I'll have the pancakes with fruit.
+s1_097	Let me know if you need anything.
+s1_098	I'm happy to help out.
+s1_099	That's very kind of you.
+s1_100	No problem at all.
+s1_101	Don't worry about it.
+s1_102	I'm sorry I'm late.
+s1_103	Traffic was really bad.
+s1_104	I took the wrong exit.
+s1_105	The map sent me the long way.
+s1_106	We finally made it.
+s1_107	The parking lot was full.
+s1_108	I found a spot on the street.
+s1_109	The meeting starts at three.
+s1_110	Can we push it to four instead?
+s1_111	I'll bring my notes.
+s1_112	I wrote everything down.
+s1_113	Let's go over the plan again.
+s1_114	The first step is the hardest.
+s1_115	We tested it a hundred times.
+s1_116	It works much better now.
+s1_117	We fixed the bug this morning.
+s1_118	The code is finally clean.
+s1_119	I learned a lot from my mentor.
+s1_120	She gave me really good advice.
+s1_121	He always asks the best questions.
+s1_122	I want to start my own company someday.
+s1_123	Building things makes me happy.
+s1_124	I like solving problems for people.
+s1_125	My grandfather lost his voice after surgery.
+s1_126	He used a buzzer to talk.
+s1_127	It sounded very robotic.
+s1_128	I want to give people their voice back.
+s1_129	Everyone deserves to be heard.
+s1_130	Talking is something we take for granted.
+s1_131	I can't imagine not being able to speak.
+s1_132	It must be very frustrating.
+s1_133	Thank you for listening to me.
+s1_134	What made you want to be a judge?
+s1_135	Where are you calling from?
+s1_136	Is it sunny where you are?
+s1_137	It's almost midnight here.
+s1_138	I should probably go to bed soon.
+s1_139	I'll call you back in a bit.
+s1_140	Talk to you later.
+s1_141	Have a great rest of your day.
+s1_142	Take care of yourself.
+s1_143	See you tomorrow morning.
+s1_144	Good luck with everything.
+s1_145	Congratulations on your new job.
+s1_146	That's amazing news.
+s1_147	I'm so proud of you.
+s1_148	You did a really good job.
+s1_149	I knew you could do it.
+s1_150	Let's celebrate this weekend.
+s1_151	We could go out for dinner.
+s1_152	I know a great place downtown.
+s1_153	They have the best tacos in the city.
+s1_154	The line is usually very long.
+s1_155	We should get there early.
+s1_156	I'll make a reservation for six.
+s1_157	Party of four please.
+s1_158	Can we sit by the window?
+s1_159	The view is beautiful from here.
+s1_160	Look at the sunset.
+s1_161	The sky is bright orange.
+s1_162	I took a picture of it.
+s1_163	I'll send it to you.
+s1_164	My camera is better than my phone.
+s1_165	I bought it last month.
+s1_166	It was on sale.
+s1_167	I got a really good deal.
+s1_168	I think we should leave now.
+s1_169	Grab your bag and let's go.
+s1_170	Did you lock the door?
+s1_171	I left the lights on.
+s1_172	The keys are on the table.
+s1_173	Turn left at the next light.
+s1_174	Keep going straight for a mile.
+s1_175	It's the big building on the right.
+s1_176	We passed it already.
+s1_177	Let's turn around.
+s1_178	I'm getting a little hungry.
+s1_179	Do you have any snacks?
+s1_180	I packed some apples and nuts.
+s1_181	I could eat a whole pizza right now.
+s1_182	Let's order some food.
+s1_183	What are you in the mood for?
+s1_184	Anything is fine with me.
+s1_185	I'll pay this time.
+s1_186	You can get the next one.
+s1_187	This tastes better than I thought.
+s1_188	I'm completely full.
+s1_189	I need a nap.
+s1_190	I didn't sleep well last night.
+s1_191	My neighbors were having a party.
+s1_192	The music was so loud.
+s1_193	I could hear every word.
+s1_194	I wore earplugs but it didn't help.
+s1_195	I'll talk to them tomorrow.
+s1_196	Maybe they'll keep it down.
+s1_197	Life is too short to be angry.
+s1_198	I try to stay positive.
+s1_199	Every day is a new chance.
+s1_200	I believe in hard work.
+s1_201	Practice makes it easier.
+s1_202	Mistakes help you learn.
+s1_203	Don't give up so fast.
+s1_204	Keep trying and you'll get there.
+s1_205	I'm glad we had this talk.
+s1_206	That really means a lot to me.
+s1_207	I feel much better now.
+s1_208	I'm a little tired but happy.
+s1_209	Today was a really good day.
+s1_210	Tomorrow will be even better.
+s1_211	Bring a jacket, it gets cold at night.
+s1_212	The beach is about an hour away.
+s1_213	Pack a towel and some sunscreen.
+s1_214	I'll drive if you want.
+s1_215	My car is parked outside.
+s1_216	Gas prices went up again.
+s1_217	I might take the train instead.
+s1_218	The train is faster during rush hour.
+s1_219	I read the news on the train.
+s1_220	Did you hear about the storm?
+s1_221	They closed the bridge for the day.
+s1_222	Schools are closed tomorrow.
+s1_223	The power went out for an hour.
+s1_224	We lit candles and played cards.
+s1_225	I won every single game.
+s1_226	My sister thinks I cheated.
+s1_227	I promise I didn't cheat.
+s1_228	Let's play again next week.
+s1_229	I'll bring the board game.
+s1_230	The pills are in the bathroom cabinet.
+s1_231	I need to pay my bills by Friday.
+s1_232	Bring a pen and some paper.
+s1_233	The man in the blue coat is my uncle.
+s1_234	I think the bat flew into the barn.
+s1_235	She bought a mat for her yoga class.
+s1_236	Put the pot back on the stove.
+s1_237	My fan stopped working last night.
+s1_238	The van is parked behind the store.
+s1_239	Ten people showed up to the party.
+s1_240	I need a den for my new desk.
+s1_241	Can you get the cat off the couch?
+s1_242	I left my coat in the car.
+s1_243	The game ended in a tie.
+s1_244	He came back with a big smile.
+s1_245	We went down to the river to fish.
+s1_246	The tea is still too hot to drink.
+s1_247	Don't forget to feed the fish before you leave.
+s1_248	I've been looking forward to this conversation all week.
+s1_249	If you have any questions, just let me know and I'll explain.
+s1_250	We spent most of the night trying to make it faster.

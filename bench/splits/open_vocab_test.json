@@ -1,0 +1,699 @@
+{
+ "description": "Gaddy's silent open-vocabulary test set: EMGDataset(test=True) with testset_largedev.json, in his evaluation order. reference = his clean_text(text).",
+ "data_root": "silent_speech/emg_data",
+ "items": [
+  {
+   "id": "silent_parallel_data/5-4_silent/216",
+   "session_dir": "silent_parallel_data/5-4_silent",
+   "index": 216,
+   "text": "\u201cHenderson,\u201d he called, \u201cyou saw that shooting star last night?\u201d",
+   "reference": "henderson he called you saw that shooting star last night"
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/340",
+   "session_dir": "silent_parallel_data/5-10_silent",
+   "index": 340,
+   "text": "He read and re-read the paper, fearing the worst had happened to me.",
+   "reference": "he read and reread the paper fearing the worst had happened to me"
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/31",
+   "session_dir": "silent_parallel_data/5-11_silent",
+   "index": 31,
+   "text": "He heard footsteps running to and fro in the rooms, and up and down stairs behind him.",
+   "reference": "he heard footsteps running to and fro in the rooms and up and down stairs behind him"
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/306",
+   "session_dir": "silent_parallel_data/5-10_silent",
+   "index": 306,
+   "text": "Some of the refugees were exchanging news with the people on the omnibuses.",
+   "reference": "some of the refugees were exchanging news with the people on the omnibuses"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/45",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 45,
+   "text": "Such things, I told myself, could not be.",
+   "reference": "such things i told myself could not be"
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/64",
+   "session_dir": "silent_parallel_data/5-11_silent",
+   "index": 64,
+   "text": "At the same time four of their fighting machines, similarly armed with tubes, crossed the river, and two of them, black against the western sky, came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of Halliford.",
+   "reference": "at the same time four of their fighting machines similarly armed with tubes crossed the river and two of them black against the western sky came into sight of myself and the curate as we hurried wearily and painfully along the road that runs northward out of halliford"
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/24",
+   "session_dir": "silent_parallel_data/5-10_silent",
+   "index": 24,
+   "text": "The hot water from the Martian\u2019s overthrow drifted downstream with me, so that for the best part of a mile I could see little of either bank.",
+   "reference": "the hot water from the martians overthrow drifted downstream with me so that for the best part of a mile i could see little of either bank"
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/120",
+   "session_dir": "silent_parallel_data/5-9_silent",
+   "index": 120,
+   "text": "The soldiers were having the greatest difficulty in making them realise the gravity of their position.",
+   "reference": "the soldiers were having the greatest difficulty in making them realise the gravity of their position"
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/200",
+   "session_dir": "silent_parallel_data/5-9_silent",
+   "index": 200,
+   "text": "Their armoured bodies glittered in the sun as they swept swiftly forward upon the guns, growing rapidly larger as they drew nearer.",
+   "reference": "their armoured bodies glittered in the sun as they swept swiftly forward upon the guns growing rapidly larger as they drew nearer"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/82",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 82,
+   "text": ".",
+   "reference": ""
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/218",
+   "session_dir": "silent_parallel_data/5-11_silent",
+   "index": 218,
+   "text": "Presently he came upon a stile, and, crossing it, followed a footpath northeastward.",
+   "reference": "presently he came upon a stile and crossing it followed a footpath northeastward"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/167",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 167,
+   "text": "All night long the Martians were hammering and stirring, sleepless, indefatigable, at work upon the machines they were making ready, and ever and again a puff of greenish-white smoke whirled up to the starlit sky.",
+   "reference": "all night long the martians were hammering and stirring sleepless indefatigable at work upon the machines they were making ready and ever and again a puff of greenishwhite smoke whirled up to the starlit sky"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/58",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 58,
+   "text": "\u201cEh?\u201d said one of the men, turning.",
+   "reference": "eh said one of the men turning"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/172",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 172,
+   "text": "Suddenly he vanished, and I could have fancied a faint shriek had reached me.",
+   "reference": "suddenly he vanished and i could have fancied a faint shriek had reached me"
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/257",
+   "session_dir": "silent_parallel_data/5-8_silent",
+   "index": 257,
+   "text": "There his story became ejaculatory.",
+   "reference": "there his story became ejaculatory"
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/123",
+   "session_dir": "silent_parallel_data/5-10_silent",
+   "index": 123,
+   "text": "He is not an insurance agent.\u201d",
+   "reference": "he is not an insurance agent"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/42",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 42,
+   "text": "It was all so real and so familiar.",
+   "reference": "it was all so real and so familiar"
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/21",
+   "session_dir": "silent_parallel_data/5-9_silent",
+   "index": 21,
+   "text": "I should have started at once, but my companion had been in active service and he knew better than that.",
+   "reference": "i should have started at once but my companion had been in active service and he knew better than that"
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/171",
+   "session_dir": "silent_parallel_data/5-8_silent",
+   "index": 171,
+   "text": "The light upon the railway puzzled me at first; there were a black heap and a vivid glare, and to the right of that a row of yellow oblongs.",
+   "reference": "the light upon the railway puzzled me at first there were a black heap and a vivid glare and to the right of that a row of yellow oblongs"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/262",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 262,
+   "text": "They seemed very helpless in that pit of theirs.",
+   "reference": "they seemed very helpless in that pit of theirs"
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/153",
+   "session_dir": "silent_parallel_data/5-4_silent",
+   "index": 153,
+   "text": "I myself heard nothing of that.",
+   "reference": "i myself heard nothing of that"
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/273",
+   "session_dir": "silent_parallel_data/5-10_silent",
+   "index": 273,
+   "text": "The authorities had reason to suppose, from the size of the cylinders, that at the outside there could not be more than five in each cylinder\u2014fifteen altogether.",
+   "reference": "the authorities had reason to suppose from the size of the cylinders that at the outside there could not be more than five in each cylinderfifteen altogether"
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/226",
+   "session_dir": "silent_parallel_data/5-4_silent",
+   "index": 226,
+   "text": "\u201cBut it\u2019s something more than a meteorite.",
+   "reference": "but its something more than a meteorite"
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/374",
+   "session_dir": "silent_parallel_data/5-10_silent",
+   "index": 374,
+   "text": "Fearful massacres in the Thames Valley!\u201d",
+   "reference": "fearful massacres in the thames valley"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/117",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 117,
+   "text": "At the end of it I sat, tempering nuts with a cigarette, regretting Ogilvy\u2019s rashness, and denouncing the short-sighted timidity of the Martians.",
+   "reference": "at the end of it i sat tempering nuts with a cigarette regretting ogilvys rashness and denouncing the shortsighted timidity of the martians"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/50",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 50,
+   "text": "Besides that, there was quite a heap of bicycles.",
+   "reference": "besides that there was quite a heap of bicycles"
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/189",
+   "session_dir": "silent_parallel_data/5-4_silent",
+   "index": 189,
+   "text": "Even then he scarcely understood what this indicated, until he heard a muffled grating sound and saw the black mark jerk forward an inch or so.",
+   "reference": "even then he scarcely understood what this indicated until he heard a muffled grating sound and saw the black mark jerk forward an inch or so"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/47",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 47,
+   "text": "and so forth.",
+   "reference": "and so forth"
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/263",
+   "session_dir": "silent_parallel_data/5-8_silent",
+   "index": 263,
+   "text": "He saw this one pursue a man, catch him up in one of its steely tentacles, and knock his head against the trunk of a pine tree.",
+   "reference": "he saw this one pursue a man catch him up in one of its steely tentacles and knock his head against the trunk of a pine tree"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/135",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 135,
+   "text": "I saw astonishment giving place to horror on the faces of the people about me.",
+   "reference": "i saw astonishment giving place to horror on the faces of the people about me"
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/163",
+   "session_dir": "silent_parallel_data/5-9_silent",
+   "index": 163,
+   "text": "Every now and then people would glance nervously across the Wey, at the meadows towards Chertsey, but everything over there was still.",
+   "reference": "every now and then people would glance nervously across the wey at the meadows towards chertsey but everything over there was still"
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/222",
+   "session_dir": "silent_parallel_data/5-8_silent",
+   "index": 222,
+   "text": "Then abruptly he sat down before the table, put his head on his arms, and began to sob and weep like a little boy, in a perfect passion of emotion, while I, with a curious forgetfulness of my own recent despair, stood beside him, wondering.",
+   "reference": "then abruptly he sat down before the table put his head on his arms and began to sob and weep like a little boy in a perfect passion of emotion while i with a curious forgetfulness of my own recent despair stood beside him wondering"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/231",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 231,
+   "text": "This was the Deputation.",
+   "reference": "this was the deputation"
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/301",
+   "session_dir": "silent_parallel_data/5-9_silent",
+   "index": 301,
+   "text": "Then suddenly the white flashes of the Heat-Ray came leaping towards me.",
+   "reference": "then suddenly the white flashes of the heatray came leaping towards me"
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/13",
+   "session_dir": "silent_parallel_data/5-9_silent",
+   "index": 13,
+   "text": "Between us and Leatherhead, however, lay the third cylinder, with its guarding giants.",
+   "reference": "between us and leatherhead however lay the third cylinder with its guarding giants"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/46",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 46,
+   "text": "\u201cREMARKABLE STORY FROM WOKING,\u201d",
+   "reference": "remarkable story from woking"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/80",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 80,
+   "text": "IV.",
+   "reference": "iv"
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/49",
+   "session_dir": "silent_parallel_data/5-8_silent",
+   "index": 49,
+   "text": "The horse took the bit between his teeth and bolted.",
+   "reference": "the horse took the bit between his teeth and bolted"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/274",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 274,
+   "text": "The Martians and their appliances were altogether invisible, save for that thin mast upon which their restless mirror wobbled.",
+   "reference": "the martians and their appliances were altogether invisible save for that thin mast upon which their restless mirror wobbled"
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/118",
+   "session_dir": "silent_parallel_data/5-11_silent",
+   "index": 118,
+   "text": "These hill-like forms grew lower and broader even as we stared.",
+   "reference": "these hilllike forms grew lower and broader even as we stared"
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/277",
+   "session_dir": "silent_parallel_data/5-8_silent",
+   "index": 277,
+   "text": "It would seem that a number of men or animals had rushed across the lawn.",
+   "reference": "it would seem that a number of men or animals had rushed across the lawn"
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/3",
+   "session_dir": "silent_parallel_data/5-8_silent",
+   "index": 3,
+   "text": "Leatherhead is about twelve miles from Maybury Hill.",
+   "reference": "leatherhead is about twelve miles from maybury hill"
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/208",
+   "session_dir": "silent_parallel_data/5-10_silent",
+   "index": 208,
+   "text": "He became alarmed at the news in this, and went again to Waterloo station to find out if communication were restored.",
+   "reference": "he became alarmed at the news in this and went again to waterloo station to find out if communication were restored"
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/183",
+   "session_dir": "silent_parallel_data/5-4_silent",
+   "index": 183,
+   "text": "For a minute he scarcely realised what this meant, and, although the heat was excessive, he clambered down into the pit close to the bulk to see the Thing more clearly.",
+   "reference": "for a minute he scarcely realised what this meant and although the heat was excessive he clambered down into the pit close to the bulk to see the thing more clearly"
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/190",
+   "session_dir": "silent_parallel_data/5-11_silent",
+   "index": 190,
+   "text": "People were fighting savagely for standing-room in the carriages even at two o\u2019clock.",
+   "reference": "people were fighting savagely for standingroom in the carriages even at two oclock"
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/184",
+   "session_dir": "silent_parallel_data/5-4_silent",
+   "index": 184,
+   "text": "He fancied even then that the cooling of the body might account for this, but what disturbed that idea was the fact that the ash was falling only from the end of the cylinder.",
+   "reference": "he fancied even then that the cooling of the body might account for this but what disturbed that idea was the fact that the ash was falling only from the end of the cylinder"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/53",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 53,
+   "text": "The burning heather had been extinguished, but the level ground towards Ottershaw was blackened as far as one could see, and still giving off vertical streamers of smoke.",
+   "reference": "the burning heather had been extinguished but the level ground towards ottershaw was blackened as far as one could see and still giving off vertical streamers of smoke"
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/155",
+   "session_dir": "silent_parallel_data/5-8_silent",
+   "index": 155,
+   "text": "I stopped short in the doorway.",
+   "reference": "i stopped short in the doorway"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/111",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 111,
+   "text": "\u201cThey are dangerous because, no doubt, they are mad with terror.",
+   "reference": "they are dangerous because no doubt they are mad with terror"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/274",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 274,
+   "text": "I and my wife stood amazed.",
+   "reference": "i and my wife stood amazed"
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/43",
+   "session_dir": "silent_parallel_data/5-8_silent",
+   "index": 43,
+   "text": "I felt a tug at the reins.",
+   "reference": "i felt a tug at the reins"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/55",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 55,
+   "text": "I stopped at the group of people.",
+   "reference": "i stopped at the group of people"
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/1",
+   "session_dir": "silent_parallel_data/5-8_silent",
+   "index": 1,
+   "text": "X.",
+   "reference": "x"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/3",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 3,
+   "text": "I found a little crowd of perhaps twenty people surrounding the huge hole in which the cylinder lay.",
+   "reference": "i found a little crowd of perhaps twenty people surrounding the huge hole in which the cylinder lay"
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/228",
+   "session_dir": "silent_parallel_data/5-9_silent",
+   "index": 228,
+   "text": "When, half suffocated, I raised my head above water, the Martian\u2019s hood pointed at the batteries that were still firing across the river, and as it advanced it swung loose what must have been the generator of the Heat-Ray.",
+   "reference": "when half suffocated i raised my head above water the martians hood pointed at the batteries that were still firing across the river and as it advanced it swung loose what must have been the generator of the heatray"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/28",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 28,
+   "text": "I could not credit it.",
+   "reference": "i could not credit it"
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/212",
+   "session_dir": "silent_parallel_data/5-9_silent",
+   "index": 212,
+   "text": "That was it!",
+   "reference": "that was it"
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/1",
+   "session_dir": "silent_parallel_data/5-10_silent",
+   "index": 1,
+   "text": "XIII.",
+   "reference": "xiii"
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/14",
+   "session_dir": "silent_parallel_data/5-8_silent",
+   "index": 14,
+   "text": "For my own part, I had been feverishly excited all day.",
+   "reference": "for my own part i had been feverishly excited all day"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/127",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 127,
+   "text": "I know I did.",
+   "reference": "i know i did"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/114",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 114,
+   "text": "The intense excitement of the events had no doubt left my perceptive powers in a state of erethism.",
+   "reference": "the intense excitement of the events had no doubt left my perceptive powers in a state of erethism"
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/155",
+   "session_dir": "silent_parallel_data/5-9_silent",
+   "index": 155,
+   "text": "People came panting along under heavy burdens; one husband and wife were even carrying a small outhouse door between them, with some of their household goods piled thereon.",
+   "reference": "people came panting along under heavy burdens one husband and wife were even carrying a small outhouse door between them with some of their household goods piled thereon"
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/162",
+   "session_dir": "silent_parallel_data/5-10_silent",
+   "index": 162,
+   "text": "Probably this is due to the relative strength of the earth\u2019s gravitational energy.\u201d On that last text their leader-writer expanded very comfortingly.",
+   "reference": "probably this is due to the relative strength of the earths gravitational energy on that last text their leaderwriter expanded very comfortingly"
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/211",
+   "session_dir": "silent_parallel_data/5-9_silent",
+   "index": 211,
+   "text": "To get under water!",
+   "reference": "to get under water"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/110",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 110,
+   "text": "\u201cThey have done a foolish thing,\u201d said I, fingering my wineglass.",
+   "reference": "they have done a foolish thing said i fingering my wineglass"
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/99",
+   "session_dir": "silent_parallel_data/5-9_silent",
+   "index": 99,
+   "text": "We were far beyond the range of the Heat-Ray there, and had it not been for the silent desertion of some of the houses, the stirring movement of packing in others, and the knot of soldiers standing on the bridge over the railway and staring down the line towards Woking, the day would have seemed very like any other Sunday.",
+   "reference": "we were far beyond the range of the heatray there and had it not been for the silent desertion of some of the houses the stirring movement of packing in others and the knot of soldiers standing on the bridge over the railway and staring down the line towards woking the day would have seemed very like any other sunday"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/8",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 8,
+   "text": "I think they perceived that nothing was to be done for the present, and had gone away to breakfast at Henderson\u2019s house.",
+   "reference": "i think they perceived that nothing was to be done for the present and had gone away to breakfast at hendersons house"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/153",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 153,
+   "text": "Those who have never seen a living Martian can scarcely imagine the strange horror of its appearance.",
+   "reference": "those who have never seen a living martian can scarcely imagine the strange horror of its appearance"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/99",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 99,
+   "text": "That, indeed, was the general opinion.",
+   "reference": "that indeed was the general opinion"
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/98",
+   "session_dir": "silent_parallel_data/5-9_silent",
+   "index": 98,
+   "text": "By Byfleet station we emerged from the pine trees, and found the country calm and peaceful under the morning sunlight.",
+   "reference": "by byfleet station we emerged from the pine trees and found the country calm and peaceful under the morning sunlight"
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/58",
+   "session_dir": "silent_parallel_data/5-9_silent",
+   "index": 58,
+   "text": "The artilleryman jumped down the bank into the road and saluted.",
+   "reference": "the artilleryman jumped down the bank into the road and saluted"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/122",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 122,
+   "text": "I did not know it, but that was the last civilised dinner I was to eat for very many strange and terrible days.",
+   "reference": "i did not know it but that was the last civilised dinner i was to eat for very many strange and terrible days"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/227",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 227,
+   "text": "I, too, on my side began to move towards the pit.",
+   "reference": "i too on my side began to move towards the pit"
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/359",
+   "session_dir": "silent_parallel_data/5-10_silent",
+   "index": 359,
+   "text": "Then the door behind him opened, and the man who lodged across the landing came in, dressed only in shirt, trousers, and slippers, his braces loose about his waist, his hair disordered from his pillow.",
+   "reference": "then the door behind him opened and the man who lodged across the landing came in dressed only in shirt trousers and slippers his braces loose about his waist his hair disordered from his pillow"
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/258",
+   "session_dir": "silent_parallel_data/5-8_silent",
+   "index": 258,
+   "text": "The place was impassable.",
+   "reference": "the place was impassable"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/148",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 148,
+   "text": "There was a mouth under the eyes, the lipless brim of which quivered and panted, and dropped saliva.",
+   "reference": "there was a mouth under the eyes the lipless brim of which quivered and panted and dropped saliva"
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/106",
+   "session_dir": "silent_parallel_data/5-4_silent",
+   "index": 106,
+   "text": "\u201cThe chances against anything manlike on Mars are a million to one,\u201d he said.",
+   "reference": "the chances against anything manlike on mars are a million to one he said"
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/205",
+   "session_dir": "silent_parallel_data/5-8_silent",
+   "index": 205,
+   "text": "\u201cWhere are you going?\u201d I asked.",
+   "reference": "where are you going i asked"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/315",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 315,
+   "text": "He turned, stared, bawled something about \u201ccrawling out in a thing like a dish cover,\u201d and ran on to the gate of the house at the crest.",
+   "reference": "he turned stared bawled something about crawling out in a thing like a dish cover and ran on to the gate of the house at the crest"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/56",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 56,
+   "text": "An enterprising sweet-stuff dealer in the Chobham Road had sent up his son with a barrow-load of green apples and ginger beer.",
+   "reference": "an enterprising sweetstuff dealer in the chobham road had sent up his son with a barrowload of green apples and ginger beer"
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/251",
+   "session_dir": "silent_parallel_data/5-8_silent",
+   "index": 251,
+   "text": "He heard the Maxims rattle for a time and then become still.",
+   "reference": "he heard the maxims rattle for a time and then become still"
+  },
+  {
+   "id": "silent_parallel_data/5-11_silent/61",
+   "session_dir": "silent_parallel_data/5-11_silent",
+   "index": 61,
+   "text": "A dozen rockets sprang out of the hills before them so soon as they began to move, and warned the waiting batteries about Ditton and Esher.",
+   "reference": "a dozen rockets sprang out of the hills before them so soon as they began to move and warned the waiting batteries about ditton and esher"
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/1",
+   "session_dir": "silent_parallel_data/5-9_silent",
+   "index": 1,
+   "text": "XII.",
+   "reference": "xii"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/134",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 134,
+   "text": "I half turned, keeping my eyes fixed upon the cylinder still, from which other tentacles were now projecting, and began pushing my way back from the edge of the pit.",
+   "reference": "i half turned keeping my eyes fixed upon the cylinder still from which other tentacles were now projecting and began pushing my way back from the edge of the pit"
+  },
+  {
+   "id": "silent_parallel_data/5-4_silent/104",
+   "session_dir": "silent_parallel_data/5-4_silent",
+   "index": 104,
+   "text": "His idea was that meteorites might be falling in a heavy shower upon the planet, or that a huge volcanic explosion was in progress.",
+   "reference": "his idea was that meteorites might be falling in a heavy shower upon the planet or that a huge volcanic explosion was in progress"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/238",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 238,
+   "text": "After a while I left them, and went on to the railway station to get as many morning papers as I could.",
+   "reference": "after a while i left them and went on to the railway station to get as many morning papers as i could"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/33",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 33,
+   "text": "In spite of Ogilvy, I still believed that there were men in Mars.",
+   "reference": "in spite of ogilvy i still believed that there were men in mars"
+  },
+  {
+   "id": "silent_parallel_data/5-8_silent/119",
+   "session_dir": "silent_parallel_data/5-8_silent",
+   "index": 119,
+   "text": "I stood over him waiting for the next flash.",
+   "reference": "i stood over him waiting for the next flash"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/290",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 290,
+   "text": "I remember I felt an extraordinary persuasion that I was being played with, that presently, when I was upon the very verge of safety, this mysterious death\u2014as swift as the passage of light\u2014would leap after me from the pit about the cylinder, and strike me down.",
+   "reference": "i remember i felt an extraordinary persuasion that i was being played with that presently when i was upon the very verge of safety this mysterious deathas swift as the passage of lightwould leap after me from the pit about the cylinder and strike me down"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/144",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 144,
+   "text": "The ringing impact of trucks, the sharp whistle of the engines from the junction, mingled with their shouts of \u201cMen from Mars!\u201d Excited men came into the station about nine o\u2019clock with incredible tidings, and caused no more disturbance than drunkards might have done.",
+   "reference": "the ringing impact of trucks the sharp whistle of the engines from the junction mingled with their shouts of men from mars excited men came into the station about nine oclock with incredible tidings and caused no more disturbance than drunkards might have done"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/142",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 142,
+   "text": "I looked again at the cylinder, and ungovernable terror gripped me.",
+   "reference": "i looked again at the cylinder and ungovernable terror gripped me"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/56",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 56,
+   "text": "\u201cWhat news from the common?\u201d said I.",
+   "reference": "what news from the common said i"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/162",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 162,
+   "text": "Beyond was a fringe of excitement, and farther than that fringe the inflammation had not crept as yet.",
+   "reference": "beyond was a fringe of excitement and farther than that fringe the inflammation had not crept as yet"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/261",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 261,
+   "text": "It hardly seemed a fair fight to me at that time.",
+   "reference": "it hardly seemed a fair fight to me at that time"
+  },
+  {
+   "id": "silent_parallel_data/5-5_silent/75",
+   "session_dir": "silent_parallel_data/5-5_silent",
+   "index": 75,
+   "text": "The case appeared to be enormously thick, and it was possible that the faint sounds we heard represented a noisy tumult in the interior.",
+   "reference": "the case appeared to be enormously thick and it was possible that the faint sounds we heard represented a noisy tumult in the interior"
+  },
+  {
+   "id": "silent_parallel_data/5-10_silent/264",
+   "session_dir": "silent_parallel_data/5-10_silent",
+   "index": 264,
+   "text": "The Martians had been repulsed; they were not invulnerable.",
+   "reference": "the martians had been repulsed they were not invulnerable"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/73",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 73,
+   "text": "\u201cYou\u2019ll hear more yet,\u201d I said, and went on to my home.",
+   "reference": "youll hear more yet i said and went on to my home"
+  },
+  {
+   "id": "silent_parallel_data/5-9_silent/239",
+   "session_dir": "silent_parallel_data/5-9_silent",
+   "index": 239,
+   "text": "The shell burst clean in the face of the Thing.",
+   "reference": "the shell burst clean in the face of the thing"
+  },
+  {
+   "id": "silent_parallel_data/5-6_silent/50",
+   "session_dir": "silent_parallel_data/5-6_silent",
+   "index": 50,
+   "text": "At times I suffer from the strangest sense of detachment from myself and the world about me; I seem to watch it all from the outside, from somewhere inconceivably remote, out of time, out of space, out of the stress and tragedy of it all.",
+   "reference": "at times i suffer from the strangest sense of detachment from myself and the world about me i seem to watch it all from the outside from somewhere inconceivably remote out of time out of space out of the stress and tragedy of it all"
+  }
+ ]
+}

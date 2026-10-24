@@ -1,0 +1,3506 @@
+{
+ "description": "All silent closed-vocabulary (date/time) recordings with text. Never used in training. reference = text spelled out as spoken, by svr.text.spell_out_date_time.",
+ "data_root": "silent_speech/emg_data",
+ "items": [
+  {
+   "id": "closed_vocab/silent/5-19_silent/3",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 3,
+   "text": "Sunday May 21",
+   "reference": "sunday may twenty first"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/8",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 8,
+   "text": "April 19 1959",
+   "reference": "april nineteenth nineteen fifty nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/9",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 9,
+   "text": "Monday February 12",
+   "reference": "monday february twelfth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/12",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 12,
+   "text": "September 23 2003",
+   "reference": "september twenty third twenty oh three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/13",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 13,
+   "text": "06:05 AM",
+   "reference": "six oh five a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/14",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 14,
+   "text": "May 17 2008",
+   "reference": "may seventeenth twenty oh eight"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/15",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 15,
+   "text": "June 12 1956",
+   "reference": "june twelfth nineteen fifty six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/18",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 18,
+   "text": "Monday February 24",
+   "reference": "monday february twenty fourth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/19",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 19,
+   "text": "Tuesday September 25",
+   "reference": "tuesday september twenty fifth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/22",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 22,
+   "text": "Wednesday February 04",
+   "reference": "wednesday february fourth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/23",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 23,
+   "text": "Sunday December 19",
+   "reference": "sunday december nineteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/24",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 24,
+   "text": "Wednesday February 08",
+   "reference": "wednesday february eighth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/25",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 25,
+   "text": "February 17 1987",
+   "reference": "february seventeenth nineteen eighty seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/26",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 26,
+   "text": "08:12 AM",
+   "reference": "eight twelve a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/27",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 27,
+   "text": "05:45 AM",
+   "reference": "five forty five a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/28",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 28,
+   "text": "Wednesday May 09",
+   "reference": "wednesday may ninth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/29",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 29,
+   "text": "Friday March 29",
+   "reference": "friday march twenty ninth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/30",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 30,
+   "text": "Wednesday December 14",
+   "reference": "wednesday december fourteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/31",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 31,
+   "text": "Friday January 24",
+   "reference": "friday january twenty fourth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/32",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 32,
+   "text": "December 04 1993",
+   "reference": "december fourth nineteen ninety three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/35",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 35,
+   "text": "Thursday September 28",
+   "reference": "thursday september twenty eighth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/36",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 36,
+   "text": "04:17 AM",
+   "reference": "four seventeen a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/37",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 37,
+   "text": "Saturday August 12",
+   "reference": "saturday august twelfth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/38",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 38,
+   "text": "September 19 1901",
+   "reference": "september nineteenth nineteen oh one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/39",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 39,
+   "text": "March 11 1883",
+   "reference": "march eleventh eighteen eighty three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/40",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 40,
+   "text": "Monday April 26",
+   "reference": "monday april twenty sixth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/41",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 41,
+   "text": "04:40 AM",
+   "reference": "four forty a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/42",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 42,
+   "text": "January 15 1890",
+   "reference": "january fifteenth eighteen ninety"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/43",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 43,
+   "text": "Sunday September 13",
+   "reference": "sunday september thirteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/44",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 44,
+   "text": "07:00 AM",
+   "reference": "seven o clock a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/45",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 45,
+   "text": "08:11 PM",
+   "reference": "eight eleven p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/46",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 46,
+   "text": "06:39 PM",
+   "reference": "six thirty nine p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/47",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 47,
+   "text": "Saturday July 11",
+   "reference": "saturday july eleventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/48",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 48,
+   "text": "August 05 1981",
+   "reference": "august fifth nineteen eighty one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/49",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 49,
+   "text": "February 02 2018",
+   "reference": "february second twenty eighteen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/50",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 50,
+   "text": "Sunday November 19",
+   "reference": "sunday november nineteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/51",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 51,
+   "text": "03:17 AM",
+   "reference": "three seventeen a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/52",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 52,
+   "text": "Tuesday October 24",
+   "reference": "tuesday october twenty fourth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/53",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 53,
+   "text": "11:57 AM",
+   "reference": "eleven fifty seven a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/54",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 54,
+   "text": "Sunday September 02",
+   "reference": "sunday september second"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/55",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 55,
+   "text": "Monday April 29",
+   "reference": "monday april twenty ninth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/56",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 56,
+   "text": "May 28 1982",
+   "reference": "may twenty eighth nineteen eighty two"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/57",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 57,
+   "text": "09:34 PM",
+   "reference": "nine thirty four p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/58",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 58,
+   "text": "October 23 2006",
+   "reference": "october twenty third twenty oh six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/61",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 61,
+   "text": "February 22 1912",
+   "reference": "february twenty second nineteen twelve"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/66",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 66,
+   "text": "December 13 1994",
+   "reference": "december thirteenth nineteen ninety four"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/67",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 67,
+   "text": "09:55 PM",
+   "reference": "nine fifty five p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/68",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 68,
+   "text": "09:24 PM",
+   "reference": "nine twenty four p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/69",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 69,
+   "text": "04:50 PM",
+   "reference": "four fifty p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/70",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 70,
+   "text": "July 31 1999",
+   "reference": "july thirty first nineteen ninety nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/71",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 71,
+   "text": "October 30 1925",
+   "reference": "october thirtieth nineteen twenty five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/72",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 72,
+   "text": "July 25 1917",
+   "reference": "july twenty fifth nineteen seventeen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/73",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 73,
+   "text": "03:01 AM",
+   "reference": "three oh one a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/74",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 74,
+   "text": "06:48 PM",
+   "reference": "six forty eight p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/79",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 79,
+   "text": "Tuesday March 07",
+   "reference": "tuesday march seventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/82",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 82,
+   "text": "10:56 PM",
+   "reference": "ten fifty six p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/83",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 83,
+   "text": "04:02 PM",
+   "reference": "four oh two p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/84",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 84,
+   "text": "Tuesday August 11",
+   "reference": "tuesday august eleventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/85",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 85,
+   "text": "April 25 1971",
+   "reference": "april twenty fifth nineteen seventy one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/88",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 88,
+   "text": "June 17 1979",
+   "reference": "june seventeenth nineteen seventy nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/89",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 89,
+   "text": "August 20 2012",
+   "reference": "august twentieth twenty twelve"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/90",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 90,
+   "text": "Sunday February 23",
+   "reference": "sunday february twenty third"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/91",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 91,
+   "text": "Monday March 02",
+   "reference": "monday march second"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/92",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 92,
+   "text": "07:23 PM",
+   "reference": "seven twenty three p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/93",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 93,
+   "text": "Monday July 09",
+   "reference": "monday july ninth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/96",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 96,
+   "text": "01:48 AM",
+   "reference": "one forty eight a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/97",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 97,
+   "text": "December 07 1990",
+   "reference": "december seventh nineteen ninety"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/98",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 98,
+   "text": "November 23 1995",
+   "reference": "november twenty third nineteen ninety five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/101",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 101,
+   "text": "08:33 PM",
+   "reference": "eight thirty three p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/102",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 102,
+   "text": "October 14 1926",
+   "reference": "october fourteenth nineteen twenty six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/103",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 103,
+   "text": "Friday March 19",
+   "reference": "friday march nineteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/104",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 104,
+   "text": "Tuesday May 15",
+   "reference": "tuesday may fifteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/105",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 105,
+   "text": "November 04 1985",
+   "reference": "november fourth nineteen eighty five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/108",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 108,
+   "text": "11:19 PM",
+   "reference": "eleven nineteen p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/109",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 109,
+   "text": "09:24 AM",
+   "reference": "nine twenty four a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/110",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 110,
+   "text": "07:55 AM",
+   "reference": "seven fifty five a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/111",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 111,
+   "text": "July 07 2018",
+   "reference": "july seventh twenty eighteen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/112",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 112,
+   "text": "01:45 AM",
+   "reference": "one forty five a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/115",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 115,
+   "text": "Tuesday December 15",
+   "reference": "tuesday december fifteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/118",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 118,
+   "text": "January 12 1959",
+   "reference": "january twelfth nineteen fifty nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/121",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 121,
+   "text": "May 16 1909",
+   "reference": "may sixteenth nineteen oh nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/122",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 122,
+   "text": "December 15 1969",
+   "reference": "december fifteenth nineteen sixty nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/125",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 125,
+   "text": "September 26 1965",
+   "reference": "september twenty sixth nineteen sixty five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/128",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 128,
+   "text": "January 26 1914",
+   "reference": "january twenty sixth nineteen fourteen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/129",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 129,
+   "text": "June 16 1960",
+   "reference": "june sixteenth nineteen sixty"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/130",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 130,
+   "text": "03:50 AM",
+   "reference": "three fifty a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/131",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 131,
+   "text": "March 09 2017",
+   "reference": "march ninth twenty seventeen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/132",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 132,
+   "text": "December 25 1979",
+   "reference": "december twenty fifth nineteen seventy nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/133",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 133,
+   "text": "April 26 1898",
+   "reference": "april twenty sixth eighteen ninety eight"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/134",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 134,
+   "text": "08:03 PM",
+   "reference": "eight oh three p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/137",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 137,
+   "text": "July 16 1973",
+   "reference": "july sixteenth nineteen seventy three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/142",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 142,
+   "text": "August 16 1974",
+   "reference": "august sixteenth nineteen seventy four"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/143",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 143,
+   "text": "10:37 AM",
+   "reference": "ten thirty seven a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/144",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 144,
+   "text": "Friday March 02",
+   "reference": "friday march second"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/145",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 145,
+   "text": "11:43 AM",
+   "reference": "eleven forty three a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/146",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 146,
+   "text": "Saturday May 23",
+   "reference": "saturday may twenty third"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/147",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 147,
+   "text": "Thursday February 19",
+   "reference": "thursday february nineteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/148",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 148,
+   "text": "08:00 PM",
+   "reference": "eight o clock p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/149",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 149,
+   "text": "Friday July 14",
+   "reference": "friday july fourteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/156",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 156,
+   "text": "02:51 AM",
+   "reference": "two fifty one a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/159",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 159,
+   "text": "Tuesday August 20",
+   "reference": "tuesday august twentieth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/160",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 160,
+   "text": "Saturday December 26",
+   "reference": "saturday december twenty sixth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/161",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 161,
+   "text": "August 19 1947",
+   "reference": "august nineteenth nineteen forty seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/162",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 162,
+   "text": "December 12 1904",
+   "reference": "december twelfth nineteen oh four"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/163",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 163,
+   "text": "Saturday June 21",
+   "reference": "saturday june twenty first"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/164",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 164,
+   "text": "Saturday October 31",
+   "reference": "saturday october thirty first"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/165",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 165,
+   "text": "October 04 1943",
+   "reference": "october fourth nineteen forty three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/166",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 166,
+   "text": "Saturday May 11",
+   "reference": "saturday may eleventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/167",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 167,
+   "text": "October 13 1958",
+   "reference": "october thirteenth nineteen fifty eight"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/168",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 168,
+   "text": "Thursday July 20",
+   "reference": "thursday july twentieth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/169",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 169,
+   "text": "12:00 AM",
+   "reference": "twelve o clock a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/170",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 170,
+   "text": "10:45 AM",
+   "reference": "ten forty five a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/171",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 171,
+   "text": "06:37 AM",
+   "reference": "six thirty seven a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/172",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 172,
+   "text": "Tuesday July 17",
+   "reference": "tuesday july seventeenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/173",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 173,
+   "text": "01:16 PM",
+   "reference": "one sixteen p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/174",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 174,
+   "text": "03:19 PM",
+   "reference": "three nineteen p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/177",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 177,
+   "text": "Tuesday December 19",
+   "reference": "tuesday december nineteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/180",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 180,
+   "text": "01:12 AM",
+   "reference": "one twelve a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/181",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 181,
+   "text": "03:53 AM",
+   "reference": "three fifty three a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/182",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 182,
+   "text": "10:21 AM",
+   "reference": "ten twenty one a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/185",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 185,
+   "text": "02:52 PM",
+   "reference": "two fifty two p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/186",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 186,
+   "text": "February 14 1941",
+   "reference": "february fourteenth nineteen forty one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/187",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 187,
+   "text": "07:56 AM",
+   "reference": "seven fifty six a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/188",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 188,
+   "text": "Saturday March 03",
+   "reference": "saturday march third"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/189",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 189,
+   "text": "Sunday April 09",
+   "reference": "sunday april ninth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/190",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 190,
+   "text": "12:50 PM",
+   "reference": "twelve fifty p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/191",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 191,
+   "text": "Wednesday September 24",
+   "reference": "wednesday september twenty fourth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/194",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 194,
+   "text": "07:28 PM",
+   "reference": "seven twenty eight p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/195",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 195,
+   "text": "January 22 2005",
+   "reference": "january twenty second twenty oh five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/196",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 196,
+   "text": "July 30 1985",
+   "reference": "july thirtieth nineteen eighty five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/197",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 197,
+   "text": "Monday June 30",
+   "reference": "monday june thirtieth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/198",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 198,
+   "text": "August 06 1981",
+   "reference": "august sixth nineteen eighty one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/199",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 199,
+   "text": "07:04 PM",
+   "reference": "seven oh four p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/202",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 202,
+   "text": "10:11 AM",
+   "reference": "ten eleven a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/203",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 203,
+   "text": "09:08 AM",
+   "reference": "nine oh eight a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/204",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 204,
+   "text": "November 01 1975",
+   "reference": "november first nineteen seventy five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/207",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 207,
+   "text": "Monday March 21",
+   "reference": "monday march twenty first"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/208",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 208,
+   "text": "05:41 AM",
+   "reference": "five forty one a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/209",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 209,
+   "text": "September 09 1977",
+   "reference": "september ninth nineteen seventy seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/210",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 210,
+   "text": "June 24 2003",
+   "reference": "june twenty fourth twenty oh three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/211",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 211,
+   "text": "11:55 AM",
+   "reference": "eleven fifty five a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/212",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 212,
+   "text": "Sunday August 14",
+   "reference": "sunday august fourteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/215",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 215,
+   "text": "07:07 PM",
+   "reference": "seven oh seven p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/216",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 216,
+   "text": "01:15 AM",
+   "reference": "one fifteen a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/217",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 217,
+   "text": "April 08 1933",
+   "reference": "april eighth nineteen thirty three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/218",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 218,
+   "text": "Thursday November 02",
+   "reference": "thursday november second"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/221",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 221,
+   "text": "October 15 2017",
+   "reference": "october fifteenth twenty seventeen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/222",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 222,
+   "text": "04:06 PM",
+   "reference": "four oh six p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/223",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 223,
+   "text": "04:53 AM",
+   "reference": "four fifty three a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/224",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 224,
+   "text": "Monday June 21",
+   "reference": "monday june twenty first"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/225",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 225,
+   "text": "09:36 AM",
+   "reference": "nine thirty six a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/226",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 226,
+   "text": "August 29 1888",
+   "reference": "august twenty ninth eighteen eighty eight"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/227",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 227,
+   "text": "06:16 PM",
+   "reference": "six sixteen p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/228",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 228,
+   "text": "12:26 AM",
+   "reference": "twelve twenty six a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/229",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 229,
+   "text": "August 03 2015",
+   "reference": "august third twenty fifteen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/230",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 230,
+   "text": "Sunday May 10",
+   "reference": "sunday may tenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/231",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 231,
+   "text": "07:39 PM",
+   "reference": "seven thirty nine p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/232",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 232,
+   "text": "April 30 1972",
+   "reference": "april thirtieth nineteen seventy two"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/235",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 235,
+   "text": "February 11 2001",
+   "reference": "february eleventh twenty oh one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/236",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 236,
+   "text": "Saturday November 27",
+   "reference": "saturday november twenty seventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/237",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 237,
+   "text": "10:59 AM",
+   "reference": "ten fifty nine a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/238",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 238,
+   "text": "07:33 PM",
+   "reference": "seven thirty three p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/239",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 239,
+   "text": "Saturday March 30",
+   "reference": "saturday march thirtieth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/240",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 240,
+   "text": "05:22 PM",
+   "reference": "five twenty two p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/241",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 241,
+   "text": "Monday September 12",
+   "reference": "monday september twelfth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/242",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 242,
+   "text": "November 05 2020",
+   "reference": "november fifth twenty twenty"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/243",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 243,
+   "text": "June 05 1985",
+   "reference": "june fifth nineteen eighty five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/244",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 244,
+   "text": "04:26 AM",
+   "reference": "four twenty six a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/245",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 245,
+   "text": "Thursday July 11",
+   "reference": "thursday july eleventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/246",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 246,
+   "text": "December 11 2009",
+   "reference": "december eleventh twenty oh nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/249",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 249,
+   "text": "Saturday December 16",
+   "reference": "saturday december sixteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/250",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 250,
+   "text": "Saturday December 12",
+   "reference": "saturday december twelfth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/251",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 251,
+   "text": "May 02 1927",
+   "reference": "may second nineteen twenty seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/252",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 252,
+   "text": "01:55 AM",
+   "reference": "one fifty five a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/255",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 255,
+   "text": "05:17 PM",
+   "reference": "five seventeen p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/256",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 256,
+   "text": "May 07 2018",
+   "reference": "may seventh twenty eighteen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/257",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 257,
+   "text": "Wednesday September 26",
+   "reference": "wednesday september twenty sixth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/258",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 258,
+   "text": "08:48 AM",
+   "reference": "eight forty eight a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/259",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 259,
+   "text": "August 20 1921",
+   "reference": "august twentieth nineteen twenty one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/260",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 260,
+   "text": "December 11 1914",
+   "reference": "december eleventh nineteen fourteen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/261",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 261,
+   "text": "August 21 1932",
+   "reference": "august twenty first nineteen thirty two"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/264",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 264,
+   "text": "Saturday December 28",
+   "reference": "saturday december twenty eighth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/265",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 265,
+   "text": "09:47 AM",
+   "reference": "nine forty seven a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/266",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 266,
+   "text": "Friday January 15",
+   "reference": "friday january fifteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/267",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 267,
+   "text": "Wednesday March 30",
+   "reference": "wednesday march thirtieth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/268",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 268,
+   "text": "11:05 PM",
+   "reference": "eleven oh five p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/269",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 269,
+   "text": "Wednesday March 14",
+   "reference": "wednesday march fourteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/270",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 270,
+   "text": "Saturday March 31",
+   "reference": "saturday march thirty first"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/271",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 271,
+   "text": "February 18 1896",
+   "reference": "february eighteenth eighteen ninety six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/272",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 272,
+   "text": "09:39 AM",
+   "reference": "nine thirty nine a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/273",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 273,
+   "text": "Monday April 15",
+   "reference": "monday april fifteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/274",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 274,
+   "text": "06:44 PM",
+   "reference": "six forty four p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/275",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 275,
+   "text": "Friday January 29",
+   "reference": "friday january twenty ninth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/276",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 276,
+   "text": "Monday October 14",
+   "reference": "monday october fourteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/277",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 277,
+   "text": "July 31 1898",
+   "reference": "july thirty first eighteen ninety eight"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/278",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 278,
+   "text": "08:20 PM",
+   "reference": "eight twenty p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/279",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 279,
+   "text": "February 04 2003",
+   "reference": "february fourth twenty oh three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/280",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 280,
+   "text": "Friday October 01",
+   "reference": "friday october first"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/281",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 281,
+   "text": "March 13 1919",
+   "reference": "march thirteenth nineteen nineteen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/282",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 282,
+   "text": "Saturday January 01",
+   "reference": "saturday january first"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/283",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 283,
+   "text": "January 16 1905",
+   "reference": "january sixteenth nineteen oh five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/284",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 284,
+   "text": "Tuesday December 10",
+   "reference": "tuesday december tenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/287",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 287,
+   "text": "07:21 PM",
+   "reference": "seven twenty one p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/288",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 288,
+   "text": "August 16 1929",
+   "reference": "august sixteenth nineteen twenty nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/289",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 289,
+   "text": "June 29 1999",
+   "reference": "june twenty ninth nineteen ninety nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/290",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 290,
+   "text": "July 10 1887",
+   "reference": "july tenth eighteen eighty seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/291",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 291,
+   "text": "Tuesday September 12",
+   "reference": "tuesday september twelfth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/292",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 292,
+   "text": "December 25 1907",
+   "reference": "december twenty fifth nineteen oh seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/293",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 293,
+   "text": "April 23 2001",
+   "reference": "april twenty third twenty oh one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/294",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 294,
+   "text": "Wednesday May 03",
+   "reference": "wednesday may third"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/295",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 295,
+   "text": "03:24 AM",
+   "reference": "three twenty four a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/296",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 296,
+   "text": "March 03 2000",
+   "reference": "march third twenty hundred"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/297",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 297,
+   "text": "Friday July 17",
+   "reference": "friday july seventeenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/298",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 298,
+   "text": "04:12 PM",
+   "reference": "four twelve p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/299",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 299,
+   "text": "June 15 1983",
+   "reference": "june fifteenth nineteen eighty three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/300",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 300,
+   "text": "June 23 1915",
+   "reference": "june twenty third nineteen fifteen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/303",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 303,
+   "text": "Thursday September 13",
+   "reference": "thursday september thirteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/306",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 306,
+   "text": "Thursday August 17",
+   "reference": "thursday august seventeenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/307",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 307,
+   "text": "Thursday March 12",
+   "reference": "thursday march twelfth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/308",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 308,
+   "text": "04:35 AM",
+   "reference": "four thirty five a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/309",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 309,
+   "text": "03:56 AM",
+   "reference": "three fifty six a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/310",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 310,
+   "text": "09:48 AM",
+   "reference": "nine forty eight a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/311",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 311,
+   "text": "05:46 AM",
+   "reference": "five forty six a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/312",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 312,
+   "text": "Wednesday April 04",
+   "reference": "wednesday april fourth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/315",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 315,
+   "text": "04:31 PM",
+   "reference": "four thirty one p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/316",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 316,
+   "text": "Sunday September 28",
+   "reference": "sunday september twenty eighth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/317",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 317,
+   "text": "Friday May 24",
+   "reference": "friday may twenty fourth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/318",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 318,
+   "text": "April 07 1950",
+   "reference": "april seventh nineteen fifty"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/319",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 319,
+   "text": "10:02 AM",
+   "reference": "ten oh two a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/320",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 320,
+   "text": "June 07 1885",
+   "reference": "june seventh eighteen eighty five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/323",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 323,
+   "text": "March 17 1978",
+   "reference": "march seventeenth nineteen seventy eight"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/324",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 324,
+   "text": "Wednesday August 09",
+   "reference": "wednesday august ninth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/325",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 325,
+   "text": "December 14 1888",
+   "reference": "december fourteenth eighteen eighty eight"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/326",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 326,
+   "text": "12:41 AM",
+   "reference": "twelve forty one a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/327",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 327,
+   "text": "January 08 1965",
+   "reference": "january eighth nineteen sixty five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/330",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 330,
+   "text": "Monday December 13",
+   "reference": "monday december thirteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/331",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 331,
+   "text": "February 03 2001",
+   "reference": "february third twenty oh one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/332",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 332,
+   "text": "05:01 AM",
+   "reference": "five oh one a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/333",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 333,
+   "text": "01:25 PM",
+   "reference": "one twenty five p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/334",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 334,
+   "text": "January 29 2007",
+   "reference": "january twenty ninth twenty oh seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/335",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 335,
+   "text": "11:09 PM",
+   "reference": "eleven oh nine p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/336",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 336,
+   "text": "Saturday January 23",
+   "reference": "saturday january twenty third"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/337",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 337,
+   "text": "11:24 AM",
+   "reference": "eleven twenty four a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/338",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 338,
+   "text": "June 24 1938",
+   "reference": "june twenty fourth nineteen thirty eight"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/339",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 339,
+   "text": "August 06 1981",
+   "reference": "august sixth nineteen eighty one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/340",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 340,
+   "text": "03:44 AM",
+   "reference": "three forty four a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/341",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 341,
+   "text": "Saturday October 27",
+   "reference": "saturday october twenty seventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/342",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 342,
+   "text": "Tuesday January 29",
+   "reference": "tuesday january twenty ninth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/343",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 343,
+   "text": "11:43 AM",
+   "reference": "eleven forty three a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/344",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 344,
+   "text": "March 31 1893",
+   "reference": "march thirty first eighteen ninety three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/347",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 347,
+   "text": "04:46 AM",
+   "reference": "four forty six a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/352",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 352,
+   "text": "February 12 1892",
+   "reference": "february twelfth eighteen ninety two"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/353",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 353,
+   "text": "August 09 1976",
+   "reference": "august ninth nineteen seventy six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/354",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 354,
+   "text": "Saturday April 28",
+   "reference": "saturday april twenty eighth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/357",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 357,
+   "text": "03:39 AM",
+   "reference": "three thirty nine a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/358",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 358,
+   "text": "03:55 PM",
+   "reference": "three fifty five p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/359",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 359,
+   "text": "Thursday February 02",
+   "reference": "thursday february second"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/360",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 360,
+   "text": "April 09 1957",
+   "reference": "april ninth nineteen fifty seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/361",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 361,
+   "text": "Friday May 24",
+   "reference": "friday may twenty fourth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/362",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 362,
+   "text": "Wednesday September 12",
+   "reference": "wednesday september twelfth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/363",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 363,
+   "text": "12:54 PM",
+   "reference": "twelve fifty four p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/364",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 364,
+   "text": "April 25 1960",
+   "reference": "april twenty fifth nineteen sixty"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/365",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 365,
+   "text": "05:40 PM",
+   "reference": "five forty p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/366",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 366,
+   "text": "June 08 2001",
+   "reference": "june eighth twenty oh one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/367",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 367,
+   "text": "11:53 AM",
+   "reference": "eleven fifty three a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/368",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 368,
+   "text": "September 16 1883",
+   "reference": "september sixteenth eighteen eighty three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/369",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 369,
+   "text": "01:46 PM",
+   "reference": "one forty six p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/372",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 372,
+   "text": "11:59 AM",
+   "reference": "eleven fifty nine a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/373",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 373,
+   "text": "July 11 1945",
+   "reference": "july eleventh nineteen forty five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/374",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 374,
+   "text": "Monday January 02",
+   "reference": "monday january second"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/377",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 377,
+   "text": "10:42 PM",
+   "reference": "ten forty two p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/378",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 378,
+   "text": "September 17 1979",
+   "reference": "september seventeenth nineteen seventy nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/379",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 379,
+   "text": "09:48 AM",
+   "reference": "nine forty eight a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/380",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 380,
+   "text": "Monday February 28",
+   "reference": "monday february twenty eighth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/381",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 381,
+   "text": "Thursday June 11",
+   "reference": "thursday june eleventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/382",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 382,
+   "text": "11:32 PM",
+   "reference": "eleven thirty two p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/385",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 385,
+   "text": "November 27 1992",
+   "reference": "november twenty seventh nineteen ninety two"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/386",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 386,
+   "text": "Wednesday July 07",
+   "reference": "wednesday july seventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/387",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 387,
+   "text": "April 18 1898",
+   "reference": "april eighteenth eighteen ninety eight"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/388",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 388,
+   "text": "April 13 1991",
+   "reference": "april thirteenth nineteen ninety one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/389",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 389,
+   "text": "01:48 AM",
+   "reference": "one forty eight a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/390",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 390,
+   "text": "Thursday December 18",
+   "reference": "thursday december eighteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/391",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 391,
+   "text": "Wednesday April 09",
+   "reference": "wednesday april ninth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/394",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 394,
+   "text": "05:16 PM",
+   "reference": "five sixteen p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/395",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 395,
+   "text": "01:22 PM",
+   "reference": "one twenty two p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/396",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 396,
+   "text": "Thursday November 29",
+   "reference": "thursday november twenty ninth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/397",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 397,
+   "text": "09:47 AM",
+   "reference": "nine forty seven a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/398",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 398,
+   "text": "07:58 PM",
+   "reference": "seven fifty eight p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/399",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 399,
+   "text": "Monday August 24",
+   "reference": "monday august twenty fourth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/400",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 400,
+   "text": "09:34 PM",
+   "reference": "nine thirty four p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/401",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 401,
+   "text": "January 15 1996",
+   "reference": "january fifteenth nineteen ninety six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/402",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 402,
+   "text": "January 22 1962",
+   "reference": "january twenty second nineteen sixty two"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/403",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 403,
+   "text": "05:33 AM",
+   "reference": "five thirty three a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/406",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 406,
+   "text": "Thursday March 27",
+   "reference": "thursday march twenty seventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/407",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 407,
+   "text": "March 11 2012",
+   "reference": "march eleventh twenty twelve"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/408",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 408,
+   "text": "Friday December 10",
+   "reference": "friday december tenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/409",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 409,
+   "text": "Tuesday August 06",
+   "reference": "tuesday august sixth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/410",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 410,
+   "text": "02:33 PM",
+   "reference": "two thirty three p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/413",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 413,
+   "text": "Monday December 15",
+   "reference": "monday december fifteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/414",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 414,
+   "text": "02:51 PM",
+   "reference": "two fifty one p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/415",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 415,
+   "text": "Sunday March 29",
+   "reference": "sunday march twenty ninth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/416",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 416,
+   "text": "December 20 1971",
+   "reference": "december twentieth nineteen seventy one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/417",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 417,
+   "text": "Tuesday August 14",
+   "reference": "tuesday august fourteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/418",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 418,
+   "text": "June 05 1998",
+   "reference": "june fifth nineteen ninety eight"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/419",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 419,
+   "text": "June 16 1897",
+   "reference": "june sixteenth eighteen ninety seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/420",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 420,
+   "text": "11:02 AM",
+   "reference": "eleven oh two a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/421",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 421,
+   "text": "August 26 1992",
+   "reference": "august twenty sixth nineteen ninety two"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/422",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 422,
+   "text": "11:36 PM",
+   "reference": "eleven thirty six p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/423",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 423,
+   "text": "June 28 1967",
+   "reference": "june twenty eighth nineteen sixty seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/424",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 424,
+   "text": "Sunday October 27",
+   "reference": "sunday october twenty seventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/425",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 425,
+   "text": "07:09 AM",
+   "reference": "seven oh nine a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/426",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 426,
+   "text": "01:19 PM",
+   "reference": "one nineteen p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/427",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 427,
+   "text": "09:17 AM",
+   "reference": "nine seventeen a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/428",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 428,
+   "text": "Saturday July 16",
+   "reference": "saturday july sixteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/429",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 429,
+   "text": "12:33 PM",
+   "reference": "twelve thirty three p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/430",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 430,
+   "text": "January 26 2007",
+   "reference": "january twenty sixth twenty oh seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/433",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 433,
+   "text": "Sunday August 12",
+   "reference": "sunday august twelfth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/434",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 434,
+   "text": "06:57 AM",
+   "reference": "six fifty seven a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/435",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 435,
+   "text": "Wednesday June 24",
+   "reference": "wednesday june twenty fourth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/436",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 436,
+   "text": "March 04 1992",
+   "reference": "march fourth nineteen ninety two"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/437",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 437,
+   "text": "Saturday December 15",
+   "reference": "saturday december fifteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/438",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 438,
+   "text": "Saturday September 16",
+   "reference": "saturday september sixteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/439",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 439,
+   "text": "Saturday July 07",
+   "reference": "saturday july seventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/440",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 440,
+   "text": "08:45 AM",
+   "reference": "eight forty five a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/441",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 441,
+   "text": "November 21 1969",
+   "reference": "november twenty first nineteen sixty nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/442",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 442,
+   "text": "November 16 1925",
+   "reference": "november sixteenth nineteen twenty five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/443",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 443,
+   "text": "July 22 1952",
+   "reference": "july twenty second nineteen fifty two"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/444",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 444,
+   "text": "Tuesday January 26",
+   "reference": "tuesday january twenty sixth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/445",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 445,
+   "text": "June 03 1940",
+   "reference": "june third nineteen forty"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/448",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 448,
+   "text": "November 25 1900",
+   "reference": "november twenty fifth nineteen hundred"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/449",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 449,
+   "text": "09:33 PM",
+   "reference": "nine thirty three p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/450",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 450,
+   "text": "Sunday April 26",
+   "reference": "sunday april twenty sixth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/451",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 451,
+   "text": "Friday February 15",
+   "reference": "friday february fifteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/452",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 452,
+   "text": "06:27 PM",
+   "reference": "six twenty seven p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/453",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 453,
+   "text": "June 13 1907",
+   "reference": "june thirteenth nineteen oh seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/454",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 454,
+   "text": "12:39 PM",
+   "reference": "twelve thirty nine p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/455",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 455,
+   "text": "March 18 2013",
+   "reference": "march eighteenth twenty thirteen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/456",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 456,
+   "text": "03:55 AM",
+   "reference": "three fifty five a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/459",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 459,
+   "text": "10:51 PM",
+   "reference": "ten fifty one p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/460",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 460,
+   "text": "January 09 1930",
+   "reference": "january ninth nineteen thirty"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/461",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 461,
+   "text": "10:13 AM",
+   "reference": "ten thirteen a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/462",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 462,
+   "text": "05:51 AM",
+   "reference": "five fifty one a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/463",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 463,
+   "text": "January 10 1897",
+   "reference": "january tenth eighteen ninety seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/464",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 464,
+   "text": "October 15 1885",
+   "reference": "october fifteenth eighteen eighty five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/465",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 465,
+   "text": "December 14 1984",
+   "reference": "december fourteenth nineteen eighty four"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/466",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 466,
+   "text": "Wednesday September 02",
+   "reference": "wednesday september second"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/467",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 467,
+   "text": "07:29 PM",
+   "reference": "seven twenty nine p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/470",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 470,
+   "text": "12:05 PM",
+   "reference": "twelve oh five p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/473",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 473,
+   "text": "Tuesday May 08",
+   "reference": "tuesday may eighth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/474",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 474,
+   "text": "July 14 1975",
+   "reference": "july fourteenth nineteen seventy five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/475",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 475,
+   "text": "Saturday December 29",
+   "reference": "saturday december twenty ninth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/476",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 476,
+   "text": "Wednesday December 06",
+   "reference": "wednesday december sixth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/477",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 477,
+   "text": "Thursday September 21",
+   "reference": "thursday september twenty first"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/478",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 478,
+   "text": "10:36 PM",
+   "reference": "ten thirty six p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/481",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 481,
+   "text": "02:52 PM",
+   "reference": "two fifty two p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/482",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 482,
+   "text": "01:44 AM",
+   "reference": "one forty four a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/483",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 483,
+   "text": "August 30 1906",
+   "reference": "august thirtieth nineteen oh six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/484",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 484,
+   "text": "January 04 1926",
+   "reference": "january fourth nineteen twenty six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/487",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 487,
+   "text": "Monday February 12",
+   "reference": "monday february twelfth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/488",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 488,
+   "text": "10:28 PM",
+   "reference": "ten twenty eight p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/489",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 489,
+   "text": "Wednesday January 31",
+   "reference": "wednesday january thirty first"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/490",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 490,
+   "text": "Wednesday August 05",
+   "reference": "wednesday august fifth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/491",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 491,
+   "text": "August 13 1979",
+   "reference": "august thirteenth nineteen seventy nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/492",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 492,
+   "text": "December 21 1907",
+   "reference": "december twenty first nineteen oh seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/495",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 495,
+   "text": "03:45 PM",
+   "reference": "three forty five p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/496",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 496,
+   "text": "02:20 AM",
+   "reference": "two twenty a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/497",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 497,
+   "text": "10:28 AM",
+   "reference": "ten twenty eight a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/498",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 498,
+   "text": "October 24 1929",
+   "reference": "october twenty fourth nineteen twenty nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/499",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 499,
+   "text": "November 02 1899",
+   "reference": "november second eighteen ninety nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/500",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 500,
+   "text": "Monday October 15",
+   "reference": "monday october fifteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/501",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 501,
+   "text": "February 25 1951",
+   "reference": "february twenty fifth nineteen fifty one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/506",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 506,
+   "text": "07:59 PM",
+   "reference": "seven fifty nine p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/511",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 511,
+   "text": "06:54 AM",
+   "reference": "six fifty four a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/512",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 512,
+   "text": "January 02 1915",
+   "reference": "january second nineteen fifteen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/513",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 513,
+   "text": "12:50 PM",
+   "reference": "twelve fifty p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/518",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 518,
+   "text": "February 21 1903",
+   "reference": "february twenty first nineteen oh three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/519",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 519,
+   "text": "October 25 2014",
+   "reference": "october twenty fifth twenty fourteen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/520",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 520,
+   "text": "Monday May 02",
+   "reference": "monday may second"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/521",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 521,
+   "text": "January 05 1907",
+   "reference": "january fifth nineteen oh seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/524",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 524,
+   "text": "Wednesday December 02",
+   "reference": "wednesday december second"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/525",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 525,
+   "text": "Wednesday July 28",
+   "reference": "wednesday july twenty eighth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/526",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 526,
+   "text": "02:21 AM",
+   "reference": "two twenty one a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/527",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 527,
+   "text": "01:12 PM",
+   "reference": "one twelve p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/528",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 528,
+   "text": "Monday March 29",
+   "reference": "monday march twenty ninth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/529",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 529,
+   "text": "January 07 1941",
+   "reference": "january seventh nineteen forty one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/532",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 532,
+   "text": "Saturday September 08",
+   "reference": "saturday september eighth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/533",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 533,
+   "text": "October 25 1976",
+   "reference": "october twenty fifth nineteen seventy six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/534",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 534,
+   "text": "Tuesday May 03",
+   "reference": "tuesday may third"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/537",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 537,
+   "text": "Sunday September 10",
+   "reference": "sunday september tenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/538",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 538,
+   "text": "December 01 1946",
+   "reference": "december first nineteen forty six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/539",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 539,
+   "text": "September 30 2019",
+   "reference": "september thirtieth twenty nineteen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/542",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 542,
+   "text": "Saturday August 23",
+   "reference": "saturday august twenty third"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/545",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 545,
+   "text": "September 19 1979",
+   "reference": "september nineteenth nineteen seventy nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/546",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 546,
+   "text": "March 23 1944",
+   "reference": "march twenty third nineteen forty four"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/547",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 547,
+   "text": "03:40 PM",
+   "reference": "three forty p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/550",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 550,
+   "text": "Tuesday April 02",
+   "reference": "tuesday april second"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/551",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 551,
+   "text": "04:18 PM",
+   "reference": "four eighteen p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/552",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 552,
+   "text": "June 16 2006",
+   "reference": "june sixteenth twenty oh six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/555",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 555,
+   "text": "05:39 PM",
+   "reference": "five thirty nine p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/556",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 556,
+   "text": "04:07 AM",
+   "reference": "four oh seven a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/557",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 557,
+   "text": "September 29 1932",
+   "reference": "september twenty ninth nineteen thirty two"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/558",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 558,
+   "text": "Sunday March 27",
+   "reference": "sunday march twenty seventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/559",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 559,
+   "text": "August 05 1897",
+   "reference": "august fifth eighteen ninety seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/560",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 560,
+   "text": "Tuesday February 14",
+   "reference": "tuesday february fourteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/561",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 561,
+   "text": "08:25 AM",
+   "reference": "eight twenty five a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/564",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 564,
+   "text": "Saturday November 30",
+   "reference": "saturday november thirtieth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/565",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 565,
+   "text": "Thursday June 11",
+   "reference": "thursday june eleventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/568",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 568,
+   "text": "October 17 2017",
+   "reference": "october seventeenth twenty seventeen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/569",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 569,
+   "text": "Tuesday August 07",
+   "reference": "tuesday august seventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/570",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 570,
+   "text": "March 09 1951",
+   "reference": "march ninth nineteen fifty one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/571",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 571,
+   "text": "Saturday February 08",
+   "reference": "saturday february eighth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/572",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 572,
+   "text": "Wednesday September 08",
+   "reference": "wednesday september eighth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/573",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 573,
+   "text": "Tuesday October 01",
+   "reference": "tuesday october first"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/574",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 574,
+   "text": "03:05 PM",
+   "reference": "three oh five p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/575",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 575,
+   "text": "November 09 1934",
+   "reference": "november ninth nineteen thirty four"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/576",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 576,
+   "text": "July 04 1998",
+   "reference": "july fourth nineteen ninety eight"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/577",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 577,
+   "text": "Monday March 23",
+   "reference": "monday march twenty third"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/578",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 578,
+   "text": "Tuesday September 26",
+   "reference": "tuesday september twenty sixth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/579",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 579,
+   "text": "December 08 1905",
+   "reference": "december eighth nineteen oh five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/582",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 582,
+   "text": "Sunday February 19",
+   "reference": "sunday february nineteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/583",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 583,
+   "text": "Wednesday April 11",
+   "reference": "wednesday april eleventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/584",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 584,
+   "text": "Sunday April 29",
+   "reference": "sunday april twenty ninth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/585",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 585,
+   "text": "May 14 1903",
+   "reference": "may fourteenth nineteen oh three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/586",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 586,
+   "text": "Friday March 23",
+   "reference": "friday march twenty third"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/591",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 591,
+   "text": "February 16 2006",
+   "reference": "february sixteenth twenty oh six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/592",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 592,
+   "text": "December 22 1958",
+   "reference": "december twenty second nineteen fifty eight"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/593",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 593,
+   "text": "01:45 AM",
+   "reference": "one forty five a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/598",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 598,
+   "text": "02:50 AM",
+   "reference": "two fifty a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/599",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 599,
+   "text": "December 21 2014",
+   "reference": "december twenty first twenty fourteen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/600",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 600,
+   "text": "September 15 1989",
+   "reference": "september fifteenth nineteen eighty nine"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/601",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 601,
+   "text": "06:20 PM",
+   "reference": "six twenty p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/602",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 602,
+   "text": "11:50 PM",
+   "reference": "eleven fifty p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/603",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 603,
+   "text": "December 21 1897",
+   "reference": "december twenty first eighteen ninety seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/604",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 604,
+   "text": "Sunday July 28",
+   "reference": "sunday july twenty eighth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/607",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 607,
+   "text": "December 02 1950",
+   "reference": "december second nineteen fifty"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/608",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 608,
+   "text": "Wednesday July 22",
+   "reference": "wednesday july twenty second"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/611",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 611,
+   "text": "Monday January 23",
+   "reference": "monday january twenty third"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/612",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 612,
+   "text": "Tuesday December 26",
+   "reference": "tuesday december twenty sixth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/613",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 613,
+   "text": "Saturday December 13",
+   "reference": "saturday december thirteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/614",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 614,
+   "text": "Tuesday October 02",
+   "reference": "tuesday october second"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/615",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 615,
+   "text": "May 07 1953",
+   "reference": "may seventh nineteen fifty three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/616",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 616,
+   "text": "December 24 1905",
+   "reference": "december twenty fourth nineteen oh five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/619",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 619,
+   "text": "Sunday October 27",
+   "reference": "sunday october twenty seventh"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/620",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 620,
+   "text": "06:28 AM",
+   "reference": "six twenty eight a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/621",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 621,
+   "text": "Sunday April 03",
+   "reference": "sunday april third"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/622",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 622,
+   "text": "05:01 AM",
+   "reference": "five oh one a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/623",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 623,
+   "text": "11:23 AM",
+   "reference": "eleven twenty three a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/624",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 624,
+   "text": "September 24 1980",
+   "reference": "september twenty fourth nineteen eighty"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/625",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 625,
+   "text": "Wednesday October 10",
+   "reference": "wednesday october tenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/628",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 628,
+   "text": "Sunday February 12",
+   "reference": "sunday february twelfth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/629",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 629,
+   "text": "Tuesday March 24",
+   "reference": "tuesday march twenty fourth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/630",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 630,
+   "text": "07:00 AM",
+   "reference": "seven o clock a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/631",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 631,
+   "text": "Tuesday April 14",
+   "reference": "tuesday april fourteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/634",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 634,
+   "text": "06:43 AM",
+   "reference": "six forty three a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/635",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 635,
+   "text": "11:57 AM",
+   "reference": "eleven fifty seven a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/636",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 636,
+   "text": "November 23 1905",
+   "reference": "november twenty third nineteen oh five"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/637",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 637,
+   "text": "03:51 AM",
+   "reference": "three fifty one a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/638",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 638,
+   "text": "June 23 1896",
+   "reference": "june twenty third eighteen ninety six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/641",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 641,
+   "text": "04:51 PM",
+   "reference": "four fifty one p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/642",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 642,
+   "text": "Sunday June 28",
+   "reference": "sunday june twenty eighth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/643",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 643,
+   "text": "May 14 2001",
+   "reference": "may fourteenth twenty oh one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/644",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 644,
+   "text": "April 20 1907",
+   "reference": "april twentieth nineteen oh seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/645",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 645,
+   "text": "July 07 1976",
+   "reference": "july seventh nineteen seventy six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/646",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 646,
+   "text": "April 20 2006",
+   "reference": "april twentieth twenty oh six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/647",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 647,
+   "text": "November 04 1924",
+   "reference": "november fourth nineteen twenty four"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/648",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 648,
+   "text": "Wednesday January 26",
+   "reference": "wednesday january twenty sixth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/651",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 651,
+   "text": "February 11 1928",
+   "reference": "february eleventh nineteen twenty eight"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/652",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 652,
+   "text": "June 12 1918",
+   "reference": "june twelfth nineteen eighteen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/653",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 653,
+   "text": "April 11 2006",
+   "reference": "april eleventh twenty oh six"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/654",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 654,
+   "text": "January 27 1974",
+   "reference": "january twenty seventh nineteen seventy four"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/655",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 655,
+   "text": "09:13 AM",
+   "reference": "nine thirteen a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/656",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 656,
+   "text": "August 08 1998",
+   "reference": "august eighth nineteen ninety eight"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/657",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 657,
+   "text": "Sunday June 02",
+   "reference": "sunday june second"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/660",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 660,
+   "text": "August 26 1944",
+   "reference": "august twenty sixth nineteen forty four"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/661",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 661,
+   "text": "Sunday March 10",
+   "reference": "sunday march tenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/662",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 662,
+   "text": "Sunday February 02",
+   "reference": "sunday february second"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/663",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 663,
+   "text": "Saturday September 12",
+   "reference": "saturday september twelfth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/664",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 664,
+   "text": "11:18 PM",
+   "reference": "eleven eighteen p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/665",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 665,
+   "text": "11:28 PM",
+   "reference": "eleven twenty eight p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/666",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 666,
+   "text": "09:29 PM",
+   "reference": "nine twenty nine p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/667",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 667,
+   "text": "Friday December 08",
+   "reference": "friday december eighth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/668",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 668,
+   "text": "Thursday August 18",
+   "reference": "thursday august eighteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/669",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 669,
+   "text": "Wednesday June 22",
+   "reference": "wednesday june twenty second"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/670",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 670,
+   "text": "January 26 2014",
+   "reference": "january twenty sixth twenty fourteen"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/673",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 673,
+   "text": "12:13 AM",
+   "reference": "twelve thirteen a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/674",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 674,
+   "text": "Friday October 08",
+   "reference": "friday october eighth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/675",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 675,
+   "text": "September 30 1922",
+   "reference": "september thirtieth nineteen twenty two"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/678",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 678,
+   "text": "April 07 1943",
+   "reference": "april seventh nineteen forty three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/679",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 679,
+   "text": "March 03 1987",
+   "reference": "march third nineteen eighty seven"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/680",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 680,
+   "text": "Saturday April 03",
+   "reference": "saturday april third"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/681",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 681,
+   "text": "08:51 PM",
+   "reference": "eight fifty one p m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/682",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 682,
+   "text": "12:50 AM",
+   "reference": "twelve fifty a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/683",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 683,
+   "text": "Tuesday August 18",
+   "reference": "tuesday august eighteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/686",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 686,
+   "text": "Saturday June 19",
+   "reference": "saturday june nineteenth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/687",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 687,
+   "text": "October 18 1941",
+   "reference": "october eighteenth nineteen forty one"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/688",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 688,
+   "text": "Friday February 04",
+   "reference": "friday february fourth"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/689",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 689,
+   "text": "August 15 1883",
+   "reference": "august fifteenth eighteen eighty three"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/690",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 690,
+   "text": "03:09 AM",
+   "reference": "three oh nine a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/691",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 691,
+   "text": "09:48 AM",
+   "reference": "nine forty eight a m"
+  },
+  {
+   "id": "closed_vocab/silent/5-19_silent/692",
+   "session_dir": "closed_vocab/silent/5-19_silent",
+   "index": 692,
+   "text": "March 03 1923",
+   "reference": "march third nineteen twenty three"
+  }
+ ]
+}

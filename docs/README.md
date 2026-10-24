@@ -1,15 +1,11 @@
-# EMG model docs (Austin)
+# Docs
 
-Planning docs for the EMG side: SVR-1, our silent-speech EMG model, and how it could fuse with the camera pipeline. Snapshot of October 23, 2026, exported from the team's Claude docs.
-
-| File | What it is |
+| Doc | Read it for |
 | --- | --- |
-| [fused-emg-plan.md](fused-emg-plan.md) ([PDF](fused-emg-plan.pdf)) | Plan and status: how it works, results so far, real-time pipeline, benchmarks, data to record, next steps, risks |
-| [svr1-explained.md](svr1-explained.md) ([PDF](svr1-explained.pdf)) | Plain-language walkthrough of the SVR-1 architecture figure, part by part, and what makes it real time |
-| [svr1_architecture.png](svr1_architecture.png) | The architecture figure both docs refer to |
+| [REALTIME_PIPELINE.md](REALTIME_PIPELINE.md) ([PDF](REALTIME_PIPELINE.pdf)) | How the whole real-time system works, in plain words: the three readers, re-reading every 100 ms, confidence locking, Claude, the voice and the call |
+| [SVR1_SPEC.md](SVR1_SPEC.md) ([PDF](SVR1_SPEC.pdf)) | The EMG model, SVR-1, as an engineering spec: inputs, layers, outputs, losses, training, and the changes from the current code. Figure: [svr1_architecture.png](../figures/svr1_architecture.png) |
+| [TEAM_TASKS_AND_INTERFACES.md](TEAM_TASKS_AND_INTERFACES.md) ([PDF](TEAM_TASKS_AND_INTERFACES.pdf)) | Who builds what, the message formats between parts, the order of work, recording and training |
+| [EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md) ([PDF](EVAN_REALTIME_LIP_READING.pdf)) | Evan's step-by-step plan for the real-time camera reader |
+| [recording/](recording/) | The sentences for the three recording sessions. The procedure is [RECORDING.md](../RECORDING.md) at the top of the repo |
 
-Where these docs differ from the settled decisions in `CLAUDE.md` (those decisions win until the team changes them):
-
-- The docs use Gaddy electrode site 4 on the throat; `CLAUDE.md` says no pad on the throat.
-- The docs fuse EMG into free speech and use a local ~4B LLM to rescore; `CLAUDE.md` keeps free speech camera-only with Claude fixing mistakes.
-- The docs' fixed-sentence head is the same idea as the quick-phrases classifier (10 phrases plus rest).
+The Markdown is the source of truth; the PDFs are copies for reading. After editing a doc, rebuild its PDF with `python docs/build_pdfs.py` (needs `pip install markdown playwright` and `playwright install chromium`; works offline, Mermaid is vendored in `vendor/`) and commit both.

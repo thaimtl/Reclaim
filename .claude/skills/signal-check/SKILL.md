@@ -24,7 +24,7 @@ The Windows arduino-cli path has not been checked on a real machine.
 ## Before the check
 
 1. Set up once: create the venv, then `PY -m pip install -r rig/requirements.txt`.
-2. Confirm the laptop is on battery and nothing from wall power touches it, unless a USB isolator sits before the Uno.
+2. Confirm the laptop is on battery and nothing from wall power touches it. We have no USB isolator, so there is no exception.
 3. Find the Uno with `PY -m serial.tools.list_ports`.
    No port means the USB is unplugged or the cable only carries power.
    On Windows, a clone Uno with a CH340 chip also needs the CH340 driver.
