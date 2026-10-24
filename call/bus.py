@@ -1,8 +1,10 @@
 """Team bus for the call service: ZeroMQ PUB/SUB, multipart [topic, msgpack body], body carries v, seq, t_pub
-(the team bus's envelope, bus/schema.md, v2; t_pub is bus.now() = time.perf_counter()). We publish partner.text,
-timing.voice and call.state; we read voice.say and cam.tick (only its emotion map {label, confidence, scores}).
+(same envelope as bus/__init__.py). We publish partner.text, timing.voice and call.state; we read voice.say and cam.tick
+(any version: only its emotion map {label, confidence, scores} is used, unchanged in bus v2).
 
-Only plain msgpack is read here (cam.tick's numpy maps stay as bytes and are ignored), so this needs no numpy.
+The envelope (VERSION, t_pub = time.perf_counter()) is bus/__init__.py's; tests/call checks they stay equal. Decoding
+is plain msgpack on purpose: cam.tick's numpy maps stay raw bytes, never converted, so reading its emotion at 10 Hz
+costs almost nothing.
 """
 import os
 import time
@@ -11,7 +13,7 @@ import msgpack
 import zmq
 import zmq.asyncio
 
-VERSION = 2
+VERSION = 2      # the team bus envelope (bus/__init__.py): plain msgpack maps are the same in v1 and v2
 PARTNER_TEXT, TIMING_VOICE, CALL_STATE = 'partner.text', 'timing.voice', 'call.state'
 VOICE_SAY, CAM_TICK = 'voice.say', 'cam.tick'
 

@@ -388,8 +388,10 @@ class Decoder:
             return []
         utt.final_sent = final   # sent even with no words, so the voice always closes its context
         pace, effort = self.emg.voice(now) if self.emg is not None else (PACE, EFFORT)
+        # offset: where ready[0] sits in the sentence, so the voice never has to guess (a real repeat, "no no", is
+        # spoken; a resent word never is)
         return [('voice.say', {'utt_id': utt.utt_id, 'words': ready, 'final': final,
-                               'pace': pace, 'effort': effort})]
+                               'offset': utt.spoken - len(ready), 'pace': pace, 'effort': effort})]
 
 
 def _norm(x):

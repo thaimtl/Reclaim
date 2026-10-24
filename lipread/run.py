@@ -446,7 +446,7 @@ def main(argv=None):
         cropper = LiveCropper(os.path.join(lipread.LIPFLOW_MODELS, 'face_landmarker.task'), pose=not args.no_pose)
         segmenter = Segmenter() if args.segments == 'auto' else Segmenter.stream()
         if not args.no_emotion:
-            emotion = EmotionWorker()
+            emotion = EmotionWorker(sync=not live_mode)     # a fast replay: the same emotion every run
         runner = Runner(model, pub.send, segmenter, emotion.current if emotion else None, tick_ms=args.tick_ms,
                         final=final, fe_cache=not args.no_fe_cache)
         q = queue.Queue()
@@ -487,6 +487,8 @@ def main(argv=None):
             if th.is_alive():
                 log.error('crop thread still running after %.0f s (source stuck?): exiting without closing it', JOIN_S)
                 code = code or 1
+        if emotion is not None:
+            emotion.close()
         if final is not None:
             final.close(timeout=3.0)
             log.info('final pass: %d beams, %d dropped, %d errors', len(final.stats), len(final.dropped),

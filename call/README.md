@@ -21,14 +21,14 @@ flowchart LR
 | --- | --- |
 | **Instant Voice Clone** | Austin's own voice, made from his recordings with his consent. Without it he would sound like an electrolarynx. |
 | **Sonic 3.6 over the WebSocket, continuations** | One context per sentence. Words are pushed as the decoder settles them (`continue: true`), so speech starts while Austin is still mouthing. |
-| **`generation_config`** | His facial expression picks the `emotion` (happy, sad, angry, surprised, neutral); his mouthing pace sets `speed`, his effort sets `volume`. |
+| **`generation_config` + inline tags** | When a sentence starts, his facial expression picks the `emotion` (neutral, happy, sad, surprised), his mouthing pace sets `speed` and his effort sets `volume`. Sonic keeps a context's settings, so a change mid-sentence goes inline as `<emotion value/>`, `<speed ratio/>` or `<volume ratio/>`. |
 | **`pcm_mulaw` 8 kHz output** | Sonic speaks phone audio directly: no resampling between Cartesia and Twilio. |
 | **Ink (ink-2) with turn detection** | Transcribes the judge from the call audio (also `pcm_mulaw` 8 kHz) into live captions and into Claude's context. |
 
 ## Setup
 
 1. Environment (on the machine that runs it; venvs can't be copied between computers):
-   `bash scripts/setup_envs.sh call`
+   `uv venv --python 3.11 venv-call && uv pip install --python venv-call/bin/python -r requirements-call.txt`
 2. Keys: `cp call/.env.example call/keys.env`, then fill in `CARTESIA_API_KEY`, `CARTESIA_VOICE_ID` (Austin's clone),
    the Twilio account SID, auth token and number (a paid account: trial calls play an announcement first).
 3. A public HTTPS tunnel to `PORT` (default 8787), e.g. `cloudflared tunnel --url http://127.0.0.1:8787` or ngrok;
@@ -38,6 +38,19 @@ flowchart LR
    - Or the judge calls our number: point the number's voice webhook at `https://PUBLIC_HOST/twiml` (POST), then
      `venv-call/bin/python -m call.server`
 5. Tests (no network, fake Cartesia and Twilio): `venv-call/bin/python -m pytest tests/call -q -c tests/call/pytest.ini`
+
+## Team bus
+
+ZeroMQ over TCP on the laptop's loopback (docs/TEAM_TASKS_AND_INTERFACES.md; no `ipc://`, which Windows lacks). Each variable in
+`call/keys.env` or the environment overrides its address.
+
+| Address | Who binds it | What we use |
+| --- | --- | --- |
+| `tcp://127.0.0.1:5556` (`RECLAIM_CAM_PUB`) | camera reader (`lipread.run`) | `cam.tick`: only its `emotion` |
+| `tcp://127.0.0.1:5557` (`RECLAIM_DEC_PUB`) | Austin's decoder | `voice.say`: `utt_id`, `words` (the new words), `final`, `pace`, `effort`, and `offset` (where `words[0]` sits in the sentence, so a resent word is never spoken twice and a real repeat like "no no" is) |
+| `tcp://127.0.0.1:5559` (`RECLAIM_CALL_PUB`) | this service | publishes `partner.text`, `timing.voice`, `call.state` |
+
+Times on the bus are `time.perf_counter()` (the team clock).
 
 ## Responsible use
 
@@ -58,5 +71,6 @@ flowchart LR
 - Each word goes to Sonic as soon as it arrives (the repo plan), with a 120 ms server buffer. Austin mouths about as
   fast as speech plays, so streaming word by word can leave short silences mid-sentence; `CARTESIA_PHRASE_WORDS=3` with
   `CARTESIA_MAX_BUFFER_MS=0` groups words instead (an experiment, off by default).
-- Pace and effort mapping assume pace 1.0 = normal and effort 0 to 1 (to confirm with the decoder).
+- Pace and effort are relative to Austin's normal (1.0 = normal, as svr/live.py computes effort): speed = pace, volume =
+  effort, clamped to Sonic's 0.6-1.5 and 0.5-2.0.
 - Emotion comes from the camera's face label; below 0.5 confidence the voice stays neutral.

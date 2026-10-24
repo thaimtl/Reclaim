@@ -104,7 +104,7 @@ flowchart TD
 | `dec.repeat` | Austin → dashboard | at sentence end | `utt_id`, `reason` {`reader` (camera / EMG / Claude), `text`, `threshold`, `claude_please_repeat`, `words` [{`index`, `w`, `cam`, `emg`, `claude`, `nbest`, `score`, `alts`}]} |
 | `claude.predict` | Claude → Austin | on judge line, ~2 s | `words` [{`w`, `weight`}], `phrases`, `predictability` (0 to 1), `ttl_s` |
 | `claude.repair` | Claude → Austin, dashboard | on reply | `utt_id`, `edits` [{`index`, `from`, `to`}], `please_repeat` |
-| `voice.say` | Austin → Frank | words leaving the repair window | `utt_id`, `words`, `final` (sent once per sentence, with `words` [] if nothing locked), `pace`, `effort` (both relative, 1.0 = Austin's normal; below) |
+| `voice.say` | Austin → Frank | words leaving the repair window | `utt_id`, `words` (only the new ones), `offset` (where `words[0]` sits in the sentence), `final` (sent once per sentence, with `words` [] if nothing locked), `pace`, `effort` (both relative, 1.0 = Austin's normal; below) |
 | `partner.text` | Frank → Claude, dashboard | streaming | `text`, `is_final`, `t` |
 | `timing.*` | everyone → logger | every event | the stage and its duration in ms (the camera's ride in `cam.tick.timing_ms`) |
 

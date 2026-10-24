@@ -12,6 +12,11 @@ except ImportError:  # pragma: no cover
     pass
 
 
+DEFAULT_CAM_PUB = 'tcp://127.0.0.1:5556'      # the camera reader (bus/__init__.py DEFAULT_CAM_PUB)
+DEFAULT_DEC_PUB = 'tcp://127.0.0.1:5557'      # Austin's decoder (voice.say)
+DEFAULT_CALL_PUB = 'tcp://127.0.0.1:5559'     # this service (partner.text, timing.voice, call.state)
+
+
 def _env(name, default=None):
     v = os.environ.get(name)
     return v if v not in (None, '') else default
@@ -37,11 +42,12 @@ class Config:
     record_inbound: str = field(default_factory=lambda: _env('RECORD_INBOUND'))
     # unguessable path for the media websocket: only Twilio (who gets it in our TwiML) can open it
     media_token: str = field(default_factory=lambda: _env('MEDIA_TOKEN', secrets.token_urlsafe(16)), repr=False)
-    # team bus (ZeroMQ on the loopback, one TCP port per producer: docs/TEAM_TASKS_AND_INTERFACES.md, bus.team): we
-    # connect to the decoder's and the camera reader's publishers and bind our own. Each env var overrides.
-    dec_pub: str = field(default_factory=lambda: _env('RECLAIM_DEC_PUB', 'tcp://127.0.0.1:5557'))
-    cam_pub: str = field(default_factory=lambda: _env('RECLAIM_CAM_PUB', 'tcp://127.0.0.1:5556'))
-    call_pub: str = field(default_factory=lambda: _env('RECLAIM_CALL_PUB', 'tcp://127.0.0.1:5559'))
+    # team bus (docs/TEAM_TASKS_AND_INTERFACES.md): ZeroMQ over TCP on the loopback, one port per publisher (no ipc://:
+    # it doesn't work on Windows). We connect to the camera reader's (5556, bus.DEFAULT_CAM_PUB) and the decoder's
+    # (5557) publishers and bind our own (5559; 5558 is the Claude service). Each env var overrides.
+    dec_pub: str = field(default_factory=lambda: _env('RECLAIM_DEC_PUB', DEFAULT_DEC_PUB))
+    cam_pub: str = field(default_factory=lambda: _env('RECLAIM_CAM_PUB', DEFAULT_CAM_PUB))
+    call_pub: str = field(default_factory=lambda: _env('RECLAIM_CALL_PUB', DEFAULT_CALL_PUB))
 
     def missing(self, *names):
         """Names of required settings that are empty, for a clear startup error."""

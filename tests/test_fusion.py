@@ -249,7 +249,7 @@ def test_repair_in_window_changes_voice():
     assert topics(dec.pump(t + REPAIR_WINDOW_S / 2), 'voice.say') == []
     dec.on_repair({'utt_id': 1, 'edits': [{'index': 0, 'from': 'bat', 'to': 'mat'}], 'please_repeat': False}, t + 0.2)
     say = topics(dec.pump(t + REPAIR_WINDOW_S + 1e-6), 'voice.say')
-    assert say == [{'utt_id': 1, 'words': ['mat'], 'final': False, 'pace': 1.0, 'effort': 1.0}]
+    assert say == [{'utt_id': 1, 'words': ['mat'], 'final': False, 'offset': 0, 'pace': 1.0, 'effort': 1.0}]
 
 
 def test_late_repair_fixes_captions_only():
@@ -290,6 +290,7 @@ def test_sentence_end_settles_with_nbest():
     says = topics(out + fin + dec.pump(now + 5.0), 'voice.say')
     assert [w for s in says for w in s['words']] == ['i', 'want']
     assert [s['final'] for s in says] == [False, True]
+    assert [s['offset'] for s in says] == [0, 1]                     # where each message's first word sits
 
 
 def test_please_repeat_instead_of_guessing():
@@ -335,7 +336,8 @@ def test_voice_final_even_with_nothing_locked():
     fr = frames_for([(7, 0.3)])                                       # far too unsure
     _, now = feed(dec, fr, [len(fr)] * 3, quiet_tail=12)
     out = dec.pump(now + 0.5) + dec.pump(now + 0.5 + 3.0)
-    assert topics(out, 'voice.say') == [{'utt_id': 1, 'words': [], 'final': True, 'pace': 1.0, 'effort': 1.0}]
+    assert topics(out, 'voice.say') == [{'utt_id': 1, 'words': [], 'final': True, 'offset': 0, 'pace': 1.0,
+                                         'effort': 1.0}]
 
 
 def test_final_timeout_without_cam_final():

@@ -9,7 +9,6 @@ import os
 import sys
 from types import SimpleNamespace
 
-import pytest
 import zmq
 import zmq.asyncio
 
@@ -28,20 +27,25 @@ def test_generation_config_maps_and_clamps():
     assert generation_config('happy', 0.9) == {'emotion': 'happy', 'speed': 1.1}
     assert generation_config('happy', 0.2)['emotion'] == 'neutral'         # unsure face: neutral voice
     assert generation_config('confused', 1.0)['emotion'] == 'neutral'      # unknown label
-    g = generation_config('sad', 1.0, pace=3.0, effort=1.0)
-    assert g == {'emotion': 'sad', 'speed': 1.5, 'volume': 1.0}             # effort 1.0 = Austin's normal
+    assert generation_config('happy', 1.0, effort=1.0)['volume'] == 1.0     # effort 1.0 = his normal = normal volume
+    g = generation_config('sad', 1.0, pace=3.0, effort=3.0)
+    assert g == {'emotion': 'sad', 'speed': 1.5, 'volume': 2.0}
     g = generation_config('neutral', 1.0, pace=0.1, effort=0.0)
     assert g == {'emotion': 'neutral', 'speed': 0.6, 'volume': 0.5}
-    assert generation_config('happy', 1.0, effort=4.0)['volume'] == 2.0    # emphatic, clamped
 
 
-def test_utterance_handles_delta_and_cumulative_messages():
+def test_utterance_words_without_offset_are_new_words():
+    """No guessing: without an offset every message is the next words (the decoder's voice.say), so a real repeat is
+    spoken ("no no way"); with an offset, resent words are skipped (nothing spoken twice)."""
     u = Utterance(1)
-    assert u.new_words(['I', 'GOT']) == ['I', 'GOT']
-    assert u.new_words(['I', 'GOT', 'THE']) == ['THE']          # cumulative
-    assert u.new_words(['PILLS']) == ['PILLS']                  # delta
-    assert u.new_words(['I', 'GOT', 'THE', 'PILLS']) == []      # repeat: nothing spoken twice
-    assert u.sent == ['I', 'GOT', 'THE', 'PILLS']
+    assert u.new_words(['NO']) == ['NO']
+    assert u.new_words(['NO', 'WAY']) == ['NO', 'WAY']           # a second "no", not the first one resent
+    assert u.sent == ['NO', 'NO', 'WAY']
+    v = Utterance(2)
+    assert v.new_words(['I', 'GOT'], offset=0) == ['I', 'GOT']
+    assert v.new_words(['I', 'GOT', 'THE'], offset=0) == ['THE']   # cumulative, said so by the offset
+    assert v.new_words(['THE', 'PILLS'], offset=2) == ['PILLS']
+    assert v.sent == ['I', 'GOT', 'THE', 'PILLS']
 
 
 def test_twiml_and_frames():
@@ -126,13 +130,13 @@ async def test_voice_streams_words_then_closes_context():
     v, conn = await make_voice(sink)
     v.set_emotion('happy', 0.9)
     await v.say(7, ['A', 'BURRITO'])
-    await v.say(7, ['A', 'BURRITO', 'IT', 'WAS'])
+    await v.say(7, ['IT', 'WAS'])                 # only the new words (voice.say)
     await v.say(7, ['AMAZING'], final=True)
     await asyncio.sleep(0.05)
     ctx = conn.contexts[0]
     assert len(conn.contexts) == 1, 'one context per utterance'
     assert [p[0] for p in ctx.pushed] == ['A burrito', ' it was', ' amazing.']   # each word as it arrives (the plan)
-    assert ctx.pushed[0][1]['emotion'] == 'happy'
+    assert ctx.defaults['generation_config']['emotion'] == 'happy'
     assert ctx.defaults['output_format']['encoding'] == 'pcm_mulaw' and ctx.defaults['voice'] == {'id': 'austin'}
     assert ctx.closed
     assert heard == [b'A burrito', b' it was', b' amazing.']
@@ -217,9 +221,9 @@ async def test_service_end_to_end(aiohttp_client):
         out.append(m)
     assert out[0]['event'] == 'media' and out[0]['streamSid'] == 'MZ1'
     assert base64.b64decode(out[0]['media']['payload']) == b'I got the pills.'
-    assert out[1] == {'event': 'mark', 'streamSid': 'MZ1', 'mark': {'name': 'utt-3'}}
-    assert conn.contexts[0].pushed[0][1]['emotion'] == 'happy'
-    await ws.send_str(json.dumps({'event': 'mark', 'mark': {'name': 'utt-3'}}))   # Twilio: it has played
+    assert out[1] == {'event': 'mark', 'streamSid': 'MZ1', 'mark': {'name': 'utt-3-1'}}
+    assert conn.contexts[0].defaults['generation_config']['emotion'] == 'happy'   # set when the context opens
+    await ws.send_str(json.dumps({'event': 'mark', 'mark': {'name': 'utt-3-1'}}))   # Twilio: it has played
     await ws.send_str(json.dumps({'event': 'stop'}))
     await asyncio.sleep(0.05)
 
@@ -332,7 +336,7 @@ async def test_pause_speaks_waiting_words():
     old, cv.PAUSE_S = cv.PAUSE_S, 0.05
     try:
         await v.say(9, ['I', 'WENT'])                       # first phrase goes at once
-        await v.say(9, ['I', 'WENT', 'TO', 'THE'])          # held: ends on a function word
+        await v.say(9, ['TO', 'THE'])                       # held: ends on a function word
         assert [p[0] for p in conn.contexts[0].pushed] == ['I went']
         await asyncio.sleep(0.15)                           # Austin pauses: the waiting words are spoken
         assert [p[0] for p in conn.contexts[0].pushed] == ['I went', ' to the']
@@ -342,17 +346,15 @@ async def test_pause_speaks_waiting_words():
 
 
 def test_defaults_match_the_team_bus():
+    import importlib
     import sys
-    if any(f'RECLAIM_{n}_PUB' in os.environ for n in ('CAM', 'DEC', 'CALL')):
-        pytest.skip('endpoints overridden in the environment')
-    c = Config()
-    assert (c.cam_pub, c.dec_pub, c.call_pub) == ('tcp://127.0.0.1:5556', 'tcp://127.0.0.1:5557', 'tcp://127.0.0.1:5559')
+    from call import config
     sys.path.insert(0, ROOT)
-    try:
-        import bus.team as team                   # the repo's own table, when bus/ is importable (needs numpy)
-    except Exception:                             # noqa: BLE001
-        return
-    assert (team.ENDPOINTS['cam'], team.ENDPOINTS['dec'], team.ENDPOINTS['call']) == (c.cam_pub, c.dec_pub, c.call_pub)
+    team = importlib.import_module('bus')         # the repo's bus package: the camera reader's own default
+    assert config.DEFAULT_CAM_PUB == team.DEFAULT_CAM_PUB
+    assert bus.VERSION == team.VERSION            # the same envelope as the rest of the team
+    assert len({config.DEFAULT_CAM_PUB, config.DEFAULT_DEC_PUB, config.DEFAULT_CALL_PUB}) == 3
+    assert all(a.startswith('tcp://127.0.0.1:') for a in (config.DEFAULT_DEC_PUB, config.DEFAULT_CALL_PUB))
 
 
 async def test_ipc_publisher_creates_its_folder(tmp_path):
@@ -458,7 +460,7 @@ async def test_reconnects_and_resends_the_phrase_when_sonic_dies():
     await v.start()
     await v.say(4, ['I', 'GOT'])
     tts.conns[0].dead = True                                     # the socket dies mid-utterance
-    await v.say(4, ['I', 'GOT', 'THE', 'PILLS'], final=True)
+    await v.say(4, ['THE', 'PILLS'], final=True)
     await asyncio.sleep(0.05)
     assert len(tts.conns) == 2, 'a fresh connection, not the cached dead one'
     assert [p[0] for p in tts.conns[1].contexts[0].pushed] == [' the pills.']
@@ -567,4 +569,117 @@ async def test_whole_sentence_fallback_when_streaming_keeps_failing():
     await asyncio.sleep(0.05)
     assert heard == [b'WHOLE:I got the pills.']
     assert calls[0]['output_format']['encoding'] == 'pcm_mulaw' and done == [8]
+    await v.close()
+
+
+def test_inline_tags_only_for_changes_inside_a_context():
+    from call.voice import inline_tags
+    base = {'emotion': 'neutral', 'speed': 1.1}
+    assert inline_tags(base, dict(base)) == ''
+    assert inline_tags(base, {'emotion': 'happy', 'speed': 1.1}) == '<emotion value="happy"/> '
+    assert inline_tags(base, {'emotion': 'neutral', 'speed': 1.32, 'volume': 1.8}) == \
+        '<speed ratio="1.32"/><volume ratio="1.80"/> '
+    assert inline_tags(None, base) == ''
+
+
+async def test_a_change_mid_sentence_goes_inline_not_in_generation_config():
+    conn = FakeConn()
+    v = Voice(cfg(), lambda b: asyncio.sleep(0), client=SimpleNamespace(tts=FakeTTS(conn)))
+    await v.start()
+    v.set_emotion('neutral', 1.0)
+    await v.say(3, ['I', 'GOT'])
+    v.set_emotion('happy', 1.0)                                 # his face changes mid-sentence
+    await v.say(3, ['IT'], effort=1.8)                          # and he stresses a word
+    await v.say(3, ['TODAY'], final=True)
+    pushed = [p for p, _ in conn.contexts[0].pushed]
+    assert len(conn.contexts) == 1 and conn.contexts[0].defaults['generation_config']['emotion'] == 'neutral'
+    assert pushed[1] == ' <emotion value="happy"/><volume ratio="1.80"/> it'
+    assert pushed[2] == ' today.'                               # no effort sent: the volume stays as it is
+    assert all(g is None for _, g in conn.contexts[0].pushed)   # generation_config only when the context opens
+    await v.close()
+
+
+async def test_fallback_after_the_audio_ended_is_still_played():
+    """Words left for the whole-sentence fallback after the context's audio already ended get their own run."""
+    heard = []
+
+    async def sink(b):
+        heard.append(b)
+
+    class Gen:
+        async def generate(self, **kw):
+            return SimpleNamespace(read=lambda: asyncio.sleep(0, result=b'FALLBACK'))
+    v = Voice(cfg(), sink, client=SimpleNamespace(tts=Gen()))
+    v._player = asyncio.create_task(v._play())
+    u = Utterance(11)
+    u.sent, u.final, u.lost = ['HELLO'], True, ['HELLO']
+    v.utts[11] = u
+    v._ensure_run(u)
+    u.audio.put_nowait(b'early')
+    u.end_audio()                                               # the context's audio already ended
+    await v._lost_then_end(u)
+    await asyncio.sleep(0.05)
+    assert heard == [b'early', b'FALLBACK']
+    v._player.cancel()
+
+
+def test_gate_floor_ignores_the_callers_speech():
+    from call.ink import FRAME, NoiseGate
+    import audioop  # noqa: F401  (py3.11 still has it; only to build mu-law frames)
+    quiet = audioop.lin2ulaw(b'\x10\x00' * FRAME, 2)
+    loud = audioop.lin2ulaw(b'\x00\x30' * FRAME, 2)
+    g = NoiseGate()
+    for _ in range(50):
+        g.push(quiet)
+    for _ in range(300):                                        # 6 s of continuous speech, no pause
+        out = g.push(loud)
+    assert out == loud, 'the gate must stay open through a long sentence'
+
+
+def test_gate_floor_follows_a_room_that_gets_louder():
+    from call.ink import FRAME, NoiseGate
+    import audioop  # noqa: F401
+    quiet = audioop.lin2ulaw(b'\x10\x00' * FRAME, 2)
+    crowd = audioop.lin2ulaw(b'\x00\x20' * FRAME, 2)          # the expo fills up: steady noise, well above the start
+    g = NoiseGate()
+    for _ in range(50):
+        g.push(quiet)
+    outs = [g.push(crowd) for _ in range(2000)]                 # 40 s of crowd
+    assert outs[-1] != crowd, 'a louder room must not hold the gate open forever'
+
+
+async def test_effort_and_pace_carry_over_when_a_message_leaves_them_out():
+    conn = FakeConn()
+    v = Voice(cfg(), lambda b: asyncio.sleep(0), client=SimpleNamespace(tts=FakeTTS(conn)))
+    await v.start()
+    await v.say(4, ['SO'], pace=1.0, effort=1.0)
+    await v.say(4, ['LOUD'], effort=2.0)
+    await v.say(4, ['RIGHT', 'NOW'], final=True)              # no pace or effort: keep the last ones
+    pushed = [p for p, _ in conn.contexts[0].pushed]
+    assert pushed[1] == ' <volume ratio="2.00"/> loud' and pushed[2] == ' right now.'
+    assert v.utts[4].gen['volume'] == 2.0 and v.utts[4].gen['speed'] == conn.contexts[0].defaults['generation_config']['speed']
+    await v.close()
+
+
+async def test_end_mark_alone_does_not_open_a_new_context():
+    conn = FakeConn()
+    v = Voice(cfg(), lambda b: asyncio.sleep(0), client=SimpleNamespace(tts=FakeTTS(conn)))
+    await v.start()
+    u = Utterance(6)
+    u.sent, u.spoken, u.final = ['HI'], 1, True
+    v.utts[6] = u
+    await v._send(u, 0, end=True)                               # its context timed out earlier: nothing to close
+    assert conn.contexts == []
+    await v.close()
+
+
+async def test_after_a_double_failure_the_rest_keeps_its_order():
+    conn = FakeConn()
+    v = Voice(cfg(), lambda b: asyncio.sleep(0), client=SimpleNamespace(tts=FakeTTS(conn)))
+    await v.start()
+    u = Utterance(8)
+    u.sent, u.pending, u.broken, u.lost = ['A', 'B', 'C'], ['C'], True, ['A', 'B']
+    v.utts[8] = u
+    await v._send(u, 1)
+    assert u.lost == ['A', 'B', 'C'] and conn.contexts == []
     await v.close()
