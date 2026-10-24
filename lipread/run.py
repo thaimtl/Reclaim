@@ -125,7 +125,6 @@ class Runner:
         self.last_t, self.capture_t = t, crop.t
         return crop if t == crop.t else dataclasses.replace(crop, t=t)
 
-
     def tick_if_due(self, backlog=0):
         seg = self.segmenter.segment
         if seg is None:

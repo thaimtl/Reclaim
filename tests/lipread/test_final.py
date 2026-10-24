@@ -180,7 +180,6 @@ def test_close_with_a_big_job_queued_for_a_dead_child_does_not_hang():
     assert time.perf_counter() - t0 < 5 and not beam.proc.is_alive()
 
 
-
 @needs_weights
 @needs_cuda
 @needs_sample

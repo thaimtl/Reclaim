@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# One-time setup of the lip reader. Linux, or Git Bash on Windows. Data goes to $RECLAIM_WORKDIR (default: the repo).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 W="${RECLAIM_WORKDIR:-$PWD}"

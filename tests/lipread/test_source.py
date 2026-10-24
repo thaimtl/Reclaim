@@ -19,7 +19,6 @@ from lipread.types import FPS
 SIZE = (64, 48)
 
 
-
 class StallCap:
     """cv2.VideoCapture stand-in at 50 fps. `script` (class attribute, shared by reopens): the number of good grabs
     each opened device gives before failing for good, or None when the device does not open."""
@@ -134,7 +133,6 @@ def test_camera_close_during_a_stall(stall_cam):
     threading.Timer(0.4, src.close).start()
     got, wall = drain(src)
     assert wall < 1.5 and src.error is None and StallCap.races == 0
-
 
 
 def level(i):
