@@ -20,3 +20,11 @@ tmp/
 # Screenshots pasted into images/ (Windows names them {GUID}.png)
 images/{*}.png
 cluster/VERSION
+
+# call service: keys and Austin's voice recordings stay on the laptop
+call/keys.env
+call/.env
+call/*.wav
+call/*.m4a
+call/clone_ab/
+demo/audio/

@@ -1,0 +1,11 @@
+# Call service environment (venv-call):  uv venv --python 3.11 venv-call && uv pip install --python venv-call/bin/python -r requirements-call.txt
+aiohttp==3.14.5
+cartesia[websockets]==4.2.0
+msgpack==1.2.3
+numpy==2.4.6
+pytest==9.1.1
+pytest-asyncio==1.4.0
+python-dotenv==1.2.4
+pyzmq==27.2.0
+twilio==9.12.0
+websockets==15.0.1

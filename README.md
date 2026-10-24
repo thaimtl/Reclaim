@@ -79,6 +79,9 @@ All code lives in this repo; datasets, checkpoints, results and Python environme
 | `bus/` | The team bus: ZeroMQ + msgpack on the loopback, one TCP port per producer ([bus/schema.md](bus/schema.md); `bus.team` for every topic besides the camera's) |
 | `fusion/` | Fusion decoder and word locking (`python -m fusion.run`), and the offline scorer (`python -m fusion.evaluate`) |
 | `claude_service/` | The Claude service: predicts Austin's next words and repairs look-alikes, on the bus |
+| `call/` | The phone call: Twilio media stream, Cartesia Ink for the judge, Sonic 3.6 in Austin's cloned voice ([call/README.md](call/README.md)) |
+| `demo/dashboard/` | The captions dashboard (prototype on sample data) |
+| `scripts/run_pipeline.py` | Starts every part in its own venv, restarts a crashed one, Ctrl-C stops all |
 | `buslog/` | Logs every bus message to `$RECLAIM_WORKDIR/logs/` and replays a session on the replay's clock |
 | `figures/` | The SVR-1 architecture figure and the script that draws it |
 | `tests/` | Smoke and unit tests |

@@ -65,9 +65,9 @@ Claude service, prompt tuning on replayed logs. Agents write code against the co
 | Logger, replay, offline scorer | built: `buslog/`, `fusion/evaluate.py` | `tests/test_buslog.py`, `tests/test_evaluate.py` [ran] |
 | Recorder | merged to main with the delivery styles (#10) | `git log origin/main` [ran] |
 
-Code that must move into the repo (CLAUDE.md: all code lives in this repo): `call/`, `tests/call/`, `demo/dashboard/`,
-`scripts/setup_envs.sh`. `call/config.py` still defaults to `ipc://`, which doesn't work on Windows: it must move to the
-TCP ports in the Interfaces table.
+`call/`, `tests/call/` and `demo/dashboard/` are now in the repo (keys and voice recordings stay out), on the TCP
+ports and bus v2; `voice.say` effort maps to Sonic volume as 1.0 = normal. `scripts/run_pipeline.py` starts
+everything. Still outside: `scripts/setup_envs.sh` (it builds venv-live from a lock file that isn't in the repo).
 
 **The EMG checkpoint, and when it joins.** Fine-tune `W_svr1` from `SVR1_4ch` (better than `SVR1_4ch_artic` at
 look-alikes, which is EMG's job here) on sessions 1 and 2 on the 5090:
