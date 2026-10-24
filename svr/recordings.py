@@ -7,9 +7,9 @@ Layout (written by recorder/record.py, the Reclaim recorder; session folders are
     recordings/<session>/manifest.jsonl          one JSON object per utterance
     recordings/<session>/<id>_emg.npy            (samples, 4), 1000 Hz, raw unfiltered Uno readings (uint16, 0-1023),
                                                  columns = rig pins A0..A3 = Gaddy sites 3, 2, 6, 1
-    recordings/<session>/<id>_emg_ts.npy         float64 (samples,): time.monotonic() of each EMG sample
+    recordings/<session>/<id>_emg_ts.npy         float64 (samples,): time.perf_counter() of each EMG sample
     recordings/<session>/<id>.mp4                webcam video of the same utterance
-    recordings/<session>/<id>_video_ts.npy       per-frame timestamps (s), time.monotonic(), the same clock as the EMG
+    recordings/<session>/<id>_video_ts.npy       per-frame timestamps (s), time.perf_counter(), the same clock as the EMG
 
 Manifest fields:
     id          unique utterance id, e.g. "s1_C_0042"
