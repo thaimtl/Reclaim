@@ -22,6 +22,8 @@ rig\.venv\Scripts\pip install -r recorder\requirements.txt
 rig\.venv\Scripts\python recorder\test_record.py
 ```
 
+The recorder writes H.264 through [ffmpeg](https://ffmpeg.org/download.html): on the GPU's video encoder (`h264_nvenc`) when there is an NVIDIA GPU, else on the CPU (`libx264`). Put ffmpeg on PATH, or pass `--ffmpeg PATH` or set `RECLAIM_FFMPEG`. At start it prints the codec it picked (`video: nvenc`); without ffmpeg it falls back to OpenCV's older MPEG-4 and says so.
+
 Flash the Uno with `rig/uno/uno.ino`. In Arduino IDE: open the file, pick the board (Arduino Uno) and its port, press Upload. Then **quit Arduino IDE completely**, since it holds the serial port even with its windows closed.
 
 ## Each session
@@ -59,7 +61,7 @@ Under `$RECLAIM_WORKDIR/recordings/session_0N/`, or `recordings/` in the repo if
 
 | File | Contents |
 | --- | --- |
-| `<id>.mp4` | Camera video, unmirrored, at the camera's resolution (default 1920×1080, the capture size of Evan's live camera reader, which shrinks frames to 1280×720 itself) |
+| `<id>.mp4` | Camera video, H.264, unmirrored, at the camera's resolution (default 1920×1080, the capture size of Evan's live camera reader, which shrinks frames to 1280×720 itself) |
 | `<id>_video_ts.npy` | Laptop-clock time (`time.perf_counter()`) of every video frame |
 | `<id>_emg.npy` | Raw Uno readings, shape (samples, 4), uint16, unfiltered; columns A0 to A3 = sites 3, 2, 6, 1 |
 | `<id>_emg_ts.npy` | Laptop-clock time of every EMG sample |
@@ -70,7 +72,7 @@ The EMG is saved raw on purpose: training runs `rig/filters.py` over each clip i
 
 ## How camera and EMG stay in sync
 
-Both use the laptop's `time.perf_counter()`, the team bus clock (`bus.now()`). Video frames are stamped right after the camera hands them over. EMG samples come in USB chunks, so each chunk's arrival is paired with the running sample count, and a straight line through the earliest arrivals (the ones with the least USB delay) gives every sample's time. That handles the Uno's clock running a bit fast or slow. The test checks it stays within 3 ms with 1 to 15 ms of USB jitter and a 0.5% clock error. Dropped serial frames (from the firmware's counter) are filled with the last reading and counted, so later samples keep their right time.
+Both use the laptop's `time.perf_counter()` (`time.monotonic()` ticks only every 15.6 ms on Windows before Python 3.13). Video frames are stamped right after the camera hands them over. EMG samples come in USB chunks, so each chunk's arrival is paired with the running sample count, and a straight line through the earliest arrivals (the ones with the least USB delay) gives every sample's time. That handles the Uno's clock running a bit fast or slow. The test checks it stays within 3 ms with 1 to 15 ms of USB jitter and a 0.5% clock error. Dropped serial frames (from the firmware's counter) are filled with the last reading and counted, so later samples keep their right time.
 
 ## Trying it without hardware
 

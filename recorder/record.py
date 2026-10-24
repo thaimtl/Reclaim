@@ -24,6 +24,8 @@ import os
 import platform
 import queue
 import random
+import shutil
+import subprocess
 import sys
 import textwrap
 import threading
@@ -38,7 +40,11 @@ REPO = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(REPO, 'rig'))
 from filters import EmgFilter  # noqa: E402  (rig/filters.py, Thai's live filter)
 
-VERSION = 2  # 2: delivery styles (slow pace, facial expression, effort) on some sentences
+VERSION = 3  # 2: delivery styles (slow pace, facial expression, effort) on some sentences
+#             3: H.264 video (NVENC), MJPG camera capture asked for at open, perf_counter clock
+# The clock for every camera and EMG timestamp. time.monotonic() ticks only every 15.6 ms on Windows before Python 3.13;
+# perf_counter is the same steady clock at under a microsecond (on 3.13+ and on Linux/macOS the two are the same clock).
+now = time.perf_counter
 FS = 1000
 CHANNELS = 4
 SITES = [3, 2, 6, 1]  # Gaddy and Klein sites on rig pins A0, A1, A2, A3
@@ -156,7 +162,7 @@ class EmgBuffer:
         with self.lock:
             pts = np.array([p for p in self.anchors if p[0] >= self.n - window_s * FS], dtype=np.float64)
         if len(pts) < 2:
-            return (pts[0][1] - pts[0][0] / FS, 1.0 / FS) if len(pts) else (time.perf_counter(), 1.0 / FS)
+            return (pts[0][1] - pts[0][0] / FS, 1.0 / FS) if len(pts) else (now(), 1.0 / FS)
         n, t = pts[:, 0], pts[:, 1]
         b, a = np.polyfit(n, t, 1)
         resid = t - (a + b * n)
@@ -169,8 +175,8 @@ class EmgBuffer:
         """Raw samples taken between t0 and t1 (laptop clock), and each sample's time."""
         a, b = self.clock()
         n0, n1 = int(np.ceil((t0 - a) / b)), int(np.floor((t1 - a) / b))
-        deadline = time.perf_counter() + wait_s
-        while self.n <= n1 and time.perf_counter() < deadline:  # the last samples may still be in the USB pipe
+        deadline = now() + wait_s
+        while self.n <= n1 and now() < deadline:  # the last samples may still be in the USB pipe
             time.sleep(0.01)
         with self.lock:
             parts = []
@@ -206,7 +212,7 @@ class SerialEmg(threading.Thread):
         try:
             for chunk in frames(self.port, stats):
                 d = stats.get('dropped', 0)
-                self.buf.push(chunk, time.perf_counter(), d - seen)
+                self.buf.push(chunk, now(), d - seen)
                 seen = d
         except Exception as e:  # noqa: BLE001  (shown in the window)
             self.error = str(e)
@@ -221,10 +227,10 @@ class FakeEmg(threading.Thread):
 
     def run(self):
         rng = np.random.default_rng(0)
-        n, t0 = 0, time.perf_counter()
+        n, t0 = 0, now()
         while True:
             time.sleep(0.008 + rng.uniform(0, 0.006))
-            target = int((time.perf_counter() - t0) * FS * self.drift)
+            target = int((now() - t0) * FS * self.drift)
             k = target - n
             if k <= 0:
                 continue
@@ -232,7 +238,7 @@ class FakeEmg(threading.Thread):
             burst = (np.sin(2 * np.pi * 0.4 * tt) > 0.3) * rng.normal(0, 25, (k, CHANNELS))
             x = 512 + 20 * np.sin(2 * np.pi * 60 * tt) + rng.normal(0, 3, (k, CHANNELS)) + burst
             n = target
-            self.buf.push(np.clip(x, 0, 1023).astype(np.uint16), time.perf_counter() + rng.uniform(0.001, 0.004))
+            self.buf.push(np.clip(x, 0, 1023).astype(np.uint16), now() + rng.uniform(0.001, 0.004))
 
 
 def find_port():
@@ -245,7 +251,7 @@ def find_port():
 
 # ------------------------------------------------------------------------------------------------ camera
 class Camera(threading.Thread):
-    """Grabs frames as fast as the camera gives them and stamps each with time.perf_counter() right after read()."""
+    """Grabs frames as fast as the camera gives them and stamps each with now() (time.perf_counter) right after read()."""
 
     def __init__(self, source, width, height, fps):
         super().__init__(daemon=True)
@@ -259,27 +265,46 @@ class Camera(threading.Thread):
         if not self.fake:
             src = int(source) if str(source).isdigit() else source
             backend = {'Windows': cv2.CAP_DSHOW, 'Darwin': cv2.CAP_AVFOUNDATION}.get(platform.system(), cv2.CAP_ANY)
-            self.cap = cv2.VideoCapture(src, backend) if isinstance(src, int) else cv2.VideoCapture(src)
+            self.file = not isinstance(src, int)
+            if self.file:
+                self.cap = cv2.VideoCapture(src)
+            else:
+                # Ask for MJPG when opening. Set afterwards, Windows DirectShow (OpenCV 5) keeps the uncompressed YUY2
+                # mode, which USB 2 limits to 5 fps at 1920x1080 and 10 fps at 1280x720; the C920 gives 30 in MJPG.
+                params = [cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'), cv2.CAP_PROP_FRAME_WIDTH, width,
+                          cv2.CAP_PROP_FRAME_HEIGHT, height, cv2.CAP_PROP_FPS, int(round(fps))]
+                self.cap = cv2.VideoCapture(src, backend, params)
+                if not self.cap.isOpened():  # a backend that rejects open parameters: open, then set
+                    self.cap = cv2.VideoCapture(src, backend)
+                    for prop, value in zip(params[::2], params[1::2]):
+                        self.cap.set(prop, value)
             if not self.cap.isOpened():
                 sys.exit(f'Cannot open camera {source}. Try --camera 1, or --list-cameras.')
-            self.file = not isinstance(src, int)
             if not self.file:
-                self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-                self.cap.set(cv2.CAP_PROP_FPS, fps)
-            self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or width
-            self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or height
-            self.fps = self.cap.get(cv2.CAP_PROP_FPS) or fps
+                # Auto exposure on (0.75 means auto for DirectShow and V4L2): a camera keeps a manual exposure that
+                # another program set until it is unplugged, and the C920 came up nearly black that way.
+                self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
+            # a property a backend can't report reads 0 or -1 (DirectShow gives fps -1 after open parameters)
+            got = [self.cap.get(p) for p in (cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT, cv2.CAP_PROP_FPS)]
+            self.width = int(got[0]) if got[0] > 0 else width
+            self.height = int(got[1]) if got[1] > 0 else height
+            self.fps = got[2] if got[2] > 0 else fps
+            code = int(self.cap.get(cv2.CAP_PROP_FOURCC))
+            self.fourcc = ''.join(chr((code >> 8 * i) & 0xFF) for i in range(4)).strip('\0 ') or None
+            print(f'camera {source}: {self.width}x{self.height}, {self.fourcc or "unknown format"}', flush=True)
+            if not self.file and self.fourcc and self.fourcc != 'MJPG':
+                print(f'warning: the camera gave {self.fourcc}, not MJPG, so it may run at 5 to 10 fps', flush=True)
+        else:
+            self.fourcc = None
 
     def run(self):
         k = 0
         period = 1.0 / self.fps
-        next_t = time.perf_counter()
+        next_t = now()
         while True:
             if self.fake:
                 next_t += period
-                time.sleep(max(0.0, next_t - time.perf_counter()))
+                time.sleep(max(0.0, next_t - now()))
                 frame = np.full((self.height, self.width, 3), 40, np.uint8)
                 x = int((k * 7) % self.width)
                 cv2.rectangle(frame, (x, self.height // 3), (x + 60, 2 * self.height // 3), (80, 160, 220), -1)
@@ -292,8 +317,8 @@ class Camera(threading.Thread):
                     continue
                 if self.file:
                     next_t += period
-                    time.sleep(max(0.0, next_t - time.perf_counter()))
-            t = time.perf_counter()
+                    time.sleep(max(0.0, next_t - now()))
+            t = now()
             if not ok:
                 self.error = 'camera stopped sending frames'
                 time.sleep(0.1)
@@ -311,16 +336,56 @@ class Camera(threading.Thread):
         return (len(ts) - 1) / (ts[-1] - ts[0]) if len(ts) > 2 and ts[-1] > ts[0] else 0.0
 
 
+# H.264 encoders through ffmpeg, best first: h264_nvenc runs on the GPU's video engine (not the CUDA cores Auto-AVSR and
+# SVR-1 use), libx264 on the CPU. Without ffmpeg, OpenCV's MPEG-4 Part 2 ('mp4v') is the last resort.
+ENCODERS = {
+    'nvenc': ['-c:v', 'h264_nvenc', '-preset', 'p5', '-rc', 'vbr', '-cq', '21', '-b:v', '0'],
+    'x264': ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20'],
+}
+NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)  # Windows: no console window per clip
+
+
+def ffmpeg_cmd(ffmpeg, codec, path, fps, size):
+    return [ffmpeg, '-hide_banner', '-loglevel', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'bgr24',
+            '-s', f'{size[0]}x{size[1]}', '-r', f'{fps:.3f}', '-i', '-', *ENCODERS[codec],
+            '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path]
+
+
+def pick_codec(want, ffmpeg):
+    """The codec to record with: 'nvenc' or 'x264' if a 1-second test encode works, else 'mp4v'."""
+    if want == 'mp4v':
+        return 'mp4v'
+    if not ffmpeg:
+        print('warning: ffmpeg not found (pass --ffmpeg PATH): writing MPEG-4 with OpenCV, not H.264', flush=True)
+        return 'mp4v'
+    frame = np.zeros((256, 256, 3), np.uint8).tobytes()
+    for codec in ([want] if want != 'auto' else list(ENCODERS)):
+        cmd = ffmpeg_cmd(ffmpeg, codec, '-', 30.0, (256, 256))
+        cmd[-1:] = ['-f', 'null', '-']
+        try:
+            r = subprocess.run(cmd, input=frame * 30, capture_output=True, timeout=30, creationflags=NO_WINDOW)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            r = type('R', (), {'returncode': 1, 'stderr': str(e).encode()})()
+        if r.returncode == 0:
+            return codec
+        print(f'warning: {codec} test encode failed: {r.stderr.decode(errors="replace").strip()[-300:]}', flush=True)
+    print('warning: no H.264 encoder worked: writing MPEG-4 with OpenCV', flush=True)
+    return 'mp4v'
+
+
 class ClipWriter(threading.Thread):
-    """Writes one clip's frames to MP4 off the capture thread; a full queue drops a frame and counts it."""
+    """Writes one clip's frames to MP4 off the capture thread; a full queue drops a frame and counts it.
+
+    H.264 goes through an ffmpeg process fed raw frames on stdin; the file's frame rate is nominal, the _video_ts.npy
+    times are the truth."""
 
     QUEUE_BYTES = 600e6     # frames waiting to be encoded: ~100 at 1920x1080 (3 s), ~200 at 1280x720
 
-    def __init__(self, path, fps, size):
+    def __init__(self, path, fps, size, codec='mp4v', ffmpeg=None):
         super().__init__(daemon=True)
-        self.path, self.fps, self.size = path, fps, size
+        self.path, self.fps, self.size, self.codec, self.ffmpeg = path, fps, size, codec, ffmpeg
         self.q = queue.Queue(maxsize=max(30, int(self.QUEUE_BYTES / (size[0] * size[1] * 3))))
-        self.ts, self.dropped = [], 0
+        self.ts, self.dropped, self.error = [], 0, None
 
     def put(self, frame, t):
         try:
@@ -329,17 +394,40 @@ class ClipWriter(threading.Thread):
             self.dropped += 1
 
     def run(self):
-        out = cv2.VideoWriter(self.path, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.size)
+        proc = out = None
+        if self.codec == 'mp4v':
+            out = cv2.VideoWriter(self.path, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.size)
+        else:
+            proc = subprocess.Popen(ffmpeg_cmd(self.ffmpeg, self.codec, self.path, self.fps, self.size),
+                                    stdin=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=NO_WINDOW)
         while True:
             item = self.q.get()
             if item is None:
                 break
             frame, t = item
+            if self.error:
+                continue  # keep draining so the capture thread never waits
             if (frame.shape[1], frame.shape[0]) != self.size:
                 frame = cv2.resize(frame, self.size)
-            out.write(frame)
+            if out is not None:
+                out.write(frame)
+            else:
+                try:
+                    proc.stdin.write(np.ascontiguousarray(frame).data)
+                except OSError:
+                    self.error = 'video encoder stopped'
+                    continue
             self.ts.append(t)
-        out.release()
+        if out is not None:
+            out.release()
+        else:
+            try:
+                proc.stdin.close()
+            except OSError:
+                pass
+            err = proc.stderr.read().decode(errors='replace').strip()
+            if proc.wait() != 0 or self.error:
+                self.error = f'video encoder failed: {err[-200:] or proc.returncode}'
 
     def finish(self):
         self.q.put(None)
@@ -349,12 +437,13 @@ class ClipWriter(threading.Thread):
 
 # ------------------------------------------------------------------------------------------------ session
 class Session:
-    def __init__(self, root, session, speaker, emg, cam, emg_source):
+    def __init__(self, root, session, speaker, emg, cam, emg_source, codec='mp4v', ffmpeg=None):
         self.session = session
         self.dir = os.path.join(root, f'session_{session:02d}')
         os.makedirs(self.dir, exist_ok=True)
         self.items = load_items(session)
         self.speaker, self.emg, self.cam, self.emg_source = speaker, emg, cam, emg_source
+        self.codec, self.ffmpeg = codec, ffmpeg
         self.manifest = os.path.join(self.dir, 'manifest.jsonl')
         self.entries = {}
         if os.path.exists(self.manifest):
@@ -385,19 +474,20 @@ class Session:
             pass
         except ValueError:          # cut short by a crash: the clips and manifest are fine, start the history again
             print('note: meta.json was unreadable, rewriting it', flush=True)
-        now = datetime.datetime.now().isoformat()
-        run = {'started': now, 'recorder_version': VERSION, 'camera': [self.cam.width, self.cam.height]}
+        started = datetime.datetime.now().isoformat()
+        run = {'started': started, 'recorder_version': VERSION, 'camera': [self.cam.width, self.cam.height],
+               'codec': self.codec}
         unstyled = sum(1 for e in self.entries.values() if 'expression' not in e)
         if unstyled:
             print(f'note: {unstyled} clips in this session were saved by recorder v1 (no delivery styles); only the '
                   f'remaining sentences get styles', flush=True)
-        meta = {'session': self.session, 'speaker': self.speaker, 'created': old.get('created', now),
+        meta = {'session': self.session, 'speaker': self.speaker, 'created': old.get('created', started),
                 'runs': old.get('runs', []) + [run],
                 'emg': {'sample_rate': FS, 'channels': CHANNELS, 'pins': ['A0', 'A1', 'A2', 'A3'], 'sites': SITES,
                         'units': 'raw 10-bit Uno readings, unfiltered', 'source': self.emg_source},
                 'camera': {'width': self.cam.width, 'height': self.cam.height, 'fps_requested': self.cam.fps,
-                           'mirrored': False},
-                'clock': 'time.perf_counter() on this laptop (bus.now()), shared by camera and EMG',
+                           'capture_format': self.cam.fourcc, 'codec': self.codec, 'mirrored': False},
+                'clock': 'time.perf_counter() on this laptop, shared by camera and EMG',
                 'recorder_version': VERSION, 'platform': platform.platform(),
                 'n_items': len(self.items), 'prompts': SESSIONS[self.session][0],
                 'styles': STYLES.get(self.session, {})}
@@ -408,14 +498,14 @@ class Session:
     def start(self, item):
         self.current = item
         path = os.path.join(self.dir, f"{item['id']}.mp4")
-        self.writer = ClipWriter(path, self.cam.fps, (self.cam.width, self.cam.height))
+        self.writer = ClipWriter(path, self.cam.fps, (self.cam.width, self.cam.height), self.codec, self.ffmpeg)
         self.writer.start()
-        self.t_start = time.perf_counter()
+        self.t_start = now()
         with self.cam.lock:
             self.cam.sink = self.writer
 
     def stop(self):
-        t_end = time.perf_counter()
+        t_end = now()
         with self.cam.lock:
             self.cam.sink = None
         video_ts = self.writer.finish()
@@ -435,6 +525,8 @@ class Session:
             warnings += [f'A{c} flat' for c in range(CHANNELS) if flat[c]]
         if len(video_ts) < max(5, 0.8 * dur * self.cam.fps):
             warnings.append(f'video short: {len(video_ts)} frames for {dur:.1f} s')
+        if self.writer.error:
+            warnings.append(self.writer.error)
         if self.writer.dropped:
             warnings.append(f'{self.writer.dropped} video frames dropped')
         entry = {'id': uid, 'session': f'session_{self.session:02d}', 'set': item['set'], 'prompt': item['prompt'],
@@ -445,6 +537,7 @@ class Session:
                  'clip_t0': self.t_start, 'clip_t1': t_end, 'duration_s': round(dur, 3),
                  'emg_samples': int(len(raw)), 'emg_dropped_total': int(self.emg.dropped),
                  'n_frames': int(len(video_ts)), 'video_dropped': int(self.writer.dropped),
+                 'video_codec': self.codec,
                  'fps': round(len(video_ts) / dur, 2) if dur > 0 else 0, 'speaker': self.speaker, 'sites': SITES,
                  'recorded_at': datetime.datetime.now().isoformat(), 'recorder_version': VERSION,
                  'warnings': warnings}
@@ -505,7 +598,7 @@ def draw(sess, cam, emg, emg_thread, state, item, help_on, msg, charger, real_em
     # side panel: EMG levels
     lv, pinned = emg.levels()
     put(canvas, 'EMG', (VW + 20, 40), 0.8)
-    alive = emg.last_arrival is not None and time.perf_counter() - emg.last_arrival < 1.0
+    alive = emg.last_arrival is not None and now() - emg.last_arrival < 1.0
     for c in range(CHANNELS):
         y = 80 + c * 60
         put(canvas, f'A{c} site {SITES[c]}', (VW + 20, y), 0.55)
@@ -513,7 +606,9 @@ def draw(sess, cam, emg, emg_thread, state, item, help_on, msg, charger, real_em
         col = (60, 60, 220) if pinned[c] > 0.05 else (90, 200, 120)
         cv2.rectangle(canvas, (VW + 20, y + 10), (VW + 20 + w, y + 30), col, -1)
         cv2.rectangle(canvas, (VW + 20, y + 10), (VW + 260, y + 30), (90, 90, 90), 1)
-    put(canvas, f'camera {cam.measured_fps():4.1f} fps', (VW + 20, 345), 0.55)
+    fps = cam.measured_fps()
+    slow = len(cam.times) == cam.times.maxlen and fps < 0.85 * cam.fps   # after 60 frames, under ~25 of 30 fps
+    put(canvas, f'camera {fps:4.1f} fps', (VW + 20, 345), 0.55, (80, 80, 255) if slow else (235, 235, 235))
     put(canvas, f'EMG dropped frames: {emg.dropped}', (VW + 20, 375), 0.55)
     done, total = len(sess.entries), len(sess.items)
     put(canvas, f'session {sess.session}: {done}/{total} saved', (VW + 20, 415), 0.6)
@@ -527,6 +622,8 @@ def draw(sess, cam, emg, emg_thread, state, item, help_on, msg, charger, real_em
         warn.append('EMG silent: ' + (emg_thread.error or 'no frames from the Uno'))
     if any(pinned > 0.05):
         warn.append('a channel hits 0 or 1023: press pads / REF down')
+    if slow:
+        warn.append(f'camera only {fps:.0f} fps: check the light, or that it gave MJPG')
     if cam.error:
         warn.append(cam.error)
     for i, w in enumerate(warn):
@@ -548,7 +645,7 @@ def draw(sess, cam, emg, emg_thread, state, item, help_on, msg, charger, real_em
         text = item['prompt'] or item['cue']
         for i, line in enumerate(textwrap.wrap(text, 42)[:3]):
             put(canvas, line, (30, top + i * 52), 1.45, (255, 255, 255), 3)
-        status = (f'RECORDING  {time.perf_counter() - sess.t_start:4.1f} s   (SPACE to stop)' if state == 'rec'
+        status = (f'RECORDING  {now() - sess.t_start:4.1f} s   (SPACE to stop)' if state == 'rec'
                   else 'SPACE to start, mouth it once, SPACE to stop')
         put(canvas, status, (30, H - 25), 0.8, (60, 60, 230) if state == 'rec' else (200, 200, 200))
         if state == 'rec':
@@ -583,6 +680,10 @@ def parse(argv=None):
     p.add_argument('--width', type=int, default=1920)
     p.add_argument('--height', type=int, default=1080)
     p.add_argument('--fps', type=float, default=30)
+    p.add_argument('--codec', default='auto', choices=['auto', 'nvenc', 'x264', 'mp4v'],
+                   help='video codec; auto: H.264 on the GPU (nvenc), else on the CPU (x264), else mp4v')
+    p.add_argument('--ffmpeg', default=os.environ.get('RECLAIM_FFMPEG') or shutil.which('ffmpeg'),
+                   help='ffmpeg executable (default: $RECLAIM_FFMPEG, then ffmpeg on PATH)')
     p.add_argument('--port', default=None, help='Uno serial port; found automatically if omitted')
     p.add_argument('--fake-emg', action='store_true', help='synthetic EMG, no Uno')
     p.add_argument('--allow-charger', action='store_true', help='only with --fake-emg: ignore the charger check')
@@ -607,10 +708,12 @@ def main(argv=None):
     cam = Camera(a.camera, a.width, a.height, a.fps)
     emg_thread.start()
     cam.start()
-    sess = Session(a.root, a.session, a.speaker, emg, cam, emg_source)
+    codec = pick_codec(a.codec, a.ffmpeg)
+    print(f'video: {codec}' + (' (H.264 on the GPU)' if codec == 'nvenc' else ''), flush=True)
+    sess = Session(a.root, a.session, a.speaker, emg, cam, emg_source, codec, a.ffmpeg)
     print(f'{len(sess.pending())} of {len(sess.items)} clips to record, saving to {sess.dir}', flush=True)
-    t_wait = time.perf_counter() + 6  # the Uno resets when the port opens
-    while (emg.last_arrival is None or cam.latest is None) and time.perf_counter() < t_wait:
+    t_wait = now() + 6  # the Uno resets when the port opens
+    while (emg.last_arrival is None or cam.latest is None) and now() < t_wait:
         time.sleep(0.05)
     if a.auto is not None:  # testing: no window
         for item in sess.pending()[:a.auto]:
@@ -622,15 +725,15 @@ def main(argv=None):
     cv2.namedWindow(WIN, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(WIN, 1280, 820)
     state, help_on, msg, msg_t = 'idle', True, '', 0
-    charger, charger_t = charger_plugged(), time.perf_counter()
+    charger, charger_t = charger_plugged(), now()
     while True:
-        if time.perf_counter() - charger_t > 2:
-            charger, charger_t = charger_plugged(), time.perf_counter()
+        if now() - charger_t > 2:
+            charger, charger_t = charger_plugged(), now()
         pend = sess.pending()
         item = sess.current if state == 'rec' else (pend[0] if pend else None)
         if item is None and state != 'rec':
             state = 'done'
-        if msg and time.perf_counter() - msg_t > 4:
+        if msg and now() - msg_t > 4:
             msg = ''
         cv2.imshow(WIN, draw(sess, cam, emg, emg_thread, state, item, help_on, msg, charger, not a.fake_emg))
         key = cv2.waitKey(15) & 0xFF
@@ -641,7 +744,7 @@ def main(argv=None):
             break
         elif key == ord(' ') and state == 'idle':
             if charger and not a.fake_emg:
-                msg, msg_t = 'Unplug the charger first (pads are on).', time.perf_counter()
+                msg, msg_t = 'Unplug the charger first (pads are on).', now()
             else:
                 sess.start(item)
                 state = 'rec'
@@ -649,15 +752,15 @@ def main(argv=None):
             e = sess.stop()
             state = 'idle'
             msg = f"saved {e['id']}" + (f": {', '.join(e['warnings'])}" if e['warnings'] else '')
-            msg_t = time.perf_counter()
+            msg_t = now()
             print(msg, flush=True)
         elif key == ord('r') and state in ('idle', 'done') and sess.last_id:
             sess.redo(sess.last_id)
-            msg, msg_t = f'redo {sess.last_id}', time.perf_counter()
+            msg, msg_t = f'redo {sess.last_id}', now()
             sess.last_id, state = None, 'idle'
         elif key == ord('s') and state == 'idle' and item is not None:
             sess.skipped.add(item['id'])
-            msg, msg_t = f"skipped {item['id']} (rerun to get it back)", time.perf_counter()
+            msg, msg_t = f"skipped {item['id']} (rerun to get it back)", now()
         elif key == ord('h'):
             help_on = not help_on
     cv2.destroyAllWindows()
