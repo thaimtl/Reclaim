@@ -28,6 +28,7 @@ Failures: a tick that raises is logged and skipped (MAX_FAILURES in a row: exit 
 run with exit 1 after the last read. Ctrl+C: last read + 'end' of the open segment, then the publisher closes.
 
     venv-live/bin/python -m lipread.run --replay third_party/lipflow/samples/2016-03-12.mov --start 20.4 --end 28.1
+    venv-live/bin/python -m lipread.run --replay-session session_01 --realtime --recorder-clock   # for fusion.evaluate
     venv-live/bin/python -m lipread.run --cam 0                          # webcam, Ctrl+C stops
 
 Capture size: the webcam opens at --size (default 1920x1080); the crop thread shrinks any larger frame (camera or a
@@ -376,6 +377,9 @@ def summary(stats):
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--replay', default=None, help='video file instead of the webcam')
+    ap.add_argument('--replay-session', default=None, metavar='SESSION',
+                    help='every clip of a recording session (e.g. session_01) in order, 1.5 s apart (SessionSource)')
+    ap.add_argument('--clips', type=int, default=None, help='--replay-session: only the first N clips')
     ap.add_argument('--start', type=float, default=0.0)
     ap.add_argument('--end', type=float, default=None)
     ap.add_argument('--realtime', action='store_true', help='replay at real speed (default: as fast as possible)')
@@ -405,7 +409,9 @@ def parse_args(argv=None):
 
 
 def make_source(args):
-    from lipread.source import CameraSource, ReplaySource
+    from lipread.source import CameraSource, ReplaySource, SessionSource
+    if args.replay_session:
+        return SessionSource(args.replay_session, realtime=args.realtime, limit=args.clips)
     if args.replay:
         return ReplaySource(args.replay, args.start, args.end, realtime=args.realtime)
     w, h = args.size
@@ -420,7 +426,8 @@ def main(argv=None):
     import torch
 
     pub = Publisher(args.pub)
-    live_mode = args.replay is None or args.realtime
+    replay = bool(args.replay or args.replay_session)
+    live_mode = not replay or args.realtime
     final = emotion = th = logf = None
     runner = Runner(None, pub.send, None)
     stop = threading.Event()
@@ -451,8 +458,8 @@ def main(argv=None):
                         final=final, fe_cache=not args.no_fe_cache)
         q = queue.Queue()
         face_pub = None if args.no_face else (lambda m: pub.send(m, block=False))
-        offset = getattr(source, 't_offset', 0.0) if args.replay and args.recorder_clock else None
-        th = threading.Thread(target=crop_thread, args=(source, cropper, q, stop, emotion, bool(args.replay),
+        offset = getattr(source, 't_offset', 0.0) if replay and args.recorder_clock else None
+        th = threading.Thread(target=crop_thread, args=(source, cropper, q, stop, emotion, replay,
                                                         args.process_size, face_pub), kwargs={'clock_offset': offset},
                               name='crop', daemon=True)
         logf = open(args.log, 'w') if args.log else None
