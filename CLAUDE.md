@@ -16,7 +16,7 @@ Decisions already made, so don't re-litigate them without new evidence:
 - No pad on the throat, no AD8232, no ESP32 in the rig, and each board has its own REF pad.
 - Everything runs and is tested on Austin's laptop (RTX 5060), on battery whenever the pads are on skin: no charger while the Uno is connected (no USB isolator).
 - Parts talk over ZeroMQ on the laptop, with the message formats in docs/TEAM_TASKS_AND_INTERFACES.md.
-- Recording: three sessions of varied sentences with camera + EMG, following RECORDING.md (prompts in docs/recording/). Run the signal check (.claude/skills/signal-check) every time pads go on.
+- Recording: three sessions of varied sentences with camera + EMG, recorded with `recorder/record.py`, following RECORDING.md (prompts in docs/recording/). Run the signal check (.claude/skills/signal-check) every time pads go on.
 
 All code lives in this repo, never only in a working directory: datasets, checkpoints and environments stay outside git, and code finds them through `RECLAIM_WORKDIR` (README, "Code and data").
 Never commit API keys or sponsor codes.

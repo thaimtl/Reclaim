@@ -1,0 +1,3 @@
+-r ../rig/requirements.txt
+opencv-python>=4.9
+psutil>=5.9

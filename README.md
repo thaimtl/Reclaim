@@ -74,6 +74,7 @@ All code lives in this repo; datasets, checkpoints, results and Python environme
 | `cluster/` | H100/H200 job scripts (PBS), smoke tests, runbook |
 | `camera/` | Camera-only baselines (Auto-AVSR, BRAVEn, LipLearner) |
 | `rig/` | EMG rig: Arduino firmware, serial reader, live hum filter, signal check |
+| `recorder/` | The recording app: camera + EMG + the session sentences ([recorder/README.md](recorder/README.md)) |
 | `figures/` | The SVR-1 architecture figure and the script that draws it |
 | `tests/` | Smoke and unit tests |
 | `docs/` | Plans and specs, Markdown with PDF copies |
