@@ -5,7 +5,7 @@ description: Run and read the pre-recording signal check on the Reclaim pad rig,
 
 # Signal check
 
-The rig is 4 BioAmp boards on A0 to A3 of an Uno running `rig/uno`, read by `rig/reader.py` and filtered by `rig/filters.py`.
+The rig is 4 BioAmp boards on A0 to A3, which are sites 3, 2, 6, and 1 in Gaddy and Klein 2020, on an Uno running `rig/uno`, read by `rig/reader.py` and filtered by `rig/filters.py`.
 Read HARDWARE.md for pad sites and wiring, and RECORDING.md for real data collection.
 This check runs after wiring and every time pads go on, and it never produces training data.
 

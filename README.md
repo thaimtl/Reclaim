@@ -17,7 +17,7 @@ Most rely on an electrolarynx, a handheld buzzer that sounds robotic and needs a
 |---|---|---|
 | Priority | Main goal | Stretch goal |
 | You do | Mouth any sentence | Mouth one of 10 set phrases |
-| Sensor | Webcam | 4 face electrode channels, no camera |
+| Sensor | Webcam | 4 face electrode channels (A0 to A3 are the paper's sites 3, 2, 6, 1), no camera |
 | Reads it | Auto-AVSR lip reading, then Claude fixes mistakes | Our classifier, then Jev picks using the conversation |
 | Voice | Cartesia, live in a cloned voice | 10 pre-made Cartesia clips |
 

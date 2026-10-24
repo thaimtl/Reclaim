@@ -46,7 +46,7 @@ Across the 3 sessions we need 50 clips of each of the [10 phrases](PHRASES.md) p
 recordings/
   labels.csv              file, phrase, session, speaker
   session_01/
-    meta.json             date, speaker, sample rate, channel to site
+    meta.json             date, speaker, sample rate, channel to site (A0 to A3 = sites 3, 2, 6, 1)
     0001.npy              raw readings, shape (samples, 4), unfiltered
   session_02/
 ```

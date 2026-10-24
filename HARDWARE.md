@@ -28,6 +28,7 @@ The BioAmp is built for 5V boards like the Uno, so its output plugs straight in,
 ## Pad sites
 
 The 4 sites are the best 4-electrode set from [Gaddy and Klein, 2020](https://aclanthology.org/2020.emnlp-main.445.pdf), so our signals look like the Berkeley data we pre-train on.
+A0 to A3 are the paper's sites 3, 2, 6, and 1, in that order.
 We tried 2 extra sites on the jaw and back of the cheek, but there wasn't room for clean contact on Austin's face, and hair behind the ear kept their REF pads loose.
 In the paper, the best 4 got 76.8% of words wrong on open speech against 68.0% for all 8, and nobody has measured the gap for 10 phrases.
 
