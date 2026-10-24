@@ -26,7 +26,7 @@ Each session also records 10 rest clips. Sessions 1 and 2 take about 15 minutes 
 
 ## Before
 
-- [ ] `rig/uno` is on the Uno, and the recorder runs and saves a test clip
+- [ ] `rig/uno` is on the Uno, and the recorder runs and saves a test clip (the recorder is being built in `recorder/`; until it lands, this checklist can't be completed)
 - [ ] 12 pads (4 boards × 3), alcohol prep pads, and a skin marker, plus 12 spares
 - [ ] Austin's laptop on battery with the charger unplugged, and no other cable from wall power on the laptop
 - [ ] The webcam at the height and distance used in the demo, the face lit from the front, nothing bright behind Austin
@@ -37,7 +37,7 @@ Each session also records 10 rest clips. Sessions 1 and 2 take about 15 minutes 
 1. Wipe the pad spots with alcohol and let them dry.
 2. Put the pads on the [marked spots](HARDWARE.md#pad-sites), with each board's REF on bare bone behind the ear.
 3. Run the [signal check](HARDWARE.md#signal-check). Every channel must say OK, so fix any other verdict now, not after recording.
-4. Start the recorder for the session (instructions in `recorder/README.md`). It shows one sentence at a time.
+4. Start the recorder for the session. It shows one sentence at a time. (In progress: the recorder and its `recorder/README.md` land in `recorder/` before this guide is used.)
 5. For each sentence: read it, start the clip, stay still for half a second, mouth the sentence once at the pace shown (natural, or fast for the sentences marked fast), stay still for half a second, stop the clip.
 6. If a clip goes wrong, like a stumble, a cough, a laugh or a missed word, redo it instead of keeping it.
 7. At the end, the recorder checks that every clip has both video and EMG and that `labels.csv` matches the files.

@@ -5,7 +5,9 @@
     python docs/build_pdfs.py PLAN.md    # one doc
 
 Markdown -> HTML (python-markdown), Mermaid blocks drawn by mermaid.js in headless Chromium, printed to Letter PDF.
-Relative links to other docs are rewritten to their PDFs.
+Mermaid is vendored in docs/vendor/ (11.4.1, MIT), so the build works offline.
+Links to the other docs in DOCS point to their PDFs next to this one; every other relative link points to the file
+on GitHub, so links still work in a PDF opened on its own.
 """
 import html
 import os
@@ -16,8 +18,11 @@ import markdown
 from playwright.sync_api import sync_playwright
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(HERE)
 DOCS = ['ARCHITECTURE.md', 'PLAN.md', 'EVAN_WORKFLOW.md', 'DECISIONS.md']
-MERMAID = 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js'
+MERMAID = os.path.join(HERE, 'vendor', 'mermaid.min.js')
+MERMAID_JS = ''
+REPO_URL = 'https://github.com/thaimtl/Reclaim/blob/main/'
 
 CSS = """
 @page { size: Letter; margin: 18mm 16mm; }
@@ -42,28 +47,38 @@ a { color: #0b57d0; text-decoration: none; }
 """
 
 
+def fix_link(m):
+    """Sibling docs -> their PDFs; any other relative path -> the file on GitHub (main branch)."""
+    target, anchor = m.group(1), m.group(2) or ''
+    if target in DOCS:
+        return f'href="{target[:-3]}.pdf"'
+    path = os.path.relpath(os.path.normpath(os.path.join(HERE, target)), REPO)
+    return f'href="{REPO_URL}{path}{anchor}"'
+
+
 def to_html(md_text):
     body = markdown.markdown(md_text, extensions=['tables', 'fenced_code', 'sane_lists'])
     # fenced ```mermaid blocks -> <pre class="mermaid"> for mermaid.js
     body = re.sub(r'<pre><code class="language-mermaid">(.*?)</code></pre>',
                   lambda m: '<pre class="mermaid">' + html.unescape(m.group(1)) + '</pre>', body, flags=re.S)
-    # links to sibling docs -> their PDFs
-    body = re.sub(r'href="([A-Z_]+)\.md(#[^"]*)?"', lambda m: f'href="{m.group(1)}.pdf"', body)
+    body = re.sub(r'href="([^"#:]+)(#[^"]*)?"', fix_link, body)
     return ('<html><head><meta charset="utf-8"><style>' + CSS + '</style>'
-            f'<script src="{MERMAID}"></script></head><body>' + body +
+            '<script>' + MERMAID_JS + '</script></head><body>' + body +
             '<script>mermaid.initialize({startOnLoad: false, theme: "neutral", flowchart: {useMaxWidth: true}});'
             'mermaid.run().then(() => document.body.setAttribute("data-done", "1"))'
             '.catch(e => { document.body.setAttribute("data-error", String(e)); });</script></body></html>')
 
 
 def main():
+    global MERMAID_JS
+    MERMAID_JS = open(MERMAID, encoding='utf-8').read()
     names = sys.argv[1:] or DOCS
     with sync_playwright() as p:
         browser = p.chromium.launch()
         for name in names:
             src = os.path.join(HERE, name)
             page = browser.new_page()
-            page.set_content(to_html(open(src, encoding='utf-8').read()), wait_until='networkidle')
+            page.set_content(to_html(open(src, encoding='utf-8').read()), wait_until='load')
             page.wait_for_function('document.body.hasAttribute("data-done") || document.body.hasAttribute("data-error")',
                                    timeout=60000)
             err = page.evaluate('document.body.getAttribute("data-error")')

@@ -1,5 +1,8 @@
-"""Writes the recording prompts for sessions 1-3 and checks them (no duplicates, no overlap with the test set)."""
+"""Writes the recording prompts for sessions 1-3 next to this script and checks them (no duplicates, no overlap with the test set)."""
+import os
 import re
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 S1 = """Hi, it's nice to meet you.
 Thanks for calling me today.
@@ -617,7 +620,7 @@ for name, lines in SESSIONS.items():
         seen[key] = name
 assert not problems, '\n'.join(problems)
 for name, lines in SESSIONS.items():
-    with open(f'{name}.txt', 'w') as f:
+    with open(os.path.join(HERE, f'{name}.txt'), 'w') as f:
         for i, line in enumerate(lines, 1):
             f.write(f'{name.split("_")[0][0]}{name[7] if name.startswith("session") else ""}_{i:03d}\t{line.strip()}\n')
     words = [len(l.split()) for l in lines]

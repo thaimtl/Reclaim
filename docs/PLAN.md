@@ -119,7 +119,7 @@ Fallback at every point: camera + Claude + voice works without EMG. If EMG isn't
 
 ## Recording sessions
 
-Procedure: [RECORDING.md](../RECORDING.md); sentences: [recording/](recording/). Sessions are recorded with the recording tool (`recorder/`), which records the camera and Thai's EMG stream on one clock and steps through the prompts. All varied conversational sentences, mouth open, no sound, camera and EMG on one clock. The pads come off and go back on between sessions.
+Procedure: [RECORDING.md](../RECORDING.md); sentences: [recording/](recording/). Sessions are recorded with the recording tool (`recorder/`), which records the camera and Thai's EMG stream on one clock and steps through the prompts. All varied conversational sentences, mouth open, no sound. The pads come off and go back on between sessions.
 
 | Session | Sentences | Use |
 | --- | --- | --- |
@@ -127,7 +127,7 @@ Procedure: [RECORDING.md](../RECORDING.md); sentences: [recording/](recording/).
 | 2 | 250, the last 50 faster than natural | Training |
 | 3 (last, in demo conditions) | 100, at demo pace | Test only, never trained on |
 
-Each session also includes about 2 minutes of rest clips (still face, swallow, nod, smile, and so on), which teach the model what is not speech. Sessions 1 and 2 take about 30 minutes each, session 3 about 12. A minute of calibration before the demo refits SVR-1's adapter.
+Each session also records 10 rest clips of about 3 s (still face, swallow, nod, smile, and so on), which teach the model what is not speech. Sessions 1 and 2 take about 30 minutes each, session 3 about 12. A minute of calibration before the demo refits SVR-1's adapter.
 
 ## Training
 
