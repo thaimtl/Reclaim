@@ -14,8 +14,8 @@ ms late, so each sample's time is offset + index / fs, with offset the lower env
 (the read with the least delay). The envelope rises by LEAK s per s, so it follows the Uno's resonator if that
 runs slow (up to 0.5%); if it runs fast the envelope follows on its own.
 """
+import argparse
 import signal
-import sys
 import time
 
 import numpy as np
@@ -69,10 +69,13 @@ def stamped(port, stats):
 
 
 def main():
+    ap = argparse.ArgumentParser(description='Publish the rig as emg.raw on the bus (endpoint emg, RECLAIM_EMG_PUB).')
+    ap.add_argument('port', help='the Uno\'s serial port, e.g. COM5 or /dev/ttyACM0')
+    args = ap.parse_args()
     pub, stats = Pub('emg'), {}
     signal.signal(signal.SIGTERM, signal.default_int_handler)  # stop the same way as on Ctrl-C
     try:
-        for msg in batches(stamped(sys.argv[1], stats)):
+        for msg in batches(stamped(args.port, stats)):
             pub.send('emg.raw', msg)
     except KeyboardInterrupt:
         pass
