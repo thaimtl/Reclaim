@@ -17,9 +17,7 @@ either mode.
 Each crop gets its model-frame time once, when it reaches the tick loop: its capture time, or the previous frame's
 time + 40 ms if the source repeated a frame (strictly increasing), so a frame carried over at a cap has the same
 frame_t in both segments. Replay times are rebased onto now() at the first frame, so cam.tick times are
-on the laptop clock as the bus requires (and lag is real in --realtime). --recorder-clock instead keeps a recorded
-clip's own capture times (its video_ts, the recorder's bus.now()), for offline scoring: fusion.evaluate matches
-utterances to the manifest's clip_t0 / clip_t1 and svr.infer's EMG reads by those times.
+on the laptop clock as the bus requires (and lag is real in --realtime).
 
 The crop thread's queue carries (crop, crop ms) items and then one End: End(None) for a clean end of the source,
 End(err) when the thread died.
@@ -204,12 +202,6 @@ def rebased(frames):
         yield Frame(t=f.t + off, image=f.image, index=f.index)
 
 
-def shifted(frames, off):
-    """Replay frames with their video times moved by a fixed offset (--recorder-clock: the source's t_offset)."""
-    for f in frames:
-        yield Frame(t=f.t + off, image=f.image, index=f.index)
-
-
 def size_arg(s):
     """'WxH' -> (w, h)."""
     try:
@@ -231,20 +223,14 @@ def fit(frame, size):
     return dataclasses.replace(frame, image=img)
 
 
-def crop_thread(source, cropper, q, stop, emotion=None, rebase=False, process_size=None, face_pub=None, face_every=2,
-                clock_offset=None):
+def crop_thread(source, cropper, q, stop, emotion=None, rebase=False, process_size=None, face_pub=None, face_every=2):
     """Frames -> (crop, crop ms of the frame's push) on q, until the source ends or stop is set. This thread owns the
     source and the cropper and closes both itself (cap.release() from another thread while this one is inside
     cap.read() segfaults). Each frame is fit() to process_size first. The last item is End.
-    face_pub(CamFace): every face_every-th frame's face for the dashboard (cam.face), sent without blocking.
-    clock_offset: shift frame times by it instead of rebasing (--recorder-clock)."""
+    face_pub(CamFace): every face_every-th frame's face for the dashboard (cam.face), sent without blocking."""
     err, emotion_errors, face_errors, n = None, 0, 0, 0
     try:
-        frames = source.frames()
-        if clock_offset is not None:
-            frames = shifted(frames, clock_offset)
-        elif rebase:
-            frames = rebased(frames)
+        frames = rebased(source.frames()) if rebase else source.frames()
         for frame in frames:
             if stop.is_set():
                 break
@@ -379,8 +365,6 @@ def parse_args(argv=None):
     ap.add_argument('--start', type=float, default=0.0)
     ap.add_argument('--end', type=float, default=None)
     ap.add_argument('--realtime', action='store_true', help='replay at real speed (default: as fast as possible)')
-    ap.add_argument('--recorder-clock', action='store_true',
-                    help="replay: keep the recording's capture times (video_ts) instead of moving them onto now()")
     ap.add_argument('--cam', type=int, default=0)
     ap.add_argument('--camera-settings', action='store_true',
                     help="open the webcam driver's settings dialog at start (Windows: lock exposure and focus there)")
@@ -451,10 +435,8 @@ def main(argv=None):
                         final=final, fe_cache=not args.no_fe_cache)
         q = queue.Queue()
         face_pub = None if args.no_face else (lambda m: pub.send(m, block=False))
-        offset = getattr(source, 't_offset', 0.0) if args.replay and args.recorder_clock else None
         th = threading.Thread(target=crop_thread, args=(source, cropper, q, stop, emotion, bool(args.replay),
-                                                        args.process_size, face_pub), kwargs={'clock_offset': offset},
-                              name='crop', daemon=True)
+                                                        args.process_size, face_pub), name='crop', daemon=True)
         logf = open(args.log, 'w') if args.log else None
 
         def report(stats):

@@ -69,20 +69,12 @@ All code lives in this repo; datasets, checkpoints, results and Python environme
 
 | Folder | What it is |
 | --- | --- |
-| `svr/` | SVR-1, the EMG model: model, training, fine-tuning, preprocessing ([docs/SVR1_SPEC.md](docs/SVR1_SPEC.md)); the live EMG reader (`python -m svr.serve`) and offline replay of recordings (`python -m svr.infer`) |
+| `svr/` | SVR-1, the EMG model: model, training, fine-tuning, preprocessing ([docs/SVR1_SPEC.md](docs/SVR1_SPEC.md)) |
 | `bench/` | Benchmarks and their frozen test splits |
 | `cluster/` | H100/H200 job scripts (PBS), smoke tests, runbook |
 | `camera/` | Camera-only baselines (Auto-AVSR, BRAVEn, LipLearner) |
-| `lipread/` | The live camera reader: Auto-AVSR re-read every 100 ms, `cam.tick` / `cam.final` / `cam.face` ([lipread/README.md](lipread/README.md)) |
-| `rig/` | EMG rig: Arduino firmware, serial reader, live hum filter, signal check, `emg.raw` publisher |
+| `rig/` | EMG rig: Arduino firmware, serial reader, live hum filter, signal check |
 | `recorder/` | The recording app: camera + EMG + the session sentences ([recorder/README.md](recorder/README.md)) |
-| `bus/` | The team bus: ZeroMQ + msgpack on the loopback, one TCP port per producer ([bus/schema.md](bus/schema.md); `bus.team` for every topic besides the camera's) |
-| `fusion/` | Fusion decoder and word locking (`python -m fusion.run`), and the offline scorer (`python -m fusion.evaluate`) |
-| `claude_service/` | The Claude service: predicts Austin's next words and repairs look-alikes, on the bus |
-| `call/` | The phone call: Twilio media stream, Cartesia Ink for the judge, Sonic 3.6 in Austin's cloned voice ([call/README.md](call/README.md)) |
-| `demo/dashboard/` | The captions dashboard (prototype on sample data) |
-| `scripts/run_pipeline.py` | Starts every part in its own venv, restarts a crashed one, Ctrl-C stops all |
-| `buslog/` | Logs every bus message to `$RECLAIM_WORKDIR/logs/` and replays a session on the replay's clock |
 | `figures/` | The SVR-1 architecture figure and the script that draws it |
 | `tests/` | Smoke and unit tests |
 | `docs/` | Plans and specs, Markdown with PDF copies |
