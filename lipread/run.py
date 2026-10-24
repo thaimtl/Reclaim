@@ -372,7 +372,7 @@ def parse_args(argv=None):
     ap.add_argument('--process-size', type=lambda s: None if s == '0' else size_arg(s), default=(1280, 720),
                     metavar='WxH',
                     help='shrink larger frames to fit this before cropping (0: never)')
-    ap.add_argument('--half', action='store_true', help='encoder in fp16 (.half())')
+    ap.add_argument('--fp32', action='store_true', help='encoder in fp32 (default fp16 via .half(), parity-checked)')
     ap.add_argument('--segments', choices=('auto', 'stream'), default='auto',
                     help='auto: E4 activity segments; stream: one segment always open (8 s cap)')
     ap.add_argument('--tick-ms', type=int, choices=(100, 200), default=TICK_MS, help='tick period')
@@ -416,7 +416,7 @@ def main(argv=None):
             starter = threading.Thread(target=lambda: box.update(final=FinalPass(None, pub.send)), name='final-start',
                                        daemon=True)
             starter.start()
-        model = LiveModel(half=args.half)
+        model = LiveModel(half=not args.fp32)
         log.info('model ready (warm-up %.1f s)', model.warmup_s)
         if not args.no_final:
             starter.join()

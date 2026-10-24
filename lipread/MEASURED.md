@@ -202,4 +202,10 @@ Findings:
 - E3 status: steps 1 (model once, warm-up all lengths; fp16 optional), 2 (cache), 3 (8 s cap, 2 s carry), 4
   (MediaPipe in its own thread) and timing_ms done. Target p95 < 40 ms at 8 s met on the 5090 in every run
   (17.5-39.5 ms). Deliverable still owed: p50/p95 for 2/4/8 s on Austin's laptop:
-  `python -m lipread.bench.tick_bench` (and `--half`, `--no-fe-cache` once each).
+  `python -m lipread.bench.tick_bench` (it times fp32 and fp16; and `--no-fe-cache` once).
+
+### fp16 by default, 2026-10-24
+
+- `lipread.run` now runs the encoder in fp16 (`.half()`) by default, `--fp32` for the old path: the team chose fp16
+  for the 8 GB laptop (peak 966 vs 1310 MiB in `tick_bench` above) and its parity is checked (51/51 greedy
+  identical). Costs on the 5090: paced p95 22.9 vs 17.2 ms and a longer warm-up (19.5 vs 3.8 s).
