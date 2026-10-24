@@ -1,21 +1,4 @@
-"""Facial expression network for the emotion tag (E5): HSEmotion on the face crop, plus a small head fitted to the
-speaker's own recorded sessions.
-
-Why not blendshapes alone: on real faces MediaPipe's mouthFrown, noseSneer and browInnerUp stay near 0 (RAVDESS and
-Austin's session_01), so frowns and raised brows go unseen. HSEmotion reads the face picture instead.
-
-    HSEmotion  enet_b0_8_best_vgaf (Savchenko, AffectNet, Apache-2.0), ONNX, 224 px RGB face, 8 logits:
-               Anger Contempt Disgust Fear Happiness Neutral Sadness Surprise. About 11 ms per face on CPU.
-    face crop  the MediaPipe landmarks' box (the lip reader's own points, same 720p frame), square, 15% margin.
-    features   [8 logits, 52 blendshapes] minus their mean over the speaker's first emotion.BASELINE_S of face (neutral).
-    head       standardise -> logistic regression -> probabilities over the head's labels (fitted by
-               lipread/emotion_fit.py on the recorder's smile / frown / surprised / neutral sentences).
-               Without a head file: the logits alone, softmax over Neutral Happiness Sadness Anger Surprise.
-
-    net = ExpressionNet()                                    # None-safe: ExpressionNet.available() first
-    logits = net.logits(image_bgr, pts)                      # (8,) float32, or None if the face box is unusable
-    head = Head.load(path)                                   # .predict(features (N, 60)) -> (N, len(head.labels))
-"""
+"""HSEmotion (enet_b0_8_best_vgaf, Apache-2.0) on the face crop, plus a head fitted by lipread/emotion_fit.py."""
 import hashlib
 import os
 
@@ -62,7 +45,7 @@ class ExpressionNet:
 
     @staticmethod
     def available(path=MODEL_PATH, sha256=MODEL_SHA256):
-        """onnxruntime importable and the model file present with the pinned checksum (setup.sh pins the same)."""
+        """onnxruntime importable and the model file present with the pinned checksum."""
         try:
             import onnxruntime  # noqa: F401
         except ImportError:
@@ -89,8 +72,7 @@ class ExpressionNet:
 
 
 class Head:
-    """Standardise + multinomial logistic regression, as fitted by lipread/emotion_fit.py (numpy only at run time).
-    The file also carries the smoothing it was tuned with (margin, hold_s, tau_s) and its held-out scores."""
+    """Standardise + logistic regression in numpy, with the smoothing it was tuned with."""
 
     def __init__(self, labels, mean, scale, coef, intercept, margin, hold_s, tau_s, info=''):
         self.labels = tuple(str(x) for x in labels)

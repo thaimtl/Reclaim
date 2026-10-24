@@ -68,7 +68,7 @@ GAP_S = 0.12
 MARGIN = 0.35
 NOFACE_TAU_S = 2.0
 MAX_DT = 0.5
-BASELINE_S = 3.0        # the speaker's neutral face at the start of the call (both taggers, and emotion_fit)
+BASELINE_S = 3.0        # the speaker's neutral face at call start
 
 
 def _ramp(v, lo_hi):
@@ -206,14 +206,7 @@ RESTING = Emotion(NEUTRAL, 1.0, {e: float(e == NEUTRAL) for e in EMOTIONS})
 
 
 class NetTagger:
-    """Expression network (lipread/expression.py) -> Emotion, with the same baseline and switching as EmotionTagger.
-
-    push(t, image, face) per processed frame, face = (t, pts, blend) or None. The first baseline_s of face frames are
-    the person's neutral: their mean features are subtracted from every later frame. Probabilities are EMA-smoothed
-    (tau), a non-neutral label needs a smoothed prob >= margin and must win for hold_s before the published label
-    switches; with no face the label is held while the scores decay (NOFACE_TAU_S), then drops to neutral. With a head
-    (fitted on the speaker's sessions) margin, hold and tau are the head's own; without one, GENERIC_SMOOTHING.
-    """
+    """Expression network -> Emotion, with the same baseline, hold and no-face decay as EmotionTagger."""
 
     GENERIC_SMOOTHING = (0.6, 0.5, 1.0)     # margin, hold_s, tau_s: best on RAVDESS without a head
 
@@ -263,8 +256,7 @@ class NetTagger:
         return self.step(t, None if feats is None else self._probs(feats))
 
     def step(self, t, probs):
-        """Probabilities over self.own (or None: no face) -> smoothing and switching -> Emotion. lipread/emotion_fit.py
-        drives this directly with held-out probabilities, so what it scores is what runs live."""
+        """Probabilities over self.own, or None for no face -> Emotion. emotion_fit drives this directly."""
         t = float(t)
         dt = 1.0 / FPS if self.t is None else min(MAX_DT, max(0.0, t - self.t))
         self.t = t
@@ -302,15 +294,7 @@ class NetTagger:
 
 
 class EmotionWorker:
-    """The emotion for cam.tick, fed from the crop thread. face = (t, pts, blend or None) as LiveCropper.last_face.
-
-    submit() every frame (never raises): the rule tagger runs inline (~30 us). The expression network, when its model
-    is there, sees at most NET_HZ frames per second of frame time. Live it runs on its own thread on the newest frame,
-    so it never slows the crop thread; with sync=True (a replay faster than real time) it runs inline on the same
-    frames every run, so replays are deterministic. current(): without the network, the rule tagger; with it, the
-    network's emotion, or neutral while it has failed NET_MAX_FAILURES times in a row or (live) not answered for
-    NET_STALE_S: one calm change for the voice, not a jump between two taggers with different smoothing.
-    """
+    """submit() from the crop thread (never raises), current() for cam.tick. sync=True: net runs inline (replays)."""
 
     NET_HZ = 15
     NET_MAX_FAILURES = 10
@@ -323,8 +307,8 @@ class EmotionWorker:
         self.failed = False
         self.sync = sync
         self.net_tagger, self.net_failures, self._slot, self._last_t = None, 0, None, None
-        self._net = (RESTING, -math.inf)         # (emotion, monotonic time): one tuple, swapped in one assignment
-        self._lock = threading.Lock()            # NetTagger.push vs reset_baseline from another thread
+        self._net = (RESTING, -math.inf)         # (emotion, monotonic time)
+        self._lock = threading.Lock()
         self._slot_lock = threading.Lock()
         self._wake, self._stop = threading.Event(), threading.Event()
         self._thread = None

@@ -1,23 +1,7 @@
-"""Fit the expression head (lipread/expression.py) on the speaker's recorded sessions, and score it honestly.
+"""Fit the expression head on the speaker's recorded sessions and print held-out scores.
 
-    venv-live/bin/python -m lipread.emotion_fit                         # recordings/session_0*, writes data/emotion/head.npz
-    venv-live/bin/python -m lipread.emotion_fit --sessions session_01 --test session_02    # fit on 1, score on 2
-
-Labels come from the recorder (recorder/record.py delivery styles): expression smile -> happy, frown -> sad,
-surprised -> surprised, every other sentence neutral (fast, slow, soft, emphatic too); rest clips: 'Smile' -> happy,
-'Raise your eyebrows' -> surprised, the rest (nod, swallow, look away, cough...) neutral. There are no angry clips, so
-the head has no angry label (the bus score stays 0).
-
-Features are made the way the live reader makes them: each frame fit to 1280x720, the lip reader's own MediaPipe
-tracker (BlendTracker, VIDEO mode, frame times from the recording), the face crop from those points, HSEmotion's 8
-logits + 52 blendshapes; per session, minus the mean over its first 3 s of face (the live baseline). Cached in
-data/emotion/features_<session>.npz.
-
-Scoring (printed, and stored in the head's info): each session replayed in recorded order through NetTagger's
-switching, every clip predicted by a fold model that never saw it (5-fold, grouped by clip, stratified by label).
-Per label: majority label over the second half of each sentence. Flicker: neutral sentences that gain a wrong label
-mid-sentence (a label carried over from the previous sentence's expression is counted apart, as carry-over). The
-smoothing (margin, hold, tau) is chosen on those held-out predictions; --test scores a whole session never fitted on.
+    venv-live/bin/python -m lipread.emotion_fit                                         # writes data/emotion/head.npz
+    venv-live/bin/python -m lipread.emotion_fit --sessions session_01 --test session_02
 """
 import argparse
 import itertools
@@ -39,7 +23,7 @@ REST = {'Smile': 'happy', 'Raise your eyebrows': 'surprised'}
 PROCESS = (1280, 720)
 GRID = list(itertools.product((0.4, 0.5, 0.6, 0.7), (0.5, 0.8), (0.3, 0.5, 1.0)))   # margin, hold_s, tau_s
 FEATURE_DIR = os.path.join(lipread.WORK, 'data', 'emotion')
-CACHE_VERSION = 3      # 2: one MediaPipe tracker per session; 3: model checksum and frame size stored
+CACHE_VERSION = 3
 
 
 def truth(row):
@@ -70,7 +54,7 @@ def extract(root, session, cache=FEATURE_DIR):
     from lipread.types import Frame
     from lipread.expression import ExpressionNet
     net = ExpressionNet(threads=os.cpu_count() or 2)
-    # one tracker for the whole session, as live: clip times are one laptop clock, increasing in recorded order
+    # one tracker per session, as live
     tracker = BlendTracker(os.path.join(lipread.LIPFLOW_MODELS, 'face_landmarker.task'))
     out, store, t0 = [], {}, time.time()
     for n, r in enumerate(rows):
@@ -93,12 +77,13 @@ def extract(root, session, cache=FEATURE_DIR):
             print(f'  {session}: {n + 1}/{len(rows)} clips, {time.time() - t0:.0f} s', flush=True)
     tracker.close()
     os.makedirs(cache, exist_ok=True)
-    np.savez(path, version=CACHE_VERSION, model=MODEL_SHA256, process=np.array(PROCESS), ids=np.array([r['id'] for r in rows]), **store)
+    np.savez(path, version=CACHE_VERSION, model=MODEL_SHA256, process=np.array(PROCESS),
+             ids=np.array([r['id'] for r in rows]), **store)
     return out
 
 
 def baseline(clips):
-    """Mean features over the session's first BASELINE_S of face frames (what the live reader does at call start)."""
+    """Mean features over the first BASELINE_S of face frames, as live."""
     xs, t_first = [], None
     for _, _, _, t, f in clips:
         for ti, x in zip(t, f):
@@ -131,7 +116,7 @@ def fit_head(X, y, C=1.0):
 
 
 def training_frames(clips, base):
-    """The held part of each expression: frames after the first third of the clip (the onset is still neutral)."""
+    """Frames after the first third of each clip, once the expression is held."""
     X, y = [], []
     for _, lab, _, t, f in clips:
         f = f[len(f) // 3:]
@@ -142,8 +127,7 @@ def training_frames(clips, base):
 
 
 def replay(clips, probs, t_start, margin, hold_s, tau_s, hz=None):
-    """The live NetTagger (its step(): smoothing, switching, no-face decay) over one session in recorded order, fed
-    held-out probabilities at the network's rate (EmotionWorker.NET_HZ) -> published labels per recorded frame."""
+    """Published labels per frame from the live NetTagger.step, fed at EmotionWorker.NET_HZ."""
     from lipread.emotion import EmotionWorker, NetTagger
     hz = hz or EmotionWorker.NET_HZ
     head = Head(LABELS, np.zeros(N_FEATURES), np.ones(N_FEATURES), np.zeros((len(LABELS), N_FEATURES)),
@@ -172,7 +156,7 @@ def score(clips, res):
         if tr == 'neutral' and not rest and r:
             n_neutral += 1
             if any(x != 'neutral' for x in r):
-                # carried over: starts on the previous sentence's expression, and no wrong label once neutral
+                # carry-over: starts on the previous expression, then stays neutral
                 held = r[0] != 'neutral' and prev != 'neutral' and 'neutral' in r
                 if held and all(x == 'neutral' for x in r[r.index('neutral'):]):
                     carry += 1
@@ -185,13 +169,13 @@ def score(clips, res):
 
 
 def held_out_probs(sessions):
-    """Per session, per clip: (T, 4) probabilities from a fold model that never saw the clip (5-fold over all clips
-    of all sessions, grouped by clip)."""
+    """Per session, per clip: (T, 4) probabilities from a 5-fold model that never saw the clip."""
     from sklearn.model_selection import StratifiedGroupKFold
     flat = [(si, ci) for si, (clips, base, _) in enumerate(sessions) for ci in range(len(clips))]
     y = np.array([sessions[si][0][ci][1] for si, ci in flat])
     probs = [[None] * len(c) for c, _, _ in sessions]
-    for train, test in StratifiedGroupKFold(5, shuffle=True, random_state=0).split(flat, y, groups=np.arange(len(flat))):
+    folds = StratifiedGroupKFold(5, shuffle=True, random_state=0).split(flat, y, groups=np.arange(len(flat)))
+    for train, test in folds:
         X, Y = [], []
         for i in train:
             si, ci = flat[i]
@@ -237,7 +221,7 @@ def main(argv=None):
         sessions.append((clips, base, t_start))
         print(f'{s}: {len(clips)} clips, {Counter(c[1] for c in clips if not c[2])} sentences')
     missing = set(LABELS) - {c[1] for clips, _, _ in sessions for c in clips}
-    if missing:      # session 3 alone has no surprised sentences, so this is checked over all of them together
+    if missing:
         sys.exit(f'no {sorted(missing)} clips in {names}; the head needs every label in {LABELS}')
     probs = held_out_probs(sessions)
     best = None

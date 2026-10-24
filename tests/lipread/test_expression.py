@@ -1,8 +1,4 @@
-"""Expression network path of the emotion tag (lipread/expression.py, NetTagger, EmotionWorker, emotion_fit scoring),
-with a fake network so no model file is needed; the real ONNX model is checked when lipread/setup.sh has fetched it.
-
-    venv-live/bin/python -m pytest tests/lipread/test_expression.py -q
-"""
+"""Expression network path of the emotion tag, with a fake network so no model file is needed."""
 import os
 import time
 
@@ -36,8 +32,7 @@ class FakeNet:
 
 
 def toy_head(margin=0.5, hold_s=0.5, tau_s=0.3):
-    """A head that reads the AffectNet logit straight through: Happiness -> happy, Anger -> sad, Surprise -> surprised
-    (Austin's frowns read as Anger)."""
+    """Happiness -> happy, Anger -> sad (Austin's frowns read as Anger), Surprise -> surprised."""
     labels = ('neutral', 'happy', 'sad', 'surprised')
     coef = np.zeros((4, N_FEATURES), np.float32)
     for i, c in enumerate(('Neutral', 'Happiness', 'Anger', 'Surprise')):
