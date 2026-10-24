@@ -1,10 +1,10 @@
-# Evan: the real-time camera reader
+# Evan: real-time lip reading (the camera reader)
 
 Your job: turn the webcam into a live stream of lip-reading probabilities, a "is he mouthing" signal and a facial-expression tag, every 100 ms, fast enough that words appear on screen within about 0.2 s of Austin mouthing them. You use Auto-AVSR as is: no recording, no training. Everything runs on Austin's laptop (RTX 5060, 8 GB). You can prototype on your MacBook (Lipflow was built for Macs and runs there), but timing and real tests happen only on Austin's laptop.
 
 You do not decide the final words. You publish what the camera sees every 100 ms, and Austin's decoder combines it with EMG and Claude and decides when each word is confident enough to lock. Your part is a small separate program that publishes messages; Austin's decoder, Frank's dashboard and the logger subscribe to them.
 
-How it fits: [ARCHITECTURE.md](ARCHITECTURE.md). Message formats shared with everyone: [PLAN.md](PLAN.md#interfaces).
+How it fits: [REALTIME_PIPELINE.md](REALTIME_PIPELINE.md). Message formats shared with everyone: [TEAM_TASKS_AND_INTERFACES.md](TEAM_TASKS_AND_INTERFACES.md#interfaces).
 
 ```mermaid
 flowchart TD
@@ -57,7 +57,7 @@ This is the core. Every 100 ms:
 
 1. Take all crops of the current segment (see E4 for where a segment starts and ends), resample them to 25 fps with `LipReader.resample`, and encode the whole segment.
 2. Compute the CTC log-probabilities per frame (`model.ctc.log_softmax(enc)`; blank is token 0).
-3. Publish a `cam.tick` message: for every 25 fps frame, the 32 most likely tokens with their log-probabilities, the blank log-probability, the frame's timestamp, plus the greedy text for debugging. Format in [PLAN.md](PLAN.md#interfaces).
+3. Publish a `cam.tick` message: for every 25 fps frame, the 32 most likely tokens with their log-probabilities, the blank log-probability, the frame's timestamp, plus the greedy text for debugging. Format in [TEAM_TASKS_AND_INTERFACES.md](TEAM_TASKS_AND_INTERFACES.md#interfaces).
 
 Why every frame's probabilities and not just the best sentence: the decoder needs to ask "how well does *this* sentence match the lips?" for sentences the camera did not rank first. That is how EMG and Claude can overrule a look-alike mistake.
 

@@ -1,4 +1,4 @@
-# How Reclaim works
+# Reclaim's real-time pipeline
 
 Reclaim turns silently mouthed speech into live captions and a live voice. In the demo, Austin calls a judge on the phone (through Twilio). The judge talks normally; Austin only mouths, mouth open, no sound. His words appear on screen as he mouths them and play into the call in his own cloned voice, with the emotion on his face, while he is still mouthing. The judge's words, transcribed from the call, appear in the same captions. Everything runs on one laptop (RTX 5060, 115 W), and the goal at every step is the lowest possible delay.
 
@@ -79,11 +79,11 @@ The camera reader is Auto-AVSR's visual model, used as is: no recording, no fine
 
 The same MediaPipe pass gives 52 facial expression scores. Because the mouth is busy forming words, the expression comes mostly from the upper face: raised brows, squinting eyes, cheek raise, a frown. Smoothed over about a second, these become the emotion tag that Cartesia applies to the voice. The mouth landmarks also tell the system whether Austin is mouthing at all.
 
-Evan's step-by-step plan for this part is in [EVAN_WORKFLOW.md](EVAN_WORKFLOW.md).
+Evan's step-by-step plan for this part is in [EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md).
 
 ## The EMG reader: SVR-1, revised
 
-SVR-1 is our EMG model. It reads four electrode channels at sites 3, 2, 6 and 1 from Gaddy and Klein's layout, their best four-electrode set: under the chin (the tongue), the left corner of the chin (lower lip and jaw), the right cheek below the mouth (lower lip) and the left cheek above the mouth (upper lip). There is no throat pad. We tried for six, but six pads don't sit cleanly on one face, and a noisy channel hurts the model more than a missing one, so four clean channels it is.
+SVR-1 is our EMG model; its exact design (layers, losses, training, the change list) is in [SVR1_SPEC.md](SVR1_SPEC.md), with the architecture figure. It reads four electrode channels at sites 3, 2, 6 and 1 from Gaddy and Klein's layout, their best four-electrode set: under the chin (the tongue), the left corner of the chin (lower lip and jaw), the right cheek below the mouth (lower lip) and the left cheek above the mouth (upper lip). There is no throat pad. We tried for six, but six pads don't sit cleanly on one face, and a noisy channel hurts the model more than a missing one, so four clean channels it is.
 
 ```mermaid
 flowchart TD

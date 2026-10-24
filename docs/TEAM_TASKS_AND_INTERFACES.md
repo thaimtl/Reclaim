@@ -1,8 +1,8 @@
-# Reclaim: the plan
+# Team tasks and interfaces
 
 One mode, open mouth, real time. Austin calls a judge through Twilio and mouths the whole conversation; the camera, the EMG model and Claude read it together every 100 ms; live captions show both sides; Cartesia speaks Austin's words into the call in his cloned voice, with his facial emotion, while he is still mouthing. Everything runs on Austin's laptop (RTX 5060, 115 W), with the lowest delay we can get at every step.
 
-How it works: [ARCHITECTURE.md](ARCHITECTURE.md). What was decided: [DECISIONS.md](DECISIONS.md).
+How the whole system works: [REALTIME_PIPELINE.md](REALTIME_PIPELINE.md). The EMG model in detail: [SVR1_SPEC.md](SVR1_SPEC.md).
 
 ## The demo
 
@@ -20,7 +20,7 @@ Nothing is trained on the pitch or on a script: the judge can ask anything.
 
 | Person | Owns |
 | --- | --- |
-| Evan | Camera reader: real-time Auto-AVSR every 100 ms, mouthing activity and segments, facial emotion ([EVAN_WORKFLOW.md](EVAN_WORKFLOW.md)) |
+| Evan | Camera reader: real-time Auto-AVSR every 100 ms, mouthing activity and segments, facial emotion ([EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md)) |
 | Austin | SVR-1 training, live EMG reader, fusion decoder and confidence locking, logging and replay, integration |
 | Frank | Cartesia (Austin's voice clone, Sonic streaming voice, Ink for the judge), the Twilio call, the captions dashboard |
 | Thai | EMG rig (4 channels, sites 3, 2, 6, 1) and its live filter, the Claude service (predict + repair) |
@@ -41,7 +41,7 @@ Nothing is trained on the pitch or on a script: the judge can ask anything.
 
 ### Evan
 
-Follow [EVAN_WORKFLOW.md](EVAN_WORKFLOW.md). You can prototype on the MacBook (Lipflow was built for Macs), but timing and real tests run only on Austin's laptop.
+Follow [EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md). You can prototype on the MacBook (Lipflow was built for Macs), but timing and real tests run only on Austin's laptop.
 
 ### Frank
 

@@ -38,7 +38,7 @@ flowchart LR
 - Cartesia speaks each word in your cloned voice as soon as it locks, without waiting for the end of the sentence.
 - If the system can't tell what you said, it shows "Please repeat" instead of guessing.
 
-Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Plan and owners: [docs/PLAN.md](docs/PLAN.md). What changed and why: [docs/DECISIONS.md](docs/DECISIONS.md). The rig: [HARDWARE.md](HARDWARE.md). Recording sessions: [RECORDING.md](RECORDING.md).
+How the whole system works: [docs/REALTIME_PIPELINE.md](docs/REALTIME_PIPELINE.md). The EMG model, SVR-1: [docs/SVR1_SPEC.md](docs/SVR1_SPEC.md). Who builds what: [docs/TEAM_TASKS_AND_INTERFACES.md](docs/TEAM_TASKS_AND_INTERFACES.md). The rig: [HARDWARE.md](HARDWARE.md). Recording sessions: [RECORDING.md](RECORDING.md).
 
 ## What we demo
 
@@ -62,6 +62,23 @@ Two minutes, live, at our table.
 | The other person's speech to text | Cartesia Ink |
 | Phone call | Twilio |
 | Compute | One laptop, RTX 5060 |
+
+## Code and data
+
+All code lives in this repo; datasets, checkpoints, results and Python environments live in a working directory outside it.
+
+| Folder | What it is |
+| --- | --- |
+| `svr/` | SVR-1, the EMG model: model, training, fine-tuning, preprocessing ([docs/SVR1_SPEC.md](docs/SVR1_SPEC.md)) |
+| `bench/` | Benchmarks and their frozen test splits |
+| `cluster/` | H100/H200 job scripts (PBS), smoke tests, runbook |
+| `camera/` | Camera-only baselines (Auto-AVSR, BRAVEn, LipLearner) |
+| `rig/` | EMG rig: Arduino firmware, serial reader, live hum filter, signal check |
+| `figures/` | The SVR-1 architecture figure and the script that draws it |
+| `tests/` | Smoke and unit tests |
+| `docs/` | Plans and specs, Markdown with PDF copies |
+
+The code finds data through the environment variable `RECLAIM_WORKDIR` (datasets in `silent_speech/` and `data/`, plus `checkpoints/`, `benchmark_results/`, `recordings/`, `third_party/`). Without it, data is expected next to the code, which is how the cluster copy works. Data folders are in `.gitignore`.
 
 ## Known limitations
 

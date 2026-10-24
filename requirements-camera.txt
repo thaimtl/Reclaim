@@ -1,0 +1,22 @@
+# Camera-baseline environment (venv-camera): kept separate because MediaPipe needs numpy<2.
+#   uv venv --python 3.11 venv-camera && uv pip install --python venv-camera/bin/python -r requirements-camera.txt
+torch>=2.4
+numpy<2
+mediapipe==0.10.21
+opencv-python>=4.9,<4.11
+sentencepiece>=0.2
+six
+setuptools
+omegaconf>=2.3
+transformers>=4.51
+accelerate
+bitsandbytes
+huggingface_hub
+gdown
+jiwer>=3
+unidecode
+# Live camera reader (venv-live): team bus, replay/recording, E5 emotion classifier
+pyzmq>=26
+msgpack>=1.0
+av>=12
+onnxruntime>=1.20

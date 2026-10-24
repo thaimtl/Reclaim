@@ -2,13 +2,14 @@
 
     pip install markdown playwright && playwright install chromium
     python docs/build_pdfs.py            # all docs listed in DOCS
-    python docs/build_pdfs.py PLAN.md    # one doc
+    python docs/build_pdfs.py TEAM_TASKS_AND_INTERFACES.md    # one doc
 
 Markdown -> HTML (python-markdown), Mermaid blocks drawn by mermaid.js in headless Chromium, printed to Letter PDF.
 Mermaid is vendored in docs/vendor/ (11.4.1, MIT), so the build works offline.
 Links to the other docs in DOCS point to their PDFs next to this one; every other relative link points to the file
 on GitHub, so links still work in a PDF opened on its own.
 """
+import base64
 import html
 import os
 import re
@@ -19,7 +20,7 @@ from playwright.sync_api import sync_playwright
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-DOCS = ['ARCHITECTURE.md', 'PLAN.md', 'EVAN_WORKFLOW.md', 'DECISIONS.md']
+DOCS = ['REALTIME_PIPELINE.md', 'SVR1_SPEC.md', 'TEAM_TASKS_AND_INTERFACES.md', 'EVAN_REALTIME_LIP_READING.md']
 MERMAID = os.path.join(HERE, 'vendor', 'mermaid.min.js')
 MERMAID_JS = ''
 REPO_URL = 'https://github.com/thaimtl/Reclaim/blob/main/'
@@ -42,6 +43,7 @@ pre { background: #f6f8fa; padding: 8pt; border-radius: 6px; overflow-x: hidden;
       font-size: 8.6pt; page-break-inside: avoid; }
 pre code { background: none; padding: 0; }
 pre.mermaid { background: none; text-align: center; page-break-inside: avoid; }
+img { max-width: 100%; }
 pre.mermaid svg { max-width: 100%; max-height: 165mm; width: auto; height: auto; }
 a { color: #0b57d0; text-decoration: none; }
 """
@@ -56,12 +58,20 @@ def fix_link(m):
     return f'href="{REPO_URL}{path}{anchor}"'
 
 
+def embed_image(m):
+    """Relative image -> data URI, since the page has no file base URL."""
+    path = os.path.normpath(os.path.join(HERE, m.group(1)))
+    mime = {'.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml'}[os.path.splitext(path)[1].lower()]
+    return f'src="data:{mime};base64,{base64.b64encode(open(path, "rb").read()).decode()}"'
+
+
 def to_html(md_text):
     body = markdown.markdown(md_text, extensions=['tables', 'fenced_code', 'sane_lists'])
     # fenced ```mermaid blocks -> <pre class="mermaid"> for mermaid.js
     body = re.sub(r'<pre><code class="language-mermaid">(.*?)</code></pre>',
                   lambda m: '<pre class="mermaid">' + html.unescape(m.group(1)) + '</pre>', body, flags=re.S)
     body = re.sub(r'href="([^"#:]+)(#[^"]*)?"', fix_link, body)
+    body = re.sub(r'src="([^"#:]+)"', embed_image, body)
     return ('<html><head><meta charset="utf-8"><style>' + CSS + '</style>'
             '<script>' + MERMAID_JS + '</script></head><body>' + body +
             '<script>mermaid.initialize({startOnLoad: false, theme: "neutral", flowchart: {useMaxWidth: true}});'

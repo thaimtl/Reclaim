@@ -4,3 +4,12 @@ __pycache__/
 *.npy
 recordings/
 .ipynb_checkpoints/
+# Working-directory data, kept outside git (see README "Code and data")
+silent_speech/
+data/
+checkpoints/
+benchmark_results/
+baseline_gaddy/
+third_party/
+venv*/
+recordings_smoke/
