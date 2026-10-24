@@ -7,7 +7,7 @@ Three readers work together, because each one sees something the others cannot. 
 ```mermaid
 flowchart TD
     cam["Webcam<br/>lips + face"] --> avsr["Camera reader<br/>Auto-AVSR, as is"]
-    emg["6 EMG pads<br/>face muscles"] --> svr["EMG reader<br/>SVR-1, trained on Austin"]
+    emg["4 EMG pads<br/>face muscles"] --> svr["EMG reader<br/>SVR-1, trained on Austin"]
     call["Twilio phone call<br/>the judge's voice"] --> ink["Cartesia Ink<br/>transcribes the judge"]
     avsr --> dec["Fusion decoder, every 100 ms<br/>one search, three judges,<br/>confidence-based locking"]
     svr --> dec
@@ -26,7 +26,7 @@ flowchart TD
 
 The camera does most of the work. A lip reader trained on thousands of hours of video (Auto-AVSR) already gets about four words in five right on normal video, it knows English well, and it sees word boundaries clearly. Its weakness is physics: many sounds look identical on the lips. "Bat", "mat" and "pat" all start with closed lips; "t", "d" and "n" all happen behind the teeth; "k" and "g" happen at the back of the mouth, where no camera can see. It also struggles when the face turns, the light changes or the speaker talks fast.
 
-The EMG model reads electrical activity of the muscles that move the jaw, the lips, the chin and the floor of the mouth, which drags the tongue. That is exactly the information the camera lacks: what the tongue and jaw are doing. On its own, EMG is a noisier reader than the camera, but it disagrees with the camera in the right places. On our Berkeley benchmark, an EMG model picks the true sentence out of ten lip look-alikes 84 to 89% of the time.
+The EMG model reads electrical activity of the muscles under the chin, which drag the tongue, and the muscles around the lips and chin. The pad under the chin matters most: it reads the tongue, exactly the information the camera lacks. On its own, EMG is a noisier reader than the camera, but it disagrees with the camera in the right places. On our Berkeley benchmark, an EMG model with 8 electrodes picks the true sentence out of ten lip look-alikes 88% of the time; with our 4 it will be lower, which is why it works as one of three readers rather than alone.
 
 Claude knows what makes sense. If the judge just asked "how are you feeling today?", then "fine" is far more likely than "vine", even though the two look the same. Claude follows the whole conversation, both sides, and uses it to predict what Austin is likely to say before he starts mouthing, and to repair words the other two readers got wrong.
 
@@ -83,11 +83,11 @@ Evan's step-by-step plan for this part is in [EVAN_WORKFLOW.md](EVAN_WORKFLOW.md
 
 ## The EMG reader: SVR-1, revised
 
-SVR-1 is our EMG model. It reads the six electrode channels at sites 1, 2, 3, 5, 6 and 8 from Gaddy and Klein's layout: chin, under the chin, both cheeks, jaw, and the back of the right cheek. There is no throat pad.
+SVR-1 is our EMG model. It reads four electrode channels at sites 3, 2, 6 and 1 from Gaddy and Klein's layout, their best four-electrode set: under the chin (the tongue), the left corner of the chin (lower lip and jaw), the right cheek below the mouth (lower lip) and the left cheek above the mouth (upper lip). There is no throat pad. We tried for six, but six pads don't sit cleanly on one face, and a noisy channel hurts the model more than a missing one, so four clean channels it is.
 
 ```mermaid
 flowchart TD
-    raw["6 EMG channels, 1,000 samples/s"] --> filt["Remove mains hum and drift"]
+    raw["4 EMG channels, 1,000 samples/s"] --> filt["Live hum filter, rig/filters.py<br/>same filter for training"]
     filt --> adapt["Session adapter<br/>undoes small electrode shifts"]
     adapt --> conv["Convolution front end<br/>86 frames per second"]
     adapt --> rate["Pace estimate"]
@@ -100,7 +100,7 @@ flowchart TD
     rate --> pros["Pace and effort<br/>for the voice"]
 ```
 
-The front end turns about a thousand voltage readings per second into 86 short "frames" per second, each a list of numbers describing what the face muscles are doing in that slice of time. The Transformer then lets every frame look at every other frame of the sentence, because whether a burst of muscle activity is an "m" or a "b" depends on what comes before and after it, just as in hearing. A small adapter at the start learns how today's electrode placement differs from the recordings', so a minute of calibration on demo day refits only that.
+First, Thai's live filter removes the 60 Hz mains hum, its echoes and slow drift, sample by sample as they arrive. Every recording SVR-1 learns from, including Berkeley's, goes through the same filter in the same order, so the model sees exactly the signal it will see live. The front end then turns about a thousand voltage readings per second into 86 short "frames" per second, each a list of numbers describing what the face muscles are doing in that slice of time. The Transformer then lets every frame look at every other frame of the sentence, because whether a burst of muscle activity is an "m" or a "b" depends on what comes before and after it, just as in hearing. A small adapter at the start learns how today's electrode placement differs from the recordings', so a minute of calibration on demo day refits only that.
 
 What SVR-1 contributes:
 
@@ -111,13 +111,13 @@ What SVR-1 contributes:
 - **It tells Claude where the doubt is.** For each recent word, the decoder sends Claude how strongly camera and EMG supported it and which look-alikes competed, so Claude only touches the words that are actually uncertain.
 - **The look-alike verifier.** Given the few candidates the decoder is unsure between, it looks only at the words they disagree on and scores those against the muscle signal, so words everyone agrees on cannot drown out the one word that matters.
 
-Compared with Gaddy and Klein's model, which only writes letters for open-mouth speech recorded with 8 electrodes in a lab, SVR-1 is built for this job: it runs on our 6 sites, it is trained to grade the camera's look-alike guesses, it is trained on sped-up and slurred signals so it holds up at natural speed, and it gives the same answer whether it reads a whole sentence or a partial one.
+Compared with Gaddy and Klein's model, which only writes letters for open-mouth speech recorded with 8 electrodes in a lab, SVR-1 is built for this job: it runs on our 4 sites, it is trained to grade the camera's look-alike guesses, it is trained on sped-up and slurred signals so it holds up at natural speed, and it gives the same answer whether it reads a whole sentence or a partial one.
 
 The closed-mouth mode, the fixed-phrase classifier and the jaw-clench gesture from earlier plans are gone.
 
 ### How SVR-1 learns
 
-SVR-1 first learns silent speech in general from 19 hours of Berkeley recordings: one speaker, 8 electrodes, open mouth. During that pretraining it also predicts tongue, lip and jaw positions computed from the audio of the voiced recordings, which teaches it the physics of speech. It sees signals that are sped up, slurred, filtered like our amplifier and missing channels, so that our rig and Austin's pace are not a surprise. Partway through, it starts practising the grading job: for each training sentence it scores the true sentence against lip look-alikes and is rewarded when the true one wins.
+SVR-1 first learns silent speech in general from 19 hours of Berkeley recordings: one speaker, 8 electrodes, open mouth. During that pretraining it also predicts tongue, lip and jaw positions computed from the audio of the voiced recordings, which teaches it the physics of speech. It learns from all 8 Berkeley channels with channels randomly dropped, then settles on our 4, and it sees signals that are sped up, slurred and filtered like our amplifier, so that our rig and Austin's pace are not a surprise. Partway through, it starts practising the grading job: for each training sentence it scores the true sentence against lip look-alikes and is rewarded when the true one wins.
 
 Because the live system reads partial sentences every 100 ms, SVR-1 also practises on beginnings of sentences, cut at random points with the matching beginning of the text.
 

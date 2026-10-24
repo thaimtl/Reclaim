@@ -95,11 +95,11 @@ Done when: smiling, raising eyebrows and frowning while mouthing each produce th
 
 When a segment ends, run Auto-AVSR's own beam search (beam 5, with the subword language model at Lipflow's weight) on the whole segment in a background thread, and publish the 5 best sentences with scores as `cam.final`. Austin's decoder uses it to polish the captions. It must never block the next tick.
 
-### E7. Recording and replay (about 1 hour; recording is needed for session 1, now)
+### E7. Replay (about 1 hour)
 
-1. `--record DIR`: save the raw video (MP4) and the per-frame timestamps (`*_video_ts.npy`) of each utterance, named as in our recording format (`svr/recordings.py` in the main folder). Thai's EMG reader stamps with the same `time.monotonic()` clock on the same laptop, so the two line up exactly.
-2. `--replay FILE`: feed a recorded video through the same pipeline at real speed, as if it were the webcam. This lets the team test the full system on Austin's laptop without someone mouthing in front of it every time.
-3. E7's recording mode is needed for session 1, so do it right after E1.
+Recording sessions use the separate recording tool (camera + EMG + prompts, built on Thai's `rig/` code), so you don't need a recording mode. Read its video format so replay accepts it.
+
+1. `--replay FILE`: feed a recorded video through the same pipeline at real speed, as if it were the webcam. This lets the team test the full system on Austin's laptop without someone mouthing in front of it every time.
 
 ## Pitfalls
 

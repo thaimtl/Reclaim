@@ -7,7 +7,7 @@ The team settled the conflicts between the EMG plan and the earlier README, CLAU
 | # | Topic | Decision | Replaces |
 | --- | --- | --- | --- |
 | 1 | Who it's for and who demos | Laryngectomy patients are the audience. Austin, who is healthy, is the demo speaker; no patients take part. Performance and proof of concept come first, to impress the judges | "Healthy speaker only" (EMG plan) vs "patients" (README): both hold now, for different roles |
-| 2 | Electrode sites | Gaddy sites 1, 2, 3, 5, 6, 8. No throat pad | Site 4 on the throat (EMG plan) |
+| 2 | Electrode sites | 4 channels: Gaddy sites 3, 2, 6, 1 (pins A0 to A3), their best 4-electrode set. No throat pad. Six pads don't fit cleanly on the face, and noisy channels hurt more than fewer channels | Site 4 on the throat (EMG plan); sites 1, 2, 3, 5, 6, 8 (first pass of this page) |
 | 3 | Reference pads | Each board has its own REF pad behind the ears, as in HARDWARE.md | One shared reference (EMG plan) |
 | 4 | Modes | One mode: camera + EMG + Claude together, for free speech in real time. No separate camera or EMG mode, no closed-mouth speech, no EMG training for it | Free speech camera-only plus a quick-phrases EMG mode (README); lips-sealed EMG mode (EMG plan) |
 | 5 | Mouth | Open mouth, silent, camera always on | Lips sealed (EMG plan); camera off for quick phrases (README) |
@@ -48,4 +48,7 @@ The team settled the conflicts between the EMG plan and the earlier README, CLAU
     - Thai: the EMG rig and the Claude service.
 - **Phone call delay is accepted.** The phone network's delay is not ours to remove; everything else is built for the lowest delay, and the dashboard shows the real latency.
 - **Cartesia:** Sonic 3.6, with speed, volume and emotion through `generation_config`. The emotion names the camera produces are accepted.
-- **Electrical safety:** a USB isolator between the Arduino and the laptop, or the laptop on battery while pads are on skin.
+- **Electrical safety:** no USB isolator is available, so the laptop runs on battery whenever the pads are on skin, never charging with the Uno connected. Latency is measured on battery.
+- **One filter everywhere:** Thai's causal hum filter (`rig/filters.py`) processes all EMG, live, in recordings and in Berkeley pre-training data, never `filtfilt`.
+- **Phone audio:** Frank owns the Twilio ↔ Cartesia audio formats.
+- **The recording tool** records camera and EMG together, with the session prompts, on Austin's laptop.

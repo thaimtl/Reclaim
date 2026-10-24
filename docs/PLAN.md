@@ -23,19 +23,21 @@ Nothing is trained on the pitch or on a script: the judge can ask anything.
 | Evan | Camera reader: real-time Auto-AVSR every 100 ms, mouthing activity and segments, facial emotion ([EVAN_WORKFLOW.md](EVAN_WORKFLOW.md)) |
 | Austin | SVR-1 training, live EMG reader, fusion decoder and confidence locking, logging and replay, integration |
 | Frank | Cartesia (Austin's voice clone, Sonic streaming voice, Ink for the judge), the Twilio call, the captions dashboard |
-| Thai | EMG rig (sites 1, 2, 3, 5, 6, 8) and its stream into the laptop, the Claude service (predict + repair) |
+| Thai | EMG rig (4 channels, sites 3, 2, 6, 1) and its live filter, the Claude service (predict + repair) |
 
 ### Austin
 
-1. Retarget SVR-1 to the rig's sites (input slots 0, 1, 2, 4, 5, 7). Drop the closed-mouth parts: the fixed-phrase head and closed-lips transfer.
-2. Add the speaking-or-not output and partial-sentence training.
-3. Train on the cluster: one full SVR-1 run plus a Gaddy-architecture baseline on the same 6 sites.
-4. Live EMG reader: subscribe to `emg.raw`, filter, run SVR-1 every 100 ms, compute pace and effort.
-5. Fusion decoder: the joint search over camera and EMG probabilities, with look-alike expansion, Claude's predicted words and the gate.
-6. Confidence locking: compute the lock ingredients per word, train the lock model on sessions 1 and 2, and set the dynamic threshold from Claude's predictability.
-7. "Please repeat" when the final pass still isn't confident, with the reasons in the debug log.
-8. The logger, which subscribes to every topic and writes everything to disk, and a replay tool.
-9. Fine-tune SVR-1 on sessions 1 and 2, and tune the decoder, gate and lock model; test everything on session 3.
+1. Retarget SVR-1 to the rig's 4 sites (input slots 0, 1, 2, 5, the existing `4ch` channel set). Drop the closed-mouth parts: the fixed-phrase head and closed-lips transfer.
+2. Switch all EMG preprocessing to Thai's causal filter (`rig/filters.py`), Berkeley pre-training data included: re-cache Berkeley through it, in order, instead of Gaddy's `filtfilt`.
+3. Add the speaking-or-not output and partial-sentence training.
+4. Train on the cluster: one full SVR-1 run plus a Gaddy-architecture baseline on the same 4 sites.
+5. The recording tool: camera + EMG together with the session prompts (see Recording sessions).
+6. Live EMG reader: subscribe to `emg.raw`, filter, run SVR-1 every 100 ms, compute pace and effort.
+7. Fusion decoder: the joint search over camera and EMG probabilities, with look-alike expansion, Claude's predicted words and the gate.
+8. Confidence locking: compute the lock ingredients per word, train the lock model on sessions 1 and 2, and set the dynamic threshold from Claude's predictability.
+9. "Please repeat" when the final pass still isn't confident, with the reasons in the debug log.
+10. The logger, which subscribes to every topic and writes everything to disk, and a replay tool.
+11. Fine-tune SVR-1 on sessions 1 and 2, and tune the decoder, gate and lock model; test everything on session 3.
 
 ### Evan
 
@@ -58,10 +60,10 @@ Follow [EVAN_WORKFLOW.md](EVAN_WORKFLOW.md). You can prototype on the MacBook (L
 
 ### Thai
 
-1. Rig with sites 1, 2, 3, 5, 6, 8 and one REF per board, as in [HARDWARE.md](../HARDWARE.md).
-2. Arduino firmware: 6 channels at 1 kHz, binary frames with a sync byte and a sample counter.
-3. Laptop reader: parse the serial stream, stamp it with `time.monotonic()`, publish `emg.raw` every 10 ms.
-4. Safety: a USB isolator between the Uno and the laptop, or the laptop on battery while pads are on skin.
+1. Rig with 4 boards on A0 to A3 (sites 3, 2, 6, 1) and one REF per board, as in [HARDWARE.md](../HARDWARE.md).
+2. Firmware, reader and live filter (`rig/`): 1 kHz, raw frames with a counter, causal hum filter. They move from 6 to 4 channels with the recording tool.
+3. Live: the reader stamps samples with `time.monotonic()` and publishes `emg.raw` every 10 ms.
+4. Safety: the laptop runs on battery whenever the pads are on skin; never charge with the Uno connected.
 5. The Claude service:
     - **Predict:** on every final `partner.text` and every ~2 s while Austin mouths, publish `claude.predict`: likely words and phrases, plus how predictable the next words are.
     - **Repair:** on each `dec.lock`, publish `claude.repair`.
@@ -87,7 +89,7 @@ flowchart TD
 
 | Topic | From → to | Rate | Main fields |
 | --- | --- | --- | --- |
-| `emg.raw` | Thai → Austin | every 10 ms | `t0`, `fs` = 1000, `samples` (n × 6, int16), `counter` |
+| `emg.raw` | Thai → Austin | every 10 ms | `t0`, `fs` = 1000, `samples` (n × 4, raw 0 to 1023), `counter` |
 | `cam.tick` | Evan → Austin, Frank | every 100 ms | `seg_id`, `seg_start`, `frame_t` (T), `topk_ids` (T × 32), `topk_logp` (T × 32), `blank_logp` (T), `greedy`, `activity` (T), `face_ok`, `emotion` {`label`, `confidence`, `scores`}, `timing_ms` |
 | `cam.final` | Evan → Austin | at segment end | `seg_id`, `nbest` [{`text`, `score`}] |
 | `dec.hyp` | Austin → dashboard | every 100 ms | `utt_id`, `locked` [words], `unlocked` [words], `confidence` per word, `source` per word (camera / EMG / Claude) |
@@ -117,7 +119,7 @@ Fallback at every point: camera + Claude + voice works without EMG. If EMG isn't
 
 ## Recording sessions
 
-Prompts and procedure: `calhacks2026/recording_prompts/` (copies in [recording/](recording/)). All varied conversational sentences, mouth open, no sound, camera and EMG on one clock. The pads come off and go back on between sessions.
+Prompts and procedure: [recording/](recording/). Sessions are recorded with the recording tool, which records the camera and Thai's EMG stream on one clock and steps through the prompts. All varied conversational sentences, mouth open, no sound, camera and EMG on one clock. The pads come off and go back on between sessions.
 
 | Session | Sentences | Use |
 | --- | --- | --- |
@@ -129,7 +131,7 @@ Each session also includes about 2 minutes of rest clips (still face, swallow, n
 
 ## Training
 
-1. **Pretraining (cluster):** SVR-1 on Berkeley's data, retargeted to the rig's 6 sites, with the Gaddy-architecture baseline on the same sites as the fallback and the comparison. Scripts and runbook are in `calhacks2026/cluster/`.
+1. **Pretraining (cluster):** SVR-1 on Berkeley's data, re-filtered with `rig/filters.py` and retargeted to the rig's 4 sites, with the Gaddy-architecture baseline on the same 4 sites as the fallback and the comparison. Scripts and runbook are in `calhacks2026/cluster/`.
 2. **Fine-tuning:** SVR-1 on sessions 1 and 2. It is small enough for the 5090 or the cluster.
 3. **The decoder's weights, the gate and the lock model:** fitted on sessions 1 and 2.
 4. **The test:** everything is measured on session 3.
@@ -146,5 +148,5 @@ These come from Anthropic's track brief:
 
 ## Still open
 
-- **Which way to make the rig safe:** a USB isolator, or the laptop on battery while pads are on (decided: one of the two). Measure latency on battery if that is the choice.
-- **Phone audio formats:** Frank confirms the exact format Twilio's audio stream needs from Cartesia, and what Ink accepts from it.
+- **Battery life:** the whole system runs on battery during recordings and the demo. Measure how long a full run lasts, and charge between sessions with the Uno unplugged.
+- **Phone audio:** Frank owns the Twilio ↔ Cartesia audio formats.

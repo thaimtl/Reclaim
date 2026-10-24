@@ -12,10 +12,10 @@ Each line is `id <tab> sentence`. Use the id as the utterance id in the recordin
 
 ## Before each session
 
-1. Wipe the skin with alcohol and put the pads on the marked spots: sites 1, 2, 3, 5, 6, 8, one REF per board behind the ears.
+1. Wipe the skin with alcohol and put the pads on the marked spots: sites 3, 2, 6, 1 (A0 to A3), one REF per board behind the ears.
 2. Check that every channel bursts when you mouth "ta ta ta, ka ka ka, pa pa pa".
-3. Camera and EMG record on the same laptop with the same clock (`time.monotonic()`), face lit from the front, the camera at the height and distance you'll use in the demo.
-4. Electrical safety: a USB isolator between the Uno and the laptop, or the laptop on battery.
+3. Start the recording tool on Austin's laptop: it records the camera and the EMG together on one clock and steps through the prompts. Light the face from the front, with the camera at the height and distance you'll use in the demo.
+4. Electrical safety: the laptop on battery, charger unplugged, before the Uno is connected. Charge between sessions with the Uno unplugged.
 
 ## For every sentence
 

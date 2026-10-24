@@ -21,7 +21,7 @@ Three readers work together, because each sees what the others can't, and every 
 ```mermaid
 flowchart LR
     W[Webcam] --> AV[Camera reader<br/>Auto-AVSR]
-    P[6 EMG pads] --> E[EMG reader<br/>SVR-1]
+    P[4 EMG pads] --> E[EMG reader<br/>SVR-1]
     AV --> D[Fusion decoder]
     E --> D
     M[Phone call<br/>the other person] --> I[Cartesia Ink]
