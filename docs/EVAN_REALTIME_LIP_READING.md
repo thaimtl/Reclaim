@@ -69,7 +69,7 @@ Done when: a terminal shows the greedy text updating while you mouth, each pass'
 
 Measure first, then cut the biggest cost:
 
-1. fp16 for the whole encoder, `torch.backends.cudnn.benchmark = True`, model loaded once, and a warm-up encode at start-up.
+1. fp16 for the whole encoder (`.half()`, the default; `--fp32` for the old path), model loaded once, and a warm-up encode at start-up. Leave `torch.backends.cudnn.benchmark` off: measured, it gives no speed and raises the warm-up to 80 s and the peak memory to 20 GB, more than the laptop has (`lipread/MEASURED.md`).
 2. Run the front end once per frame. The encoder starts with a 3D-convolution + ResNet front end that only looks at a frame and its two neighbours on each side. Run it on new frames as they arrive (two frames late, because of the look-ahead), cache the features, and on each tick run only the Conformer on the cached features. Inspect the loaded model (`print(model)`) to find where the front end ends; it is the part before the 12 Conformer blocks.
 3. Cap a segment at about 8 s. If someone talks longer without pausing, start a new segment that keeps the last 2 s as context, and tell the joint search through the segment fields in `cam.tick`.
 4. Run MediaPipe and the GPU work in different threads, so face tracking never waits for the encoder.
