@@ -4,11 +4,11 @@ mouthing in front of the laptop.
     python -m buslog.replay SESSION [--speed 1.0] [--topics cam. emg.] [--wait 1.0] [--no-retime]
 
 SESSION is a session folder or 'latest'. Replay binds the endpoints of the topics it plays, so it stands in
-for those producers: stop them first (bus.Pub refuses an ipc:// path a live publisher holds), then start the
+for those producers: stop them first (a second bind of the same port fails with EADDRINUSE), then start the
 parts under test, which connect as usual. --topics keeps only topics starting with one of the prefixes, e.g.
 replay cam. and emg. to test a new decoder live.
 
-The parts compare message times with time.monotonic() (the repair window, sentence end), so by default every
+The parts compare message times with bus.now() (the repair window, sentence end), so by default every
 time field listed in TIME_FIELDS is moved onto the replay's clock by one constant offset, replay start minus
 the first logged t_recv; seq stays the original. A message that does not decode goes out as it was logged.
 At --speed other than 1 the times keep their original spacing, so they drift from the clock as it plays.
@@ -21,11 +21,12 @@ import time
 
 import numpy as np
 
-from bus import ENDPOINTS, Pub, decode, encode
+import bus
+from bus.team import ENDPOINTS, Pub, decode, encode
 from buslog import matches, read_raw, topic_of
 
 SNDHWM = 10000  # a fast replay must not drop at the default 100
-# topic prefix -> fields holding time.monotonic() seconds (numbers or arrays), from the Interfaces table and
+# topic prefix -> fields holding bus.now() seconds (numbers or arrays), from the Interfaces table and
 # fusion/decoder.py; 'words[].t' is the t of every item in the list words. t_pub is in every message.
 TIME_FIELDS = {
     '': ('t_pub',),
@@ -57,7 +58,7 @@ def _shift(d, path, offset):
 def retime(frames, offset):
     """The message with every TIME_FIELDS entry shifted by offset and its seq kept; unchanged if it does not decode."""
     try:
-        topic, msg = decode(frames)
+        topic, msg = decode(frames, validate=False)
     except ValueError:
         return frames
     for prefix, fields in TIME_FIELDS.items():
@@ -77,7 +78,7 @@ def replay(session, speed=1.0, topics=None, endpoints=None, ctx=None, wait_s=1.0
     if names - set(pubs):
         print(f'replay: no endpoint for {sorted(names - set(pubs))}, skipping those', file=sys.stderr)
     time.sleep(wait_s)  # let subscribers connect, or the first messages are lost
-    count, start, first = 0, time.monotonic(), None
+    count, start, first = 0, bus.now(), None
     try:
         for t_recv, name, frames in read_raw(session):
             if stop():
@@ -85,7 +86,7 @@ def replay(session, speed=1.0, topics=None, endpoints=None, ctx=None, wait_s=1.0
             if name not in pubs or not matches(topic_of(frames), topics):
                 continue
             first = t_recv if first is None else first
-            delay = start + (t_recv - first) / speed - time.monotonic()
+            delay = start + (t_recv - first) / speed - bus.now()
             if delay > 0:
                 time.sleep(delay)
             pubs[name].sock.send_multipart(retime(frames, start - first) if retime_times else frames)

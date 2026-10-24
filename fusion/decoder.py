@@ -1,6 +1,6 @@
 """The decoder's state machine: camera passes -> words that lock, wait out the repair window, and leave on voice.
 
-Pure: every handler takes a decoded message and the decoder's clock (time.monotonic()) and returns the bus
+Pure: every handler takes a decoded message and the decoder's clock (bus.now()) and returns the bus
 messages to publish as [(topic, msg)]. run.py owns the sockets; tests drive it with fake ticks.
 
 Utterances. A segment from the camera is one utterance, except that a segment capped at 8 s continues in the

@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import zmq
 
-from bus import Pub, Sub
+from bus.team import Pub, Sub
 from claude_service.brain import SCHEMA, SYSTEM, Brain
 from claude_service.service import TOPICS, run
 
@@ -125,11 +125,11 @@ def bus():
     got = []  # (topic, msg) as received
 
     def wait_for(pred, resend=None, deadline_s=5.0):
-        end, last = time.monotonic() + deadline_s, 0.0
-        while time.monotonic() < end:
-            if resend and time.monotonic() - last > 0.2:  # PUB/SUB drops until the subscription arrives
+        end, last = time.perf_counter() + deadline_s, 0.0
+        while time.perf_counter() < end:
+            if resend and time.perf_counter() - last > 0.2:  # PUB/SUB drops until the subscription arrives
                 resend()
-                last = time.monotonic()
+                last = time.perf_counter()
             topic, msg = listen.recv(timeout_ms=50)
             if topic is not None:
                 got.append((topic, msg))

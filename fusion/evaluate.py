@@ -2,7 +2,7 @@
 "Please repeat", the delay from mouthing a word to its lock, and from the lock to the voice.
 
 Inputs: a buslog session (buslog.read) and the recorder's manifest.jsonl (one line per clip: id, prompt, set,
-clip_t0 / clip_t1 on the recorder's time.monotonic()). Two modes:
+clip_t0 / clip_t1 on the recorder's bus.now() (time.perf_counter())). Two modes:
 
     logged (default)  score the dec.* and voice.say messages the live decoder published during the session.
     --decode          run a fresh Decoder over the session's cam.* and claude.* messages, with now = each message's
@@ -12,7 +12,7 @@ clip_t0 / clip_t1 on the recorder's time.monotonic()). Two modes:
                       decoder may skip stale ones), and a logged claude.repair answered the live decoder's
                       locks, so one whose 'from' no longer matches is ignored.
 
-Clocks. Live, frame_t (capture times) and t_pub are both the laptop's time.monotonic(), and so are the
+Clocks. Live, frame_t (capture times) and t_pub are both the laptop's bus.now(), and so are the
 recorder's clip_t0 / clip_t1. When the camera replays a recorded clip, frame_t is the recording's video_ts: the
 recorder's clock, the same as clip_t0 / clip_t1, while t_pub is the replay's live clock. So clips are matched on
 frame time, and only delays need t_pub (below).

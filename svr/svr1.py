@@ -1,17 +1,18 @@
 """SVR-1: the EMG model of the Silent Voice Rig.
 
-    raw EMG (B, T*8, 8 slots) x channel mask
+    raw EMG (B, T*8, 8 slots) x channel mask  (our rig: 4 channels in slots 2, 1, 5, 0; docs/SVR1_SPEC.md)
       -> session adapter (8x8 channel mix + gain, identity at init; refit on demo day)
       -> conv front end: 3 strided residual blocks (per-frame LayerNorm), 8x downsampling to 86 frames/s
       -> rate token: speaking-rate estimate from the EMG envelope, FiLM into every block       [contribution E]
       -> pre-norm Transformer: RMSNorm, RoPE, SwiGLU; attention = FlashAttention-2 (varlen) or PyTorch SDPA
-      -> heads: letter CTC, phoneme CTC, articulator regression (SPARC targets), fixed-sentence classifier + none
+      -> heads: letter CTC, phoneme CTC, speaking (per-frame logit), articulator regression (SPARC targets);
+         the fixed-sentence classifier + none (n_fixed > 0) is kept for old checkpoints only
     disputed-span verifier: candidate phonemes (+ disputed flags) cross-attend to encoder frames  [contribution B]
     score_candidates(): letter CTC + phoneme CTC + verifier, with learned combination weights; this is the
     S_emg term of the fused system and what the homophene-contrastive judge loss trains            [contribution A]
 
-Inputs use 8 channel slots so 8-channel pretraining (Berkeley) and 6-channel use (our rig, slots 0-5) share one
-model; missing channels are zeroed by the mask. One utterance per batch row, padded; attention never crosses
+Inputs use 8 channel slots (slot = Gaddy site - 1) so Berkeley pretraining and our 4-channel rig share one model;
+missing channels are zeroed by the mask. One utterance per batch row, padded; attention never crosses
 utterances.
 """
 import math
@@ -47,6 +48,7 @@ class SVR1Config:
     n_fixed: int = 0                # fixed sentences (fine-tuning); +1 "none" class when > 0
     use_rate: bool = True           # contribution E
     use_verifier: bool = True       # contribution B
+    use_speak: bool = True          # speaking-or-not head (speech start/end, word boundaries, the gate)
     verifier_dim: int = 256
     verifier_layers: int = 2
     verifier_heads: int = 4
@@ -225,6 +227,7 @@ class SVR1(nn.Module):
         self.letter = nn.Linear(d, N_LETTER_CLASSES)
         self.phone = nn.Linear(d, N_PHONE_CLASSES)
         self.artic = nn.Linear(d, cfg.n_artic)
+        self.speak = nn.Linear(d, 1) if cfg.use_speak else None
         if cfg.n_fixed:
             self.fixed_query = nn.Parameter(torch.randn(d) / math.sqrt(d))
             self.fixed = nn.Linear(d, cfg.n_fixed + 1)
@@ -263,6 +266,8 @@ class SVR1(nn.Module):
                'letter_logp': F.log_softmax(self.letter(h).float(), -1),
                'phone_logp': F.log_softmax(self.phone(h).float(), -1),
                'artic': self.artic(h).float()}
+        if self.speak is not None:
+            out['speak_logit'] = self.speak(h).float()[..., 0]
         if self.cfg.n_fixed:
             att = torch.einsum('btd,d->bt', h.float(), self.fixed_query.float()).masked_fill(~mask, -1e9).softmax(1)
             out['fixed_logits'] = self.fixed(torch.einsum('bt,btd->bd', att.to(h.dtype), h)).float()
@@ -356,8 +361,13 @@ def build(cfg_dict=None, **overrides):
     return SVR1(cfg)
 
 
+def config_of(state):
+    """Model config of a saved {'config', 'model'} dict; checkpoints from before the speaking head have none."""
+    return dict(state['config'], use_speak=state['config'].get('use_speak', 'speak.weight' in state['model']))
+
+
 def load(path, device='cpu'):
     state = torch.load(path, map_location='cpu', weights_only=False)
-    model = build(state['config'])
+    model = build(config_of(state))
     model.load_state_dict(state['model'])
     return model.to(device).eval()

@@ -143,7 +143,7 @@ class Brain:
 
     def ask(self):
         """Call Claude on the conversation so far. Runs off the main thread; returns (reply or None, log)."""
-        t0 = time.monotonic()
+        t0 = time.perf_counter()
         log = {"stage": "claude", "request": self.messages[-1]["content"]}
         try:
             r = self.client.beta.messages.create(
@@ -159,10 +159,10 @@ class Brain:
         except Exception as e:  # network, rate limit, timeout: the captions go on without Claude
             # The unanswered user turn stays: the next one follows it (the API merges consecutive user turns),
             # so the history stays append-only and the cached prefix holds.
-            log.update(ms=1000 * (time.monotonic() - t0), error=f"{type(e).__name__}: {e}")
+            log.update(ms=1000 * (time.perf_counter() - t0), error=f"{type(e).__name__}: {e}")
             return None, log
         usage = getattr(r, "usage", None)
-        log.update(ms=1000 * (time.monotonic() - t0), stop_reason=getattr(r, "stop_reason", None),
+        log.update(ms=1000 * (time.perf_counter() - t0), stop_reason=getattr(r, "stop_reason", None),
                    model=getattr(r, "model", None), request_id=getattr(r, "_request_id", None),
                    input_tokens=getattr(usage, "input_tokens", None),
                    cache_read=getattr(usage, "cache_read_input_tokens", None) or 0,

@@ -14,3 +14,9 @@ third_party/
 venv*/
 recordings_smoke/
 logs/
+.cache/
+tmp/
+
+# Screenshots pasted into images/ (Windows names them {GUID}.png)
+images/{*}.png
+cluster/VERSION

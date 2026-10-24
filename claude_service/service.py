@@ -11,10 +11,10 @@ captions go on without Claude.
 import argparse
 import signal
 import sys
-import time
 import threading
 
-from bus import Pub, Sub
+import bus
+from bus.team import Pub, Sub
 from claude_service.brain import Brain
 
 TOPICS = ("partner.text", "dec.lock", "dec.hyp")
@@ -64,11 +64,11 @@ def run(brain, sub, pub, stop=lambda: False):
                 elif topic == "dec.lock":
                     brain.locked(msg)
                 elif topic == "dec.hyp" and msg.get("unlocked"):
-                    last_mouth = time.monotonic()
+                    last_mouth = bus.now()
             except Exception as e:  # one bad message must not stop the service
                 report(pub, f"bad message: {type(e).__name__}: {e}")
             timeout = 0
-        now = time.monotonic()
+        now = bus.now()
         if call is not None and call.done():
             try:
                 reply, log = call.get()

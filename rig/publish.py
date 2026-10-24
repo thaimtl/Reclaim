@@ -3,7 +3,7 @@ rig/filters.py in order, the same as on the recordings).
 
     python -m rig.publish PORT        # e.g. COM5 or /dev/ttyACM0
 
-Each message is one run of consecutive samples: t0 (time.monotonic() of the first), fs = 1000, samples
+Each message is one run of consecutive samples: t0 (bus.now() of the first), fs = 1000, samples
 (n x 4 uint16, 0 to 1023, pins A0 to A3) and counter (running index of the first sample, dropped frames
 included). rig/reader.py reports drops as a running total, so a gap shows as counter + n of one message falling
 short of the next one's counter, and a message never spans a gap: sample i is always at t0 + i / fs. The reader
@@ -16,11 +16,11 @@ runs slow (up to 0.5%); if it runs fast the envelope follows on its own.
 """
 import argparse
 import signal
-import time
 
 import numpy as np
 
-from bus import Pub
+import bus
+from bus.team import Pub
 
 FS = 1000       # rig/uno samples every 1000 us
 BATCH = 10      # samples per message: 10 ms at 1 kHz
@@ -29,7 +29,7 @@ LEAK = 0.005    # s per s the clock offset may rise, covering a 0.5% slow resona
 
 def batches(chunks, fs=FS, size=BATCH, leak=LEAK):
     """(t_read, rows, dropped) chunks -> emg.raw messages of at most `size` consecutive samples. rows is n x 4,
-    t_read the time.monotonic() right after it was read, dropped the running total of frames lost so far."""
+    t_read bus.now() right after it was read, dropped the running total of frames lost so far."""
     seen = lost = 0                    # samples received, frames lost: the next sample's index is seen + lost
     offset = t_prev = None
     buf, start = [], 0                 # samples waiting to go out, and the index of the first
@@ -65,7 +65,7 @@ def stamped(port, stats):
     from rig.reader import frames  # here, so batches() is testable without pyserial
 
     for rows in frames(port, stats):
-        yield time.monotonic(), rows, stats.get('dropped', 0)
+        yield bus.now(), rows, stats.get('dropped', 0)
 
 
 def main():

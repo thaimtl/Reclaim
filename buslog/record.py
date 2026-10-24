@@ -19,7 +19,8 @@ import time
 
 import zmq
 
-from bus import ENDPOINTS, Sub
+import bus
+from bus.team import ENDPOINTS, Sub
 from buslog import ROTATE_BYTES, Writer, log_root
 
 FLUSH_S = 0.2
@@ -43,7 +44,7 @@ def record(folder, endpoints=None, ctx=None, stop=lambda: False, rotate_bytes=RO
     for sub in subs.values():
         poller.register(sub.sock, zmq.POLLIN)
     name_of = {sub.sock: name for name, sub in subs.items()}
-    count, flushed = 0, time.monotonic()
+    count, flushed = 0, bus.now()
     try:
         while not stop():
             for sock, _ in poller.poll(50):
@@ -52,11 +53,11 @@ def record(folder, endpoints=None, ctx=None, stop=lambda: False, rotate_bytes=RO
                         frames = sock.recv_multipart(zmq.NOBLOCK)
                     except zmq.Again:
                         break
-                    writer.write(time.monotonic(), name_of[sock], frames)
+                    writer.write(bus.now(), name_of[sock], frames)
                     count += 1
-            if time.monotonic() - flushed >= FLUSH_S:
+            if bus.now() - flushed >= FLUSH_S:
                 writer.flush()
-                flushed = time.monotonic()
+                flushed = bus.now()
     finally:
         writer.close()
         for sub in subs.values():

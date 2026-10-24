@@ -3,10 +3,15 @@
 Writes benchmark_results/<name>_cpu/raw and <name>_gpu/raw (inputs, per-frame log-probs,
 timings) for bench.score to turn into per-case results. GPU runs in strict fp32 (TF32 off).
 
-    venv/bin/python -m bench.run_model --name B1T_ours --checkpoint checkpoints/B1T/model.pt
-    venv/bin/python -m bench.run_model --name B2_ours --checkpoint checkpoints/B2/model.pt --channels 4ch
+    venv-svr/bin/python -m bench.run_model --name B1T_ours --checkpoint checkpoints/B1T/model.pt
+    venv-svr/bin/python -m bench.run_model --name B2_ours --checkpoint checkpoints/B2/model.pt --channels 4ch
+
+Inputs use the preprocessing the checkpoint was trained on (--preprocess auto): SVR-1 checkpoints say so in model.pt,
+Gaddy-architecture runs in their config.json (svr.train --preprocess); anything else (Gaddy's released model) gets his
+original zero-phase pipeline.
 """
 import argparse
+import json
 import os
 
 import numpy as np
@@ -38,11 +43,23 @@ def load_any(checkpoint, device):
     """Gaddy-architecture state dict, or an SVR-1 model.pt ({'config', 'model'})."""
     st = torch.load(checkpoint, map_location='cpu', weights_only=False)
     if isinstance(st, dict) and 'config' in st and 'model' in st:
-        from svr.svr1 import build
-        model = build(st['config'])
+        from svr.svr1 import build, config_of
+        model = build(config_of(st))
         model.load_state_dict(st['model'])
         return model.to(device).eval(), 'svr1'
     return load_gaddy_checkpoint(checkpoint, device), 'gaddy'
+
+
+def checkpoint_preprocess(checkpoint):
+    """'causal' or 'gaddy': what this checkpoint was trained on."""
+    st = torch.load(checkpoint, map_location='cpu', weights_only=False)
+    if isinstance(st, dict) and 'config' in st and 'model' in st:
+        return st.get('preprocess', 'gaddy')
+    cfg = os.path.join(os.path.dirname(os.path.abspath(checkpoint)), 'config.json')
+    if os.path.exists(cfg):
+        with open(cfg) as f:
+            return json.load(f).get('preprocess', 'gaddy')
+    return 'gaddy'
 
 
 def model_trials(raw_split):
@@ -55,7 +72,15 @@ def model_trials(raw_split):
     return out
 
 
-def run(name, checkpoint, description, channels=tuple(CHANNEL_CONFIGS), devices=('cpu', 'cuda'), speeds=SPEEDS):
+def run(name, checkpoint, description, channels=tuple(CHANNEL_CONFIGS), devices=('cpu', 'cuda'), speeds=SPEEDS,
+        preprocess='auto'):
+    if preprocess == 'auto':
+        preprocess = checkpoint_preprocess(checkpoint)
+    print('preprocessing:', preprocess, flush=True)
+    stats = None
+    if preprocess == 'causal':
+        from svr.data import scale_stats, session_gain
+        stats = scale_stats()
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.allow_tf32 = False
     torch.set_float32_matmul_precision('highest')
@@ -67,7 +92,8 @@ def run(name, checkpoint, description, channels=tuple(CHANNEL_CONFIGS), devices=
             for it in load_split(split)['items']:
                 with Timer() as t:
                     x = load_utterance(os.path.join(DATA_ROOT, it['session_dir']), it['index'],
-                                       keep_channels=CHANNEL_CONFIGS[ch]['keep_channels'])
+                                       keep_channels=CHANNEL_CONFIGS[ch]['keep_channels'], preprocess=preprocess,
+                                       gain=session_gain(it['session_dir'], stats) if stats else None)
                 prepared[ch, split, it['id']] = (x, t.ms)
                 if split == 'open_vocab_test':
                     for sp in speeds:
@@ -92,6 +118,7 @@ def run(name, checkpoint, description, channels=tuple(CHANNEL_CONFIGS), devices=
         if device == 'cuda':
             env.update(gpu=torch.cuda.get_device_name(0), tf32=False)
         meta_common = {'model': model_name, 'description': description, 'checkpoint': os.path.abspath(checkpoint),
+                       'preprocess': preprocess,
                        'checkpoint_md5': md5(checkpoint), 'device': device, 'environment': env,
                        'parameters': sum(p.numel() for p in model.parameters())}
         with torch.no_grad():
@@ -138,7 +165,7 @@ def run(name, checkpoint, description, channels=tuple(CHANNEL_CONFIGS), devices=
                         inputs[it['id']] = x_np
                     meta = dict(meta_common, split=split, channels=ch, channel_config=cfg,
                                 latency_3s_clip_forward_ms=latency_stats(clip_ms),
-                                notes='preprocess_ms is svr.preprocess.load_utterance on CPU (filters, resampling, '
+                                notes=f'preprocess_ms is svr.preprocess.load_utterance ({preprocess}) on CPU (filters, resampling, '
                                       'scaling; reads only the audio file header for the frame count).')
                     save_raw(os.path.join(RESULTS_DIR, model_name, 'raw'), split, ch, meta, items_out, logits, inputs)
                     print(model_name, split, ch, 'done', flush=True)
@@ -152,9 +179,10 @@ def main():
     p.add_argument('--channels', default=','.join(CHANNEL_CONFIGS))
     p.add_argument('--devices', default='cpu,cuda')
     p.add_argument('--speeds', default=','.join(f'{s:g}' for s in SPEEDS), help='fast-speech compressions; "" for none')
+    p.add_argument('--preprocess', default='auto', choices=['auto', 'causal', 'gaddy'])
     a = p.parse_args()
     run(a.name, a.checkpoint, a.description, a.channels.split(','), a.devices.split(','),
-        tuple(float(x) for x in a.speeds.split(',') if x))
+        tuple(float(x) for x in a.speeds.split(',') if x), a.preprocess)
 
 
 if __name__ == '__main__':

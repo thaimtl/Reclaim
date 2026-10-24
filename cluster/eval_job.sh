@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PBS wrapper for an evaluation-only entry of cluster/baselines.sh on one GPU (bench.run_model runs CPU + GPU passes).
 #   qsub -v WHAT=B1_6ch cluster/eval_job.sh
-#PBS -N svr_eval
+#PBS -N Austin-Train
 #PBS -q development
 #PBS -l select=1:ncpus=8:mem=32gb:ngpus=1:vntype=gpu
 #PBS -l place=free

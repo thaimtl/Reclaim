@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 import buslog
-from bus import encode
+from bus.team import encode
 from fusion import decoder, evaluate, lock
 from fusion.decoder import Decoder
 from tests.test_fusion import U, frames_for, tick

@@ -11,7 +11,8 @@ import pytest
 import zmq
 
 from bench.lookalikes import Lexicon
-from bus import Pub, Sub
+import bus
+from bus.team import Pub, Sub
 from fusion import decoder, lock
 from fusion.decoder import REPAIR_WINDOW_S, Decoder, cut
 from fusion.run import TOPICS, newest_ticks, serve
@@ -49,7 +50,8 @@ def tick(seg, frames, t0=100.0, face_ok=True, quiet_tail=0):
         ids[t, len(cands):] = np.arange(100, 100 + 32 - len(cands))
     return {'seg_id': seg, 'seg_start': t0, 'frame_t': t0 + FPS * np.arange(T), 'topk_ids': ids, 'topk_logp': logp,
             'blank_logp': blank, 'greedy': '', 'activity': act, 'face_ok': face_ok,
-            'emotion': {'label': 'neutral', 'confidence': 1.0, 'scores': {}}, 'timing_ms': {'T': T, 'total': 1.0}}
+            'emotion': {'label': 'neutral', 'confidence': 1.0, 'scores': {e: float(e == 'neutral') for e in bus.EMOTIONS}},
+            'timing_ms': bus.zero_timing(T)}
 
 
 def topics(out, name):
@@ -469,8 +471,8 @@ def test_bus_round_trip():
         for _ in range(3):
             cam.send('cam.tick', tick(1, fr, quiet_tail=5))
             time.sleep(0.05)
-        got, deadline = {}, time.monotonic() + 3.0
-        while 'voice.say' not in got and time.monotonic() < deadline:
+        got, deadline = {}, bus.now() + 3.0
+        while 'voice.say' not in got and bus.now() < deadline:
             topic, msg = listen.recv(timeout_ms=100)
             if topic:
                 got.setdefault(topic, []).append(msg)

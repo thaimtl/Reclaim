@@ -1,19 +1,31 @@
-"""Train SVR-1 on the Berkeley data (pretraining) with every contribution behind a switch for the ablation sweep.
+"""Pretrain SVR-1 on the Berkeley data (docs/SVR1_SPEC.md section 4), every part behind a switch for ablations.
 
-    venv/bin/python -m svr.train_svr1 --name SVR1_full --keep-channels 0,1,2,3,4,5
-    venv/bin/python -m svr.train_svr1 --name SVR1_8to6 --keep-channels 0,1,2,3,4,5,6,7 --channel-dropout 0.25
-    venv/bin/python -m svr.train_svr1 --name SVR1_no_judge --keep-channels 0,1,2,3,4,5 --no-judge
+    venv-svr/bin/python -m svr.train_svr1 --name SVR1_4ch                       # slots 0,1,2,5 = our rig's 4 sites
+    venv-svr/bin/python -m svr.train_svr1 --name SVR1_8ch_pre --keep-channels 0,1,2,3,4,5,6,7 --channel-dropout 0.25
+
+Input: the causal preprocessing (rig/filters.py, session gain, soft clip; svr.data), built by
+`python -m svr.precompute_svr1 cache` before the first run.
 
 Losses per micro-batch (each can be switched off):
-    letter CTC                                   always
+    letter CTC                                   always (on the cut for partial-sentence rows)
     phoneme CTC                                  --no-phone
-    articulator regression (SPARC targets)       --no-artic       (needs svr.precompute_svr1)
-    rate (predict log speed factor)              --no-rate        (model config use_rate)
+    articulator regression (SPARC targets)       --no-artic       (needs svr.precompute_svr1 sparc + align)
+    rate (normalised log letters per second)     --no-rate        (model config use_rate)
+    speaking (per-frame BCE)                     --no-speak       targets from the forced alignments
     homophene-contrastive judge loss             --no-judge       contribution A: true sentence vs K lip look-alikes,
                                                                   scored by letter + phoneme CTC + verifier
     verifier                                     --no-verifier    contribution B (part of the judge loss)
+Forced alignments (svr.align): from --align-start, every --align-every epochs, Viterbi over the EMA model's letter
+CTC. They give the speaking targets and the partial-sentence cuts (--prefix-p of rows cut at U[0.3, 1] x length,
+target = letters aligned before the cut; phoneme, articulator, rate and judge losses skip cut rows; --no-prefix).
 Augmentation: speed 0.8-1.6x (--no-speed), undershoot (--no-undershoot), hardware simulation (--no-hwsim),
-time masking, channel dropout (--channel-dropout p, for 8-channel pretraining that is later used with 6).
+time masking, channel dropout (--channel-dropout p, 8-slot pretraining only), and the delivery styles Austin records
+(RECORDING.md; --no-delivery): slow speech down to 0.5x, effort (all channels x0.5-2 before the soft clip), and a held
+smile / frown / surprise (tonic muscle noise, strongest on the cheek slots).
+
+Model selection: after every epoch the EMA model is scored on Berkeley's dev set (greedy WER). model.pt holds the best
+epoch so far, model_last.pt the latest. Early stopping: the run ends when dev WER has not improved for --patience
+epochs, never before --min-epochs (--patience 0: run every epoch).
 
 Batches: one utterance per row, padded; the padded size (rows x longest model-input length, 689 Hz) stays under
 --micro-batch-samples, the knob cluster/smoke.sh tunes for VRAM. Everything random in a batch derives from
@@ -41,9 +53,11 @@ import torch.nn.functional as F  # noqa: E402
 
 from bench.lookalikes import Lexicon, corpus_vocabulary, homophene_candidates  # noqa: E402
 from svr import augment  # noqa: E402
+from svr.align import ctc_align, prefix_target, scale_emit, speak_target  # noqa: E402
 from svr.data import DATA_ROOT, EMGTextDataset  # noqa: E402
 from svr.decoders import greedy_decode  # noqa: E402
 from svr.phonemes import PHONE_BLANK, sentence_phonemes  # noqa: E402
+from svr.preprocess import scale, unscale  # noqa: E402
 from svr.svr1 import INFEASIBLE, build, score_texts  # noqa: E402
 from svr.text import BLANK, clean_text, text_to_ids  # noqa: E402
 from svr.train import (EXIT_INTERRUPTED, atomic_save, load_checkpoint, log_line, save_checkpoint,  # noqa: E402
@@ -54,16 +68,23 @@ WORK = os.environ.get('RECLAIM_WORKDIR', ROOT)  # datasets, checkpoints, results
 TARGETS = os.path.join(WORK, 'data', 'svr1_targets')
 RATE_CENTER, RATE_SCALE = 2.34, 0.37  # log letters/s over Berkeley train (mean, std): the rate head's target scale
 LOSS_WEIGHTS = {'letter': lambda a: 1.0, 'phone': lambda a: a.w_phone, 'artic': lambda a: a.w_artic,
-                'rate': lambda a: a.w_rate, 'judge': lambda a: a.w_judge}
-RESUME_KEYS = ('keep_channels', 'micro_batch_samples', 'grad_accum', 'lr', 'epochs', 'seed', 'model')
+                'rate': lambda a: a.w_rate, 'speak': lambda a: a.w_speak, 'judge': lambda a: a.w_judge}
+RESUME_KEYS = ('keep_channels', 'micro_batch_samples', 'grad_accum', 'lr', 'epochs', 'seed', 'model', 'preprocess')
+KEEP_4CH = '0,1,2,5'  # Gaddy sites 1, 2, 3, 6 = rig pins A3, A1, A0, A2 (RIG_TO_SLOT in svr.preprocess)
+SLOW_MIN = 0.5        # slowest speed factor (Austin's SLOW delivery is about half speed)
+PADDED_GROWTH = 1.25  # speed < 1 may grow a micro-batch's padded size at most this much (= all rows at 0.8x)
+# held expression: tonic noise amplitude per slot, relative to the channel's spread. Slot 0 (site 1, cheek above the
+# mouth: zygomaticus, smiling) and slot 5 (site 6, cheek below the mouth) move most; the chin slots less.
+EXPRESSION_LEVEL = np.array([1.0, 0.4, 0.3, 0.5, 0.5, 0.8, 0.3, 0.3], np.float32)
 
 
 # ------------------------------------------------------------------------------------------------ data
 class TrainData:
     """Berkeley inputs + letter/phoneme targets + optional articulator targets."""
 
-    def __init__(self, split, use_artic):
-        self.ds = EMGTextDataset(split)
+    def __init__(self, split, use_artic, preprocess='causal'):
+        self.ds = EMGTextDataset(split, preprocess=preprocess)
+        self.inputs = self.ds.inputs
         # single spaces: a double space in the true sentence but not in its look-alikes would be a judge shortcut
         self.clean = [' '.join(clean_text(t).split()) for t in self.ds.texts]
         self.targets = [np.array(text_to_ids(c), np.int64) for c in self.clean]
@@ -83,6 +104,11 @@ class TrainData:
                     self.artic[k] = ((np.load(p) - self.artic_stats[0]) / self.artic_stats[1]).astype(np.float32)
         self.usable = [k for k, t in enumerate(self.ds.texts) if any(ch in string.ascii_letters for ch in t)]
         self.lengths = [len(x) for x in self.ds.inputs]  # model-input samples (689 Hz), what padding costs
+        self.align = [None] * len(self.ds)  # first frame of each target letter (svr.align), once computed
+        self.speak_neg = [False] * len(self.ds)  # rest clips (fine-tuning): speaking target all 0
+
+    def __len__(self):
+        return len(self.ds)
 
     def batches(self, seed, epoch, budget, chunk=1024):
         """Shuffle, sort within chunks of 1024 by length, fill micro-batches up to a padded-size budget, never
@@ -115,22 +141,58 @@ def ctc_feasible(frames, ids):
     return frames >= len(ids) + repeats
 
 
-def make_batch(data, idx, rng, args, keep, force_speed=None):
-    """Augment and pad one micro-batch. Returns tensors (CPU) and the per-row speed factors.
-    force_speed: use this factor for every row (the VRAM test uses the slowest, i.e. longest, 0.8)."""
-    xs, factors, artic = [], [], []
+def sample_speed(rng, args, n, allowed):
+    """Speed factor of one row: 0.8-1.6x (log-uniform), or with --slow-p of the time slow speech down to 0.5x;
+    never slower than what keeps the row within `allowed` samples (bounded padded size, so bounded VRAM)."""
+    if args.no_delivery or rng.random() >= args.slow_p:
+        f = float(np.exp(rng.uniform(np.log(0.8), np.log(1.6))))
+    else:
+        f = float(np.exp(rng.uniform(np.log(SLOW_MIN), np.log(0.8))))
+    return max(f, n / allowed)
+
+
+def delivery(x, rng, args, keep):
+    """Effort and held-expression augmentation, applied to muscle amplitude (before the soft clip)."""
+    effort = not args.no_delivery and rng.random() < args.effort_p
+    expression = not args.no_delivery and rng.random() < args.expression_p
+    if not (effort or expression):
+        return x
+    u = unscale(x)
+    if effort:  # softer or more emphatic articulation: every muscle together
+        u = u * float(np.exp(rng.uniform(np.log(0.5), np.log(2.0))))
+    if expression:  # a held smile / frown / surprise: tonic contraction under the speech, ramped in over ~0.3 s
+        n = len(u)
+        spread = np.median(np.abs(u), 0) / 0.6745 + 1e-6
+        level = EXPRESSION_LEVEL[:u.shape[1]] * rng.uniform(0.2, 1.0) * np.exp(rng.normal(0, 0.3, u.shape[1]))
+        env = np.minimum(1.0, np.arange(n) / max(1.0, rng.uniform(0.1, 0.5) * augment.RATE))
+        noise = rng.normal(0, 1, u.shape).astype(np.float32)
+        u = u + noise * (spread * level)[None] * env[:, None]
+        absent = [c for c in range(u.shape[1]) if c not in set(keep)]
+        u[:, absent] = 0
+    return scale(u)
+
+
+def make_batch(data, idx, rng, args, keep, force_speed=None, prefix_p=0.0):
+    """Augment and pad one micro-batch (CPU tensors). force_speed: use this factor for every row (the VRAM test uses
+    0.8, the largest padded size the sampler allows). prefix_p: share of aligned rows cut to a partial sentence.
+    Returns a dict: x, lengths, cmask, artic (+ mask), speak (+ mask), factors, targets (per row, cut rows shortened),
+    cut (per row bool)."""
+    xs, factors, artic, targets, speak, cut = [], [], [], [], [], []
     absent = [c for c in range(8) if c not in keep]
+    allowed = PADDED_GROWTH * args.micro_batch_samples / len(idx)
     for k in idx:
-        x = data.ds.inputs[k]
+        x = data.inputs[k]
         if absent:  # electrodes we will not have: zero them before hardware() mixes channels
             x = x.copy()
             x[:, absent] = 0
+        x = delivery(x, rng, args, keep)
         y = data.artic[k]
+        ids = data.targets[k]
         f = 1.0
         if force_speed or (not args.no_speed and rng.random() < 0.7):
-            f = force_speed or float(np.exp(rng.uniform(np.log(0.8), np.log(1.6))))
+            f = force_speed or sample_speed(rng, args, len(x), max(allowed, len(x)))
             cand = augment.speed(x, f)
-            if ctc_feasible(len(cand) // 8, data.targets[k]):
+            if ctc_feasible(len(cand) // 8, ids):
                 x = cand
                 if y is not None:
                     y = augment.speed(y.repeat(8, 0), f)[::8][:len(x) // 8] if len(y) else y
@@ -141,9 +203,27 @@ def make_batch(data, idx, rng, args, keep, force_speed=None):
         if not args.no_hwsim and rng.random() < 0.8:
             x = augment.hardware(x, rng)
         x = augment.time_mask(x, rng)
+        frames = len(x) // 8
+        emit = data.align[k]
+        if emit is not None:
+            emit = scale_emit(emit, data.lengths[k] // 8, frames)
+        s = None
+        if emit is not None:
+            s = speak_target(emit, frames)
+        elif data.speak_neg[k]:
+            s = np.zeros(frames, np.float32)
+        is_cut = False
+        if emit is not None and len(ids) and rng.random() < prefix_p:
+            t = int(rng.integers(max(1, int(0.3 * frames)), frames + 1))
+            part = prefix_target(emit, ids, t)
+            if t < frames and ctc_feasible(t, part):
+                x, ids, s, y, is_cut = x[:t * 8], part, s[:t], None, True
         xs.append(x)
         factors.append(f)
         artic.append(y)
+        targets.append(ids)
+        speak.append(s)
+        cut.append(is_cut)
     t8 = max(len(x) for x in xs)
     b = len(xs)
     xb = np.zeros((b, t8, 8), np.float32)
@@ -156,12 +236,20 @@ def make_batch(data, idx, rng, args, keep, force_speed=None):
     tf = t8 // 8
     am = torch.zeros(b, tf, dtype=torch.bool)
     at = torch.zeros(b, tf, 13)
-    for i, y in enumerate(artic):
+    sm = torch.zeros(b, tf, dtype=torch.bool)
+    st = torch.zeros(b, tf)
+    for i in range(b):
+        y, s, n = artic[i], speak[i], int(lengths[i])
         if y is not None and len(y):
-            n = min(len(y), int(lengths[i]))
-            at[i, :n] = torch.from_numpy(y[:n])
-            am[i, :n] = True
-    return torch.from_numpy(xb), lengths, torch.from_numpy(cmask), at, am, torch.tensor(factors)
+            m = min(len(y), n)
+            at[i, :m] = torch.from_numpy(y[:m])
+            am[i, :m] = True
+        if s is not None:
+            st[i, :n] = torch.from_numpy(s[:n])
+            sm[i, :n] = True
+    return {'x': torch.from_numpy(xb), 'lengths': lengths, 'cmask': torch.from_numpy(cmask), 'artic': at,
+            'artic_mask': am, 'speak': st, 'speak_mask': sm, 'factors': torch.tensor(factors), 'targets': targets,
+            'cut': cut}
 
 
 # ------------------------------------------------------------------------------------------------ judge
@@ -204,32 +292,43 @@ def judge_scores(model, out, row, cands, device, parts):
     return score_texts(model, out, row, cands, device, parts)
 
 
-def train_losses(model, train, idx, rng, args, keep, device, maker, parts, force_speed=None, judge=True):
-    """Forward pass and every enabled loss for one micro-batch (shared by the trainer and the VRAM smoke test)."""
-    xb, lengths, cmask, at, am, factors = make_batch(train, idx, rng, args, keep, force_speed)
-    xb, lengths, cmask = xb.to(device, non_blocking=True), lengths.to(device), cmask.to(device)
-    with torch.autocast('cuda', dtype=torch.bfloat16):
+def train_losses(model, train, idx, rng, args, keep, device, maker, parts, force_speed=None, judge=True,
+                 prefix_p=0.0):
+    """Forward pass and every enabled loss for one micro-batch (shared by the trainer, fine-tuning and the VRAM smoke
+    test). Returns (losses, number of cut rows)."""
+    mb = make_batch(train, idx, rng, args, keep, force_speed, prefix_p)
+    xb, lengths, cmask = mb['x'].to(device, non_blocking=True), mb['lengths'].to(device), mb['cmask'].to(device)
+    with torch.autocast('cuda', dtype=torch.bfloat16, enabled=device == 'cuda'):
         out = model(xb, lengths, cmask)
     losses = {}
-    tg = [torch.tensor(train.targets[k]) for k in idx]
+    whole = [i for i in range(len(idx)) if not mb['cut'][i]]
+    tg = [torch.tensor(t, dtype=torch.long) for t in mb['targets']]  # rest clips: no letters, all blank
     losses['letter'] = F.ctc_loss(out['letter_logp'].transpose(0, 1), torch.cat(tg).to(device), lengths.cpu(),
                                   torch.tensor([len(t) for t in tg]), blank=BLANK, zero_infinity=True)
     if not args.no_phone:
-        rows = [i for i, k in enumerate(idx) if train.phones[k]]
+        rows = [i for i in whole if train.phones[idx[i]]]
         if rows:
             pt = [torch.tensor(train.phones[idx[i]]) for i in rows]
             losses['phone'] = F.ctc_loss(out['phone_logp'][rows].transpose(0, 1), torch.cat(pt).to(device),
                                          lengths[rows].cpu(), torch.tensor([len(t) for t in pt]),
                                          blank=PHONE_BLANK, zero_infinity=True)
+    am = mb['artic_mask']
     if not args.no_artic and am.any():
         am_d = am.to(device)
-        diff = (out['artic'] - at.to(device)) ** 2
+        diff = (out['artic'] - mb['artic'].to(device)) ** 2
         losses['artic'] = diff[am_d].mean()
-    if model.cfg.use_rate:  # absolute speaking rate (letters/s after augmentation), not just the factor
-        lps = torch.tensor([len(tg_) for tg_ in tg], dtype=torch.float32) / (lengths.cpu().float() / 86.13)
-        losses['rate'] = F.mse_loss(out['rate'].float(), ((lps.log() - RATE_CENTER) / RATE_SCALE).to(device))
+    rows = [i for i in whole if len(mb['targets'][i])]
+    if model.cfg.use_rate and rows:  # absolute speaking rate (letters/s after augmentation), not just the factor
+        n_letters = torch.tensor([len(mb['targets'][i]) for i in rows], dtype=torch.float32)
+        lps = n_letters / (lengths[rows].cpu().float() / 86.13)
+        losses['rate'] = F.mse_loss(out['rate'][rows].float(), ((lps.log() - RATE_CENTER) / RATE_SCALE).to(device))
+    sm = mb['speak_mask']
+    if not args.no_speak and 'speak_logit' in out and sm.any():
+        sm_d = sm.to(device)
+        losses['speak'] = F.binary_cross_entropy_with_logits(out['speak_logit'][sm_d], mb['speak'].to(device)[sm_d])
     if judge and not args.no_judge:
-        rows = rng.permutation(len(idx))[:args.judge_rows]
+        rowset = set(rows)
+        rows = [i for i in rng.permutation(len(idx)).tolist() if i in rowset][:args.judge_rows]
         terms = []
         for i in rows:
             cands = maker(train.clean[idx[i]], args.judge_k, rng)
@@ -240,7 +339,37 @@ def train_losses(model, train, idx, rng, args, keep, device, maker, parts, force
                 terms.append(F.cross_entropy(s[None], torch.zeros(1, dtype=torch.long, device=device)))
         if terms:
             losses['judge'] = torch.stack(terms).mean()
-    return losses
+    return losses, sum(mb['cut'])
+
+
+@torch.no_grad()
+def compute_alignments(model, data, keep, device, budget, rows=None):
+    """Forced alignment (first frame of each letter) of every usable utterance with `model`, on clean inputs."""
+    model.eval()
+    cmask = torch.zeros(8, device=device)
+    cmask[keep] = 1
+    rows = data.usable if rows is None else rows
+    order = sorted(rows, key=lambda k: data.lengths[k])
+    out_align, n_ok, i = [None] * len(data), 0, 0
+    while i < len(order):
+        j = i + 1
+        while j < len(order) and data.lengths[order[j]] * (j + 1 - i) <= budget:
+            j += 1
+        idx = order[i:j]
+        t8 = max(data.lengths[k] for k in idx)
+        xb = np.zeros((len(idx), t8, 8), np.float32)
+        for r, k in enumerate(idx):
+            xb[r, :data.lengths[k]] = data.inputs[k]
+        lengths = torch.tensor([data.lengths[k] // 8 for k in idx], device=device)
+        with torch.autocast('cuda', dtype=torch.bfloat16, enabled=device == 'cuda'):
+            lp = model(torch.from_numpy(xb).to(device), lengths, cmask)['letter_logp'].float().cpu().numpy()
+        for r, k in enumerate(idx):
+            if len(data.targets[k]):
+                out_align[k] = ctc_align(lp[r, :data.lengths[k] // 8], data.targets[k], BLANK)
+                n_ok += out_align[k] is not None
+        i = j
+    model.train()
+    return out_align, n_ok
 
 
 # ------------------------------------------------------------------------------------------------ evaluation
@@ -271,7 +400,8 @@ def evaluate(model, dev, dev_cands, device, keep, parts, limit=None):
 def parse_args(argv=None):
     p = argparse.ArgumentParser()
     p.add_argument('--name', required=True)
-    p.add_argument('--keep-channels', default='0,1,2,3,4,5')
+    p.add_argument('--keep-channels', default=KEEP_4CH, help='input slots in use (default: the rig\'s 4 sites)')
+    p.add_argument('--preprocess', default='causal', choices=['causal', 'gaddy'])
     p.add_argument('--channel-dropout', type=float, default=0.0)
     p.add_argument('--epochs', type=int, default=150)
     p.add_argument('--micro-batch-samples', type=int, default=112000,
@@ -289,18 +419,29 @@ def parse_args(argv=None):
     p.add_argument('--w-artic', type=float, default=0.5)
     p.add_argument('--w-rate', type=float, default=0.1)
     p.add_argument('--w-judge', type=float, default=0.5)
+    p.add_argument('--w-speak', type=float, default=0.2)
+    p.add_argument('--align-start', type=int, default=20, help='epoch (0-based) of the first forced alignment')
+    p.add_argument('--align-every', type=int, default=10, help='epochs between forced alignments')
+    p.add_argument('--prefix-p', type=float, default=0.3, help='share of aligned rows cut to a partial sentence')
+    p.add_argument('--slow-p', type=float, default=0.15, help='share of speed-augmented rows slowed to 0.5-0.8x')
+    p.add_argument('--effort-p', type=float, default=0.5, help='rows with an effort gain of 0.5-2x')
+    p.add_argument('--expression-p', type=float, default=0.25, help='rows with held-expression tonic noise')
     p.add_argument('--judge-start', type=int, default=3000,
                    help='optimizer step where the judge loss starts (ranking with an untrained CTC is noise)')
     p.add_argument('--judge-ramp', type=int, default=3000, help='steps to ramp the judge weight from 0 to 1')
     for flag in ('no-phone', 'no-artic', 'no-rate', 'no-judge', 'no-verifier', 'no-speed', 'no-undershoot',
-                 'no-hwsim'):
+                 'no-hwsim', 'no-speak', 'no-prefix', 'no-delivery'):
         p.add_argument('--' + flag, action='store_true')
     p.add_argument('--init-from', default=None, help='model.pt to start from (e.g. 8-channel pretraining)')
     p.add_argument('--attention', default='auto', choices=['auto', 'sdpa', 'fa2'])
+    p.add_argument('--device', default='cuda', choices=['cuda', 'cpu'], help='cpu: tiny correctness runs only')
     p.add_argument('--vram-gb', type=float, default=None, help='cap; default 90%% of the card')
     p.add_argument('--ckpt-minutes', type=float, default=15.0)
     p.add_argument('--monitor-seconds', type=float, default=15.0)
     p.add_argument('--eval-limit', type=int, default=None)
+    p.add_argument('--patience', type=int, default=20, help='epochs without a better dev WER before stopping (0: off)')
+    p.add_argument('--min-epochs', type=int, default=60, help='never stop early before this many epochs')
+    p.add_argument('--align-limit', type=int, default=None, help='align only this many utterances (tiny runs)')
     p.add_argument('--max-micro-batches-per-epoch', type=int, default=None)
     p.add_argument('--crash-at-step', type=int, default=None)
     p.add_argument('--out-root', default=os.path.join(WORK, 'checkpoints'))
@@ -310,12 +451,13 @@ def parse_args(argv=None):
 def make_model(args):
     overrides = json.loads(args.model)
     if args.attention == 'auto':
-        gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else ''
+        gpu = torch.cuda.get_device_name(0) if args.device == 'cuda' and torch.cuda.is_available() else ''
         overrides.setdefault('attention', 'fa2' if 'H100' in gpu or 'H200' in gpu else 'sdpa')
     else:
         overrides['attention'] = args.attention
     overrides.setdefault('use_rate', not args.no_rate)
     overrides.setdefault('use_verifier', not args.no_verifier)
+    overrides.setdefault('use_speak', not args.no_speak)
     return build(**overrides)
 
 
@@ -333,10 +475,12 @@ def main(argv=None):
     os.makedirs(out_dir, exist_ok=True)
     keep = [int(c) for c in args.keep_channels.split(',')]
     start_resource_monitor(os.path.join(out_dir, 'erbium'), args.monitor_seconds)
-    device = 'cuda'
-    total_mem = torch.cuda.get_device_properties(0).total_memory
-    cap = args.vram_gb * 2 ** 30 / total_mem if args.vram_gb else 0.9
-    torch.cuda.set_per_process_memory_fraction(min(1.0, cap))
+    device = args.device
+    cuda = device == 'cuda'
+    if cuda:
+        total_mem = torch.cuda.get_device_properties(0).total_memory
+        cap = args.vram_gb * 2 ** 30 / total_mem if args.vram_gb else 0.9
+        torch.cuda.set_per_process_memory_fraction(min(1.0, cap))
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
     stop = {'flag': False}
@@ -349,15 +493,21 @@ def main(argv=None):
     model = make_model(args).to(device)
     if args.init_from:
         st = torch.load(args.init_from, map_location='cpu', weights_only=False)
+        if st.get('preprocess', 'gaddy') != args.preprocess:
+            print(f'warning: {args.init_from} was trained on {st.get("preprocess", "gaddy")} inputs', flush=True)
         missing = model.load_state_dict(st['model'], strict=False)
         print('initialised from', args.init_from, missing, flush=True)
     ema = copy.deepcopy(model).eval()
     for p_ in ema.parameters():
         p_.requires_grad_(False)
 
-    train = TrainData('train', use_artic=not args.no_artic)
-    dev = TrainData('dev', use_artic=False)
+    train = TrainData('train', use_artic=not args.no_artic, preprocess=args.preprocess)
+    dev = TrainData('dev', use_artic=False, preprocess=args.preprocess)
     maker = CandidateMaker(texts=[train.ds.texts[k] for k in train.usable])
+    scale_target = None
+    if args.preprocess == 'causal':  # Berkeley's per-slot spread: what fine-tuning and the live loop scale Austin to
+        from svr.data import scale_stats
+        scale_target = scale_stats()['target']
     dev_rng = np.random.default_rng(12345)
     eval_maker = CandidateMaker()
     dev_cands = [eval_maker(c, 9, dev_rng) for c in dev.clean]
@@ -377,7 +527,8 @@ def main(argv=None):
         return args.lr * (0.05 + 0.95 * 0.5 * (1 + math.cos(math.pi * prog)))
 
     config = {k: getattr(args, k) for k in RESUME_KEYS}
-    epoch, micro_in_epoch, micro_idx, opt_step, gpu_seconds = 0, 0, 0, 0, 0.0
+    epoch, micro_in_epoch, micro_idx, opt_step, gpu_seconds, align_epoch = 0, 0, 0, 0, 0.0, -1
+    best_wer, best_epoch = math.inf, 0
     state, state_path = load_checkpoint(ckpt_dir)
     if state is not None:
         if state['config'] != config:
@@ -388,8 +539,13 @@ def main(argv=None):
         epoch, micro_in_epoch, micro_idx, opt_step = (state['epoch'], state['micro_in_epoch'], state['micro_idx'],
                                                       state['opt_step'])
         gpu_seconds = state['gpu_seconds']
+        align_epoch = state.get('align_epoch', -1)
+        best_wer, best_epoch = state.get('best_wer', math.inf), state.get('best_epoch', 0)
+        if state.get('align') is not None:
+            train.align = state['align']
         torch.set_rng_state(state['torch_rng'])
-        torch.cuda.set_rng_state(state['cuda_rng'])
+        if cuda:
+            torch.cuda.set_rng_state(state['cuda_rng'])
         print(f'resumed from {state_path}: epoch {epoch + 1}, micro-batch {micro_in_epoch}, step {opt_step}',
               flush=True)
 
@@ -398,13 +554,14 @@ def main(argv=None):
                        total_steps=total_steps, train_recordings=len(train.usable),
                        articulator_targets=sum(a is not None for a in train.artic),
                        parameters=sum(p_.numel() for p_ in model.parameters()),
-                       torch=torch.__version__, gpu=torch.cuda.get_device_name(0)), f, indent=1)
+                       torch=torch.__version__, gpu=torch.cuda.get_device_name(0) if cuda else 'cpu'), f, indent=1)
 
     def snapshot(epoch_losses):
         return {'model': model.state_dict(), 'ema': ema.state_dict(), 'optim': optim.state_dict(),
                 'config': config, 'epoch': epoch, 'micro_in_epoch': micro_in_epoch, 'micro_idx': micro_idx,
                 'opt_step': opt_step, 'gpu_seconds': gpu_seconds, 'torch_rng': torch.get_rng_state(),
-                'cuda_rng': torch.cuda.get_rng_state(), 'epoch_losses': epoch_losses}
+                'cuda_rng': torch.cuda.get_rng_state() if cuda else None, 'epoch_losses': epoch_losses, 'align_epoch': align_epoch,
+                'align': train.align if align_epoch >= 0 else None, 'best_wer': best_wer, 'best_epoch': best_epoch}
 
     model.train()
     last_ckpt = time.time()
@@ -414,16 +571,28 @@ def main(argv=None):
         if args.max_micro_batches_per_epoch:
             batches = batches[:args.max_micro_batches_per_epoch]
         t_epoch = time.time()
-        torch.cuda.reset_peak_memory_stats()
+        if cuda:
+            torch.cuda.reset_peak_memory_stats()
+        aligned = None
+        if (not (args.no_speak and args.no_prefix) and epoch >= args.align_start and align_epoch < epoch
+                and (epoch - args.align_start) % args.align_every == 0):
+            train.align, aligned = compute_alignments(ema, train, keep, device, args.micro_batch_samples,
+                                                      train.usable[:args.align_limit])
+            align_epoch = epoch
+            gpu_seconds += time.time() - t_epoch
+            print(f'epoch {epoch + 1}: forced alignments for {aligned}/{len(train.usable)} utterances '
+                  f'({time.time() - t_epoch:.0f} s)', flush=True)
+        prefix_p = args.prefix_p if align_epoch >= 0 and not args.no_prefix else 0.0
         while micro_in_epoch < len(batches):
             t0 = time.time()
             rng = np.random.default_rng([args.seed, epoch, micro_in_epoch])
             idx = batches[micro_in_epoch]
             ramp = min(1.0, max(0.0, (opt_step - args.judge_start) / max(1, args.judge_ramp)))
-            losses = train_losses(model, train, idx, rng, args, keep, device, maker, parts, judge=ramp > 0)
+            losses, n_cut = train_losses(model, train, idx, rng, args, keep, device, maker, parts, judge=ramp > 0,
+                                         prefix_p=prefix_p)
             loss = sum(LOSS_WEIGHTS[k](args) * (ramp if k == 'judge' else 1.0) * v for k, v in losses.items())
             (loss / args.grad_accum).backward()
-            epoch_losses.append({k: float(v) for k, v in losses.items()})
+            epoch_losses.append(dict({k: float(v.detach()) for k, v in losses.items()}, cut_rows=n_cut / len(idx)))
             micro_idx += 1
             micro_in_epoch += 1
             if micro_idx % args.grad_accum == 0:
@@ -457,34 +626,48 @@ def main(argv=None):
                 recent = epoch_losses[-50:]
                 log_line(os.path.join(out_dir, 'progress.jsonl'), {
                     'epoch': epoch + 1, 'micro_batch': micro_in_epoch, 'micro_batches_in_epoch': len(batches),
-                    'opt_step': opt_step, 'recent_loss': float(np.mean([sum(LOSS_WEIGHTS[k](args) * v for k, v in d.items())
-                                                                        for d in recent])),
+                    'opt_step': opt_step, 'recent_loss': float(np.mean([sum(LOSS_WEIGHTS[k](args) * v for k, v in d.items()
+                                                                            if k in LOSS_WEIGHTS) for d in recent])),
                     'time': time.time()})
 
         t_eval = time.time()
         record = {'epoch': epoch + 1, 'opt_step': opt_step, 'lr': lr_at(opt_step), 'micro_batches': len(batches),
                   'epoch_train_seconds': t_eval - t_epoch,
-                  'peak_vram_reserved_gb': torch.cuda.max_memory_reserved() / 2 ** 30}
-        for k in ('letter', 'phone', 'artic', 'rate', 'judge'):
+                  'peak_vram_reserved_gb': torch.cuda.max_memory_reserved() / 2 ** 30 if cuda else 0.0}
+        for k in list(LOSS_WEIGHTS) + ['cut_rows']:
             vals = [d[k] for d in epoch_losses if k in d]
             if vals:
                 record['train_' + k] = float(np.mean(vals))
+        if aligned is not None:
+            record['aligned_utterances'] = aligned
         record.update(evaluate(ema, dev, dev_cands, device, keep, parts, args.eval_limit))
         gpu_seconds += time.time() - t_eval
         record['eval_seconds'] = time.time() - t_eval
         record['gpu_hours_total'] = gpu_seconds / 3600
         record['epoch_wall_seconds'] = time.time() - t_epoch
+        export = {'config': ema.config_dict(), 'model': ema.state_dict(), 'keep_channels': keep,
+                  'preprocess': args.preprocess, 'scale_target': scale_target, 'epoch': epoch + 1,
+                  'dev_wer_greedy': record['dev_wer_greedy']}
+        atomic_save(export, os.path.join(out_dir, 'model_last.pt'))
+        if record['dev_wer_greedy'] < best_wer:  # model.pt = the best epoch so far (what fine-tuning starts from)
+            best_wer, best_epoch = record['dev_wer_greedy'], epoch + 1
+            atomic_save(export, os.path.join(out_dir, 'model.pt'))
+        record.update(best_dev_wer_greedy=best_wer, best_epoch=best_epoch)
         log_line(os.path.join(out_dir, 'log.jsonl'), record)
-        atomic_save({'config': ema.config_dict(), 'model': ema.state_dict(), 'keep_channels': keep},
-                    os.path.join(out_dir, 'model.pt'))
         epoch += 1
         micro_in_epoch, epoch_losses = 0, []
         save_checkpoint(ckpt_dir, snapshot(epoch_losses))
         last_ckpt = time.time()
         if stop['flag']:
             sys.exit(EXIT_INTERRUPTED)
+        if args.patience and epoch >= args.min_epochs and epoch - best_epoch >= args.patience:
+            print(f'early stop after epoch {epoch}: no better dev WER since epoch {best_epoch} '
+                  f'({100 * best_wer:.1f}%)', flush=True)
+            break
     with open(os.path.join(out_dir, 'DONE'), 'w') as f:
-        f.write(json.dumps({'epochs': epoch, 'opt_step': opt_step, 'gpu_hours': gpu_seconds / 3600}) + '\n')
+        f.write(json.dumps({'epochs': epoch, 'opt_step': opt_step, 'gpu_hours': gpu_seconds / 3600,
+                            'best_epoch': best_epoch, 'best_dev_wer_greedy': best_wer,
+                            'early_stopped': epoch < args.epochs}) + '\n')
     print('training complete', flush=True)
 
 

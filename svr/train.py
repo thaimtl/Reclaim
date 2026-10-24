@@ -22,7 +22,7 @@ Efficiency logging: per epoch in log.jsonl, GPU-hours, achieved TFLOPS (FLOPs co
 window with torch's FlopCounterMode) and PyTorch peak VRAM; system CPU / RAM / GPU / VRAM utilization
 by Erbium's ResourceMonitor, as a report + plot under checkpoints/<name>/erbium/.
 
-    venv/bin/python -m svr.train --name B1T
+    venv-svr/bin/python -m svr.train --name B1T
 """
 import argparse
 import json
@@ -52,7 +52,8 @@ LM_PATH = os.path.join(WORK, 'baseline_gaddy', 'checkpoints', 'lm.binary')
 WINDOW = 200 * 8
 MILESTONES = (125, 150, 175)
 EXIT_INTERRUPTED = 3
-RESUME_KEYS = ('keep_channels', 'micro_batch_samples', 'grad_accum', 'lr', 'warmup_samples', 'epochs', 'seed')
+RESUME_KEYS = ('keep_channels', 'micro_batch_samples', 'grad_accum', 'lr', 'warmup_samples', 'epochs', 'seed',
+               'preprocess')
 
 
 def combine_fixed_length(tensors, length):
@@ -167,6 +168,8 @@ def parse_args(argv=None):
     p = argparse.ArgumentParser()
     p.add_argument('--name', required=True)
     p.add_argument('--keep-channels', default='0,1,2,3,4,5,6,7')
+    p.add_argument('--preprocess', default='causal', choices=['causal', 'gaddy'],
+                   help='causal: rig/filters.py, as SVR-1 and the live rig (G4); gaddy: his zero-phase filters (B1T)')
     p.add_argument('--epochs', type=int, default=200)
     # 432k x 1: worst micro-batch of the 200-epoch run peaks at 26.0 GB (28 GB cap); Gaddy used 128k x 2
     p.add_argument('--micro-batch-samples', type=int, default=432000, help='raw 1000 Hz EMG samples per micro-batch')
@@ -217,8 +220,8 @@ def main(argv=None):
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    train = EMGTextDataset('train', keep_channels=keep)
-    dev = EMGTextDataset('dev', keep_channels=keep)
+    train = EMGTextDataset('train', keep_channels=keep, preprocess=args.preprocess)
+    dev = EMGTextDataset('dev', keep_channels=keep, preprocess=args.preprocess)
     model = EMGModel().to(device)
     optim = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0)
     config = {k: getattr(args, k) for k in RESUME_KEYS if k != 'keep_channels'}
@@ -227,7 +230,9 @@ def main(argv=None):
     # ---- resume ----
     state, state_path = load_checkpoint(ckpt_dir)
     if state is not None:
-        mismatched = {k: (state['config'].get(k), config[k]) for k in RESUME_KEYS if state['config'].get(k) != config[k]}
+        saved = dict(state['config'])
+        saved.setdefault('preprocess', 'gaddy')  # checkpoints from before --preprocess were all Gaddy's pipeline
+        mismatched = {k: (saved.get(k), config[k]) for k in RESUME_KEYS if saved.get(k) != config[k]}
         if mismatched:
             sys.exit(f'refusing to resume from {state_path}: config differs {mismatched}')
         model.load_state_dict(state['model'])

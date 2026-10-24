@@ -9,18 +9,19 @@ import msgpack
 import numpy as np
 import zmq
 
+import bus
 import buslog
+from bus.team import Pub, Sub, decode, encode
 from buslog import Writer, read, read_raw
 from buslog.record import record
 from buslog.replay import replay, retime
-from bus import Pub, Sub, decode, encode
 
 CTX = zmq.Context.instance()
 
 
 def wait_until(pred, action=lambda: None, deadline_s=5.0):
-    end = time.monotonic() + deadline_s
-    while time.monotonic() < end:
+    end = bus.now() + deadline_s
+    while bus.now() < end:
         action()
         if pred():
             return True
@@ -99,7 +100,7 @@ def test_replay_no_retime_keeps_timing_and_bytes(tmp_path):
     got = []
     while len(got) < 3:
         assert sub.sock.poll(3000), 'replay sent nothing'
-        got.append((time.monotonic(), sub.sock.recv_multipart()))
+        got.append((bus.now(), sub.sock.recv_multipart()))
     th.join()
     assert not sub.sock.poll(100)  # dec.hyp was not played
     sub.close()
@@ -111,7 +112,7 @@ def test_replay_no_retime_keeps_timing_and_bytes(tmp_path):
 def test_replay_retimes_onto_the_replay_clock(tmp_path):
     w = Writer(tmp_path / 's')
     t = 5000.0  # an old session's clock
-    tick = {'seg_id': 1, 'seg_start': t - 1.0, 'frame_t': np.array([t - 0.04, t]), 'greedy': 'hi'}
+    tick = {'seg_id': 1, 'seg_start': t - 1.0, 'frame_t': np.array([t - 0.04, t]), 'greedy': 'HI'}
     w.write(t, 'cam', encode('cam.tick', tick, seq=7, t_pub=t))
     w.write(t + 0.1, 'cam', [b'cam.tick', b'\xc1'])  # malformed: forwarded as is
     w.close()
@@ -120,13 +121,13 @@ def test_replay_retimes_onto_the_replay_clock(tmp_path):
                           kwargs=dict(endpoints={'cam': 'inproc://rt-cam'}, ctx=CTX, wait_s=0.3))
     th.start()
     assert sub.sock.poll(3000)
-    now = time.monotonic()
-    topic, msg = decode(sub.sock.recv_multipart())
+    now = bus.now()
+    topic, msg = decode(sub.sock.recv_multipart(), validate=False)
     assert sub.sock.poll(3000)
     bad = sub.sock.recv_multipart()
     th.join()
     sub.close()
-    assert topic == 'cam.tick' and msg['seq'] == 7 and msg['greedy'] == 'hi'
+    assert topic == 'cam.tick' and msg['seq'] == 7 and msg['greedy'] == 'HI'
     assert abs(msg['t_pub'] - now) < 0.1 and abs(msg['frame_t'][-1] - now) < 0.1
     assert abs(msg['frame_t'][0] - msg['frame_t'][-1] + 0.04) < 1e-9 and abs(msg['seg_start'] - (now - 1.0)) < 0.1
     assert bad == [b'cam.tick', b'\xc1']

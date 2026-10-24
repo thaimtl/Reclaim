@@ -27,12 +27,12 @@ Nothing is trained on the pitch or on a script: the judge can ask anything.
 
 ### Austin
 
-1. Retarget SVR-1 to the rig's 4 sites (input slots 0, 1, 2, 5, the existing `4ch` channel set). Drop the closed-mouth parts: the fixed-phrase head and closed-lips transfer.
-2. Switch all EMG preprocessing to Thai's causal filter (`rig/filters.py`), Berkeley pre-training data included: re-cache Berkeley through it, in order, instead of Gaddy's `filtfilt`.
-3. Add the speaking-or-not output and partial-sentence training.
-4. Train on the cluster: one full SVR-1 run plus a Gaddy-architecture baseline on the same 4 sites.
+1. Retarget SVR-1 to the rig's 4 sites (input slots 0, 1, 2, 5, the existing `4ch` channel set). Drop the closed-mouth parts: the fixed-phrase head and closed-lips transfer. Code done.
+2. Switch all EMG preprocessing to Thai's causal filter (`rig/filters.py`), Berkeley pre-training data included: re-cache Berkeley through it, in order, instead of Gaddy's `filtfilt`. Code done.
+3. Add the speaking-or-not output, partial-sentence training, and augmentation for the recorded deliveries (slow, effort, held expression). Code done.
+4. Train on the cluster: `SVR1_4ch` plus the Gaddy-architecture baseline `G4` on the same 4 sites ([cluster/RUNBOOK.md](../cluster/RUNBOOK.md)).
 5. The recording tool: done, `recorder/record.py` (camera + EMG + the session prompts, in `svr/recordings.py`'s format).
-6. Live EMG reader: subscribe to `emg.raw`, filter, run SVR-1 every 100 ms, compute pace and effort.
+6. Live EMG reader: subscribe to `emg.raw`, filter, run SVR-1 every 100 ms, compute pace and effort. The SVR-1 side is `svr/live.py`; the bus side comes with the decoder.
 7. Fusion decoder: the joint search over camera and EMG probabilities, with look-alike expansion, Claude's predicted words and the gate.
 8. Confidence locking: compute the lock ingredients per word, train the lock model on sessions 1 and 2, and set the dynamic threshold from Claude's predictability.
 9. "Please repeat" when the final pass still isn't confident, with the reasons in the debug log.
@@ -45,8 +45,8 @@ Follow [EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md). You can pro
 
 ### Frank
 
-1. Instant Voice Clone of Austin, from his own recordings, with his consent.
-2. Sonic 3.6 over the WebSocket: one context per sentence, words streamed in with "more to come" as they arrive on `voice.say`, `max_buffer_delay_ms` kept low. Speed, volume and emotion go through `generation_config`.
+1. Instant Voice Clone of Austin, from about 60 s of his real voice read aloud, recorded separately with his consent ([RECORDING.md](../RECORDING.md#voice-sample-for-the-clone)); the silent sessions have no audio.
+2. Sonic 3.6 over the WebSocket: one context per sentence, words streamed in with "more to come" as they arrive on `voice.say`, `max_buffer_delay_ms` kept low. Speed, volume and emotion are set per sentence with `generation_config` and changed within a sentence with inline `<speed>`, `<volume>` and `<emotion>` tags, since Sonic ignores `generation_config` changes inside a context. `pace` maps to speed 0.6 to 1.5, `effort` to volume 0.5 to 2.0.
 3. Twilio:
     - Austin's call to the judge, with a two-way audio stream to the laptop.
     - Cartesia's audio goes into the call; ask Cartesia for phone-format audio, or convert it.
@@ -62,7 +62,7 @@ Follow [EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md). You can pro
 
 1. Rig with 4 boards on A0 to A3 (sites 3, 2, 6, 1) and one REF per board, as in [HARDWARE.md](../HARDWARE.md).
 2. Firmware, reader and live filter (`rig/`): 1 kHz, raw frames with a counter, causal hum filter. They move from 6 to 4 channels with the recording tool.
-3. Live: the reader stamps samples with `time.monotonic()` and publishes `emg.raw` every 10 ms.
+3. Live: the reader stamps samples with `bus.now()` (`time.perf_counter()`) and publishes `emg.raw` every 10 ms.
 4. Safety: the laptop runs on battery whenever the pads are on skin; never charge with the Uno connected.
 5. The Claude service:
     - **Predict:** on every final `partner.text` and every ~2 s while Austin mouths, publish `claude.predict`: likely words and phrases, plus how predictable the next words are.
@@ -72,7 +72,12 @@ Follow [EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md). You can pro
 
 ## Interfaces
 
-The parts run as separate small programs on the laptop and talk through ZeroMQ publish/subscribe over local sockets (`ipc://`), with messages encoded as msgpack (numpy arrays as raw bytes). A message takes well under a millisecond. All timestamps are `time.monotonic()` seconds on the same laptop.
+The parts run as separate small programs on the laptop and talk through ZeroMQ publish/subscribe over TCP on the loopback (`tcp://127.0.0.1:<port>`, one port per publisher; the camera reader is 5556), with messages encoded as msgpack (numpy arrays as raw bytes).
+`ipc://` sockets don't work on Windows, which is why it is TCP.
+A message takes well under a millisecond.
+All timestamps are `bus.now()` seconds on the same laptop, which is `time.perf_counter()`: on Windows before Python 3.13, `time.monotonic()` only ticks every 15.6 ms.
+Every message also carries `v` (schema version), `seq` (counts up per topic, so a gap is a drop) and `t_pub` (send time).
+The wire details, the queue limits and a ready-made subscriber are in [bus/schema.md](../bus/schema.md) and the `bus` package.
 
 ```mermaid
 flowchart TD
@@ -92,19 +97,32 @@ flowchart TD
 | `emg.raw` | Thai → Austin | every 10 ms | `t0`, `fs` = 1000, `samples` (n × 4, raw 0 to 1023), `counter` |
 | `cam.tick` | Evan → Austin, Frank | every 100 ms | `seg_id`, `seg_start`, `frame_t` (T), `topk_ids` (T × 32), `topk_logp` (T × 32), `blank_logp` (T), `greedy`, `activity` (T), `face_ok`, `emotion` {`label`, `confidence`, `scores`}, `timing_ms` |
 | `cam.final` | Evan → Austin | at segment end | `seg_id`, `nbest` [{`text`, `score`}] |
-| `cam.face` | Evan → dashboard | ~12.5 Hz | `t`, `w`, `h`, `face_ok`, `pts` (landmarks), `blend` (52 blendshapes), `pose` (yaw, pitch, roll); see `live/bus_schema.md` |
+| `cam.face` | Evan → dashboard | ~12.5 Hz | `t`, `w`, `h`, `face_ok`, `pts` (478 × 2, normalised), `blend` (52), `pose` (yaw, pitch, roll) |
 | `dec.hyp` | Austin → dashboard | every 100 ms | `utt_id`, `locked` [words, the newest 40], `offset` (index of the first one sent), `unlocked` [words], `confidence` and `source` (camera / EMG / Claude) per word, `raw` (each locked word before Claude's repairs), `spoken` (what the voice said), `t0` (capture time of the utterance's first frame) |
 | `dec.lock` | Austin → Claude, dashboard | on lock | `utt_id`, `words` [{`w`, `conf`, `alts`, `cam`, `emg`, `t`}] |
 | `dec.repeat` | Austin → dashboard | at sentence end | `utt_id`, `reason` {`reader` (camera / EMG / Claude), `text`, `threshold`, `claude_please_repeat`, `words` [{`index`, `w`, `cam`, `emg`, `claude`, `nbest`, `score`, `alts`}]} |
 | `claude.predict` | Claude → Austin | on judge line, ~2 s | `words` [{`w`, `weight`}], `phrases`, `predictability` (0 to 1), `ttl_s` |
 | `claude.repair` | Claude → Austin, dashboard | on reply | `utt_id`, `edits` [{`index`, `from`, `to`}], `please_repeat` |
-| `voice.say` | Austin → Frank | words leaving the repair window | `utt_id`, `words`, `final` (always sent once per sentence, with `words` [] if nothing locked), `pace`, `effort` (both relative to Austin's normal: 1.0 until SVR-1 provides them) |
+| `voice.say` | Austin → Frank | words leaving the repair window | `utt_id`, `words`, `final` (sent once per sentence, with `words` [] if nothing locked), `pace`, `effort` (both relative, 1.0 = Austin's normal; below) |
 | `partner.text` | Frank → Claude, dashboard | streaming | `text`, `is_final`, `t` |
-| `timing.*` | everyone → logger | every event | the stage and its duration in ms |
+| `timing.*` | everyone → logger | every event | the stage and its duration in ms (the camera's ride in `cam.tick.timing_ms`) |
 
 Austin applies Claude's repairs before forwarding words on `voice.say`, so the voice never needs to know about Claude. The logger subscribes to every topic.
 
-The bus code is `bus/`: every message also carries `v` (schema version 2), `seq` (per topic) and `t_pub`. Each producer binds one endpoint, overridable by `RECLAIM_<NAME>_PUB`: `ipc:///tmp/reclaim/emg` (`emg.raw`), `.../cam.tick` (`cam.*`), `.../dec` (`dec.*`, `voice.say`), `.../claude` (`claude.*`), `.../call` (`partner.text`).
+`voice.say` units, from SVR-1 ([SVR1_SPEC.md](SVR1_SPEC.md#3-outputs)):
+- `pace`: speaking rate relative to Austin's normal, `exp(0.37 × the rate head's z-score)` divided by its median over the calibration minute. 1.0 is normal, 0.5 half speed.
+- `effort`: muscle effort relative to Austin's normal, the RMS of the EMG over the last 100 ms divided by the session's median while speaking. 1.0 is normal; soft mouthing is below, emphatic above.
+- Both come with every message, so a single stressed word can get its own volume.
+
+Each producer binds one loopback port, overridable by `RECLAIM_<NAME>_PUB`; the code is `bus.team` (`Pub`, `Sub`), on the camera's wire format:
+
+| Endpoint | Port | Topics |
+| --- | --- | --- |
+| `emg` | 5555 | `emg.raw` (`rig/publish.py`) |
+| `cam` | 5556 | `cam.tick`, `cam.final`, `cam.face` (`lipread/run.py`) |
+| `dec` | 5557 | `dec.hyp`, `dec.lock`, `dec.repeat`, `voice.say`, `timing.dec` (`fusion/run.py`) |
+| `claude` | 5558 | `claude.predict`, `claude.repair`, `timing.claude` (`claude_service`) |
+| `call` | 5559 | `partner.text`, `timing.call` (`call/`) |
 
 ## Order of work
 
@@ -130,7 +148,13 @@ Procedure: [RECORDING.md](../RECORDING.md); sentences: [recording/](recording/).
 | 2 | 250, the last 50 faster than natural | Training |
 | 3 (last, in demo conditions) | 100, at demo pace | Test only, never trained on |
 
-Each session also records 10 rest clips of about 3 s (still face, swallow, nod, smile, and so on), which teach the model what is not speech. Sessions 1 and 2 take about 30 minutes each, session 3 about 12. A minute of calibration before the demo refits SVR-1's adapter.
+Each session also records 10 rest clips of about 3 s (still face, swallow, nod, smile, and so on), which teach the model what is not speech. Sessions 1 and 2 take about 30 minutes each, session 3 about 12. A minute of calibration before the demo refits SVR-1's adapter and its scale factors.
+
+Some sentences carry a delivery to hold, shown by the recorder (Frank's request, [RECORDING.md](../RECORDING.md)): in each training session 20 slow and 10 each of smile, frown, surprised, soft and emphatic; in session 3, 10 smile and 10 frown. They let SVR-1 see a smile's EMG and the range of pace and effort the voice follows, and session 3 tests "same words, two expressions". SVR-1's pretraining also simulates these deliveries on Berkeley's data.
+
+Two more recordings, outside the sessions:
+- About 60 s of Austin's real voice, read aloud, with his consent, for Frank's voice clone.
+- For the emotion tagger, nothing extra: it needs no training, only about 3 s of neutral face at the start of the call; the rest clips and the delivery clips are enough to tune it on Austin.
 
 ## Training
 

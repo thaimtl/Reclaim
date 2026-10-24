@@ -8,7 +8,7 @@
 
 A session is a folder under $RECLAIM_WORKDIR/logs/ (./logs without it): meta.json (endpoints, start time) and
 bus-0000.msgpack, bus-0001.msgpack, ... rotated by size. Each file is a plain stream of msgpack arrays
-[t_recv, endpoint, frames]: t_recv is time.monotonic() when the logger got the message, endpoint the ENDPOINTS
+[t_recv, endpoint, frames]: t_recv is bus.now() when the logger got the message, endpoint the ENDPOINTS
 name it came from, frames the raw ZeroMQ frames ([topic, payload] for a good message), never decoded, so a
 malformed message is kept as it was and replay sends the same bytes, seq and t_pub included. Appending needs no
 index, and a crash of the recorder only cuts the last record short, which the reader skips with a warning.
@@ -21,7 +21,8 @@ from pathlib import Path
 
 import msgpack
 
-from bus import decode
+import bus
+from bus.team import decode
 
 ROTATE_BYTES = 256 << 20
 
@@ -47,7 +48,7 @@ class Writer:
     def __init__(self, folder, meta=None, rotate_bytes=ROTATE_BYTES):
         self.folder, self.rotate_bytes, self.index, self.f = Path(folder), rotate_bytes, -1, None
         self.folder.mkdir(parents=True, exist_ok=False)  # never append to someone else's session
-        meta = dict(meta or {}, t_monotonic=time.monotonic(), t_wall=time.time())
+        meta = dict(meta or {}, t_now=bus.now(), t_wall=time.time())
         (self.folder / 'meta.json').write_text(json.dumps(meta, indent=2))
         self._next_file()
 
@@ -111,6 +112,6 @@ def read(session, topics=None):
         if not matches(topic_of(frames), topics):
             continue
         try:
-            yield (t_recv, *decode(frames))
+            yield (t_recv, *decode(frames, validate=False))
         except ValueError:
             continue

@@ -7,6 +7,7 @@
 # leaderboard rebuilt without it.
 set -u
 cd "$(dirname "$0")/.."
+PY=${PY:-venv-svr/bin/python}; [ -x "$PY" ] || PY=venv/bin/python  # venv: cluster copies set up before venv-svr
 OUT=checkpoints/_smoke_sup
 rm -rf "$OUT" benchmark_results/SMOKE_sup_cpu benchmark_results/SMOKE_sup_gpu
 mkdir -p "$OUT"
@@ -29,7 +30,7 @@ check "A no orphaned monitor after the crash" "! ps -eo args | grep -q '[s]vr.tr
 check "A Erbium report written" "ls $OUT/supA/erbium/*.txt > /dev/null 2>&1"
 
 # C: kill -9 the trainer -> its Erbium monitor must die with it
-venv/bin/python -m svr.train --name supC --out-root $OUT $SMALL --epochs 50 > "$OUT/supC.log" 2>&1 &
+$PY -m svr.train --name supC --out-root $OUT $SMALL --epochs 50 > "$OUT/supC.log" 2>&1 &
 trainer=$!
 until ls $OUT/supC/erbium/*.txt > /dev/null 2>&1; do sleep 1; done
 sleep 3
@@ -55,7 +56,7 @@ check "B checkpoint saved on SIGTERM" "grep -q 'checkpoint saved' $OUT/supB/trai
 check "B no benchmarks" "! grep -q 'benchmarking' $OUT/supB.log && [ ! -d benchmark_results/SMOKE_supB_gpu ]"
 
 rm -rf benchmark_results/SMOKE_sup_cpu benchmark_results/SMOKE_sup_gpu
-venv/bin/python -m bench.report > /dev/null
+$PY -m bench.report > /dev/null
 check "cleanup: leaderboard no longer lists the smoke run" "! grep -q SMOKE_sup benchmark_results/LEADERBOARD.md"
 [ $fail -eq 0 ] && echo "ALL SUPERVISOR CHECKS PASSED" || echo "SUPERVISOR CHECKS FAILED"
 exit $fail

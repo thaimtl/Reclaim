@@ -12,10 +12,10 @@ SIGTERM stops it like Ctrl-C.
 import argparse
 import signal
 import sys
-import time
 import traceback
 
-from bus import Pub, Sub
+import bus
+from bus.team import Pub, Sub
 from fusion.decoder import REPAIR_WINDOW_S, Decoder
 from fusion.words import SPM, UNITS, load_lookalikes, load_units
 
@@ -63,7 +63,7 @@ def serve(dec, sub, pub, stop=lambda: False, poll_ms=POLL_MS):
     while not stop():
         bad = []
         msgs = newest_ticks(drain(sub, poll_ms, bad))
-        now = time.monotonic()
+        now = bus.now()
         out = []
         for topic, msg in msgs:
             try:
