@@ -2,6 +2,7 @@
 
     python recorder/test_record.py      (or: python -m pytest recorder/test_record.py)
 """
+import json
 import os
 import sys
 import tempfile
@@ -64,10 +65,16 @@ def test_delivery_styles():
             assert sum([i['pace'] == 'slow', i['expression'] != 'neutral', i['effort'] != 'normal']) <= 1
             if i['pace'] == 'fast':
                 assert not i.get('style'), 'fast sentences stay neutral'
-    s1 = {i['id'] for i in record.load_items(1) if i.get('style')}
-    s2 = {i['id'] for i in record.load_items(2) if i.get('style')}
-    assert s1 != s2 and all(i.split('_')[0] == 's1' for i in s1)
+    n1 = {i['id'].split('_')[1] for i in record.load_items(1) if i.get('style')}
+    n2 = {i['id'].split('_')[1] for i in record.load_items(2) if i.get('style')}
+    assert n1 != n2, 'each session seeds its own picks'
     assert set(record.STYLE_CUES) >= {s for st in record.STYLES.values() for s in st}
+    for cue in record.STYLE_CUES.values():      # stays left of the key-help panel (x = 960)
+        (w, _), _ = cv2.getTextSize(cue, cv2.FONT_HERSHEY_SIMPLEX, record.CUE_SCALE, 2)
+        assert 30 + w < 950, (cue, w)
+    import textwrap
+    for s in (1, 2, 3):                         # with the cue line, a prompt has room for 2 wrapped lines
+        assert max(len(textwrap.wrap(i['prompt'], 42)) for i in record.load_items(s) if i['prompt']) <= 2
     assert sum(1 for i in record.load_items(1) if i['pace'] == 'natural' and i['expression'] == 'neutral'
                and i['effort'] == 'normal') == 130
 
@@ -93,6 +100,8 @@ def test_record_redo_resume_and_load():
         cap.release()
         assert r['warnings'] == [], r['warnings']
         assert 'expression' in r and 'effort' in r     # delivery style saved with the clip
+    meta = json.load(open(os.path.join(sess.dir, 'meta.json')))
+    assert meta['recorder_version'] == record.VERSION and len(meta['runs']) >= 1
     redone = sess.last_id
     sess.redo(redone)
     assert len(load_manifest(root)) == 2
@@ -110,7 +119,8 @@ def test_window_draws():
                         '--width', '320', '--height', '240', '--auto', '0'])
     item = sess.pending()[0]
     styled = next(i for i in sess.pending() if i.get('style'))
-    img = record.draw(sess, sess.cam, sess.emg, type('T', (), {'error': None})(), 'idle', styled, True, '', False, False)
+    claude = type('T', (), {'error': None})()
+    img = record.draw(sess, sess.cam, sess.emg, claude, 'idle', styled, True, '', False, False)
     cv2.imwrite(os.path.join(root, 'screen_styled.png'), img)
     for state in ('idle', 'done'):
         img = record.draw(sess, sess.cam, sess.emg, type('T', (), {'error': None})(), state, item, True, 'msg',

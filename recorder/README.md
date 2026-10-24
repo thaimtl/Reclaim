@@ -51,7 +51,7 @@ Flash the Uno with `rig/uno/uno.ino`. In Arduino IDE: open the file, pick the bo
 
 The window shows the mirrored camera with an oval where the mouth should sit, the 4 EMG levels (red means the channel hits 0 or 1023: press the pads or REF down), the camera's frame rate, dropped EMG frames, progress, and warnings: charger plugged in, EMG silent, camera stopped. After each clip it shows the clip's own warnings, such as short EMG or a flat channel; redo the clip if one appears.
 
-Order: about 260 clips per training session in a fixed shuffled order, with sentences at natural pace, sentences at a faster pace (marked FAST PACE), and 10 rest clips mixed in. Session 3 is the test set, at demo pace. 90 natural-pace sentences per training session (20 in session 3) carry a delivery: the table is in [RECORDING.md](../RECORDING.md#what-a-session-is).
+Order: about 260 clips per training session in a fixed shuffled order, with sentences at natural pace, sentences at a faster pace (marked FAST PACE), and 10 rest clips mixed in. Session 3 is the test set, at demo pace. 70 natural-pace sentences per training session (20 demo-pace in session 3) carry a delivery: the table is in [RECORDING.md](../RECORDING.md#what-a-session-is).
 
 ## What it saves
 
@@ -59,12 +59,12 @@ Under `$RECLAIM_WORKDIR/recordings/session_0N/`, or `recordings/` in the repo if
 
 | File | Contents |
 | --- | --- |
-| `<id>.mp4` | Camera video, unmirrored, at the camera's resolution (default 1920×1080, the live camera reader's capture size; it shrinks frames to 1280×720 itself) |
+| `<id>.mp4` | Camera video, unmirrored, at the camera's resolution (default 1920×1080, the capture size of Evan's live camera reader, which shrinks frames to 1280×720 itself) |
 | `<id>_video_ts.npy` | Laptop-clock time (`time.monotonic()`) of every video frame |
 | `<id>_emg.npy` | Raw Uno readings, shape (samples, 4), uint16, unfiltered; columns A0 to A3 = sites 3, 2, 6, 1 |
 | `<id>_emg_ts.npy` | Laptop-clock time of every EMG sample |
 | `manifest.jsonl` | One line per clip: id, set (C training, E test, B rest), prompt, pace (natural, fast, slow, demo, rest), expression (neutral, smile, frown, surprised; null for rest), effort (normal, soft, emphatic; null for rest), file names, clip start and end, sample and frame counts, warnings |
-| `meta.json` | The session: speaker, sample rate, pins and sites, camera settings, recorder version |
+| `meta.json` | The session: speaker, sample rate, pins and sites, camera settings, recorder version, delivery counts, and one `runs` entry per start or resume (version, camera size) |
 
 The EMG is saved raw on purpose: training runs `rig/filters.py` over each clip in order, the same filter as the live system.
 

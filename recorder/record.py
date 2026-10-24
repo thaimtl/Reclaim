@@ -54,14 +54,15 @@ STYLES = {1: {'slow': 20, 'smile': 10, 'frown': 10, 'surprised': 10, 'soft': 10,
           3: {'smile': 10, 'frown': 10}}
 EXPRESSIONS = ('smile', 'frown', 'surprised')
 EFFORTS = ('soft', 'emphatic')
-STYLE_CUES = {  # what the window tells Austin, in the instruction line above the sentence
-    'slow': 'SLOW: mouth it slowly and clearly, about half your natural speed',
-    'smile': 'SMILE while you mouth it: a real smile, held the whole sentence',
-    'frown': 'FROWN while you mouth it: look upset or annoyed, held the whole sentence',
-    'surprised': 'SURPRISED while you mouth it: brows up, eyes wide, held the whole sentence',
-    'soft': 'SOFT: small, relaxed movements, as if whispering',
-    'emphatic': 'EMPHATIC: big, firm movements, as if speaking up to be heard',
+STYLE_CUES = {  # the amber line above the sentence; short enough to stay left of the key-help panel (x < 960)
+    'slow': 'SLOW: about half your natural speed',
+    'smile': 'SMILE: a real smile, held all sentence',
+    'frown': 'FROWN: look upset, held all sentence',
+    'surprised': 'SURPRISED: brows up, held all sentence',
+    'soft': 'SOFT: small movements, like a whisper',
+    'emphatic': 'EMPHATIC: big, firm movements',
 }
+CUE_SCALE = 0.75
 REST_CUES = ['Still face, relaxed', 'Swallow once', 'Nod your head', 'Look left, then back', 'Look right, then back',
              'Smile', 'Raise your eyebrows', 'Take a slow breath', 'Lick your lips', 'Small cough']
 ARDUINO_VIDS = {0x2341, 0x2A03, 0x1A86}
@@ -313,10 +314,12 @@ class Camera(threading.Thread):
 class ClipWriter(threading.Thread):
     """Writes one clip's frames to MP4 off the capture thread; a full queue drops a frame and counts it."""
 
+    QUEUE_BYTES = 600e6     # frames waiting to be encoded: ~100 at 1920x1080 (3 s), ~200 at 1280x720
+
     def __init__(self, path, fps, size):
         super().__init__(daemon=True)
         self.path, self.fps, self.size = path, fps, size
-        self.q = queue.Queue(maxsize=240)
+        self.q = queue.Queue(maxsize=max(30, int(self.QUEUE_BYTES / (size[0] * size[1] * 3))))
         self.ts, self.dropped = [], 0
 
     def put(self, frame, t):
@@ -371,7 +374,21 @@ class Session:
         return [it for it in self.items if it['id'] not in self.entries and it['id'] not in self.skipped]
 
     def write_meta(self):
-        meta = {'session': self.session, 'speaker': self.speaker, 'created': datetime.datetime.now().isoformat(),
+        """meta.json for the session. On a resume it keeps the first 'created' and appends to 'runs', so a session
+        recorded across recorder versions or camera sizes says so; each clip's own fields stay the truth."""
+        path = os.path.join(self.dir, 'meta.json')
+        old = {}
+        if os.path.exists(path):
+            with open(path, encoding='utf-8') as f:
+                old = json.load(f)
+        now = datetime.datetime.now().isoformat()
+        run = {'started': now, 'recorder_version': VERSION, 'camera': [self.cam.width, self.cam.height]}
+        unstyled = sum(1 for e in self.entries.values() if 'expression' not in e)
+        if unstyled:
+            print(f'note: {unstyled} clips in this session were saved by recorder v1 (no delivery styles); only the '
+                  f'remaining sentences get styles', flush=True)
+        meta = {'session': self.session, 'speaker': self.speaker, 'created': old.get('created', now),
+                'runs': old.get('runs', []) + [run],
                 'emg': {'sample_rate': FS, 'channels': CHANNELS, 'pins': ['A0', 'A1', 'A2', 'A3'], 'sites': SITES,
                         'units': 'raw 10-bit Uno readings, unfiltered', 'source': self.emg_source},
                 'camera': {'width': self.cam.width, 'height': self.cam.height, 'fps_requested': self.cam.fps,
@@ -380,7 +397,7 @@ class Session:
                 'recorder_version': VERSION, 'platform': platform.platform(),
                 'n_items': len(self.items), 'prompts': SESSIONS[self.session][0],
                 'styles': STYLES.get(self.session, {})}
-        with open(os.path.join(self.dir, 'meta.json'), 'w', encoding='utf-8') as f:
+        with open(path, 'w', encoding='utf-8') as f:
             json.dump(meta, f, indent=1)
 
     def start(self, item):
@@ -510,11 +527,11 @@ def draw(sess, cam, emg, emg_thread, state, item, help_on, msg, charger, real_em
         tag = {'natural': 'NATURAL PACE', 'fast': 'FAST PACE', 'slow': 'SLOW PACE', 'demo': 'DEMO PACE',
                'rest': 'REST CLIP'}[item['pace']]
         style = item.get('style')
-        put(canvas, f"{item['id']}  |  {tag}" + (f"  |  {style.upper()}" if style else ''), (30, y0), 0.65,
-            (180, 200, 255))
+        extra = f"  |  {style.upper()}" if style and style != 'slow' else ''      # SLOW is already the pace tag
+        put(canvas, f"{item['id']}  |  {tag}{extra}", (30, y0), 0.65, (180, 200, 255))
         top = y0 + 55
         if style:   # the delivery instruction, in amber above the sentence
-            put(canvas, STYLE_CUES[style], (30, y0 + 38), 0.75, (60, 200, 255), 2)
+            put(canvas, STYLE_CUES[style], (30, y0 + 38), CUE_SCALE, (60, 200, 255), 2)
             top += 36
         text = item['prompt'] or item['cue']
         for i, line in enumerate(textwrap.wrap(text, 42)[:3]):
@@ -549,8 +566,8 @@ def parse(argv=None):
     p.add_argument('--root', default=os.path.join(os.environ.get('RECLAIM_WORKDIR', REPO), 'recordings'))
     p.add_argument('--speaker', default='austin')
     p.add_argument('--camera', default='0', help='camera index, a video file, or "fake"')
-    # the live camera reader captures the C920 at 1920x1080 and shrinks to 1280x720 itself (live/run.py --size,
-    # --process-size): record the same capture, so replayed sessions match the live demo
+    # Evan's live camera reader (live/, branch feat/camera-live, not merged yet) captures the C920 at 1920x1080 and
+    # shrinks to 1280x720 itself: record the same capture, so replayed sessions match the live demo
     p.add_argument('--width', type=int, default=1920)
     p.add_argument('--height', type=int, default=1080)
     p.add_argument('--fps', type=float, default=30)

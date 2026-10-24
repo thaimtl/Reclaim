@@ -315,7 +315,8 @@ def evaluate(model, args, tests, dev, fixed_clean, cmask, device, maker):
             dur = len(test_e.inputs[k]) / 8 / FRAME_RATE
             hyp = greedy_decode(o['letter_logp'][0].float().cpu().numpy())
             rows.append({'id': r['id'], 'reference': test_e.clean[k], 'greedy': hyp, 'mouth': r.get('mouth'),
-                         'target_wpm': r.get('target_wpm'), 'spoken_wpm': spoken_wpm(r, dur), 'forward_ms': ms})
+                         'target_wpm': r.get('target_wpm'), 'pace': r.get('pace'), 'expression': r.get('expression'),
+                         'effort': r.get('effort'), 'spoken_wpm': spoken_wpm(r, dur), 'forward_ms': ms})
 
         def wer_of(sub):
             return {'n': len(sub), 'wer': jiwer.wer([c['reference'] for c in sub], [c['greedy'] for c in sub]),
@@ -323,7 +324,7 @@ def evaluate(model, args, tests, dev, fixed_clean, cmask, device, maker):
                     'spoken_wpm': float(np.mean([c['spoken_wpm'] for c in sub])),
                     'forward_ms_median': float(np.median([c['forward_ms'] for c in sub]))}
         summary['open_vocab_E'] = {'all': wer_of(rows)}
-        for key in ('target_wpm', 'mouth'):
+        for key in ('target_wpm', 'mouth', 'pace', 'expression', 'effort'):    # deliveries: RECORDING.md
             for v in sorted({str(c[key]) for c in rows}):
                 summary['open_vocab_E'][f'{key}={v}'] = wer_of([c for c in rows if str(c[key]) == v])
         # 2. homophene judge: true sentence vs 9 lip look-alikes (fixed seed)
