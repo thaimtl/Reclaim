@@ -1,34 +1,4 @@
-"""Facial expression -> emotion tag (E5): one Emotion per Crop from MediaPipe's 52 blendshapes, for cam.tick.
-
-The mouth is busy mouthing words, so the tag leans on the upper face; mouth shapes count only when held longer than
-a mouthed syllable (SUSTAIN_S). Everything is scored as a change from the person's own neutral face: the median of
-each blendshape over the first baseline_s of frames with a face (a resting news speaker already reads browDown ~0.6,
-eyeSquint ~0.5, so raw thresholds fail; the median survives talking during the baseline).
-
-Evidence per frame, d(x) = max(0, x - baseline x), ramp(v, lo, hi) = clip((v - lo) / (hi - lo), 0, 1),
-a | b = 1 - (1 - a)(1 - b) (noisy-or), L/R pairs averaged:
-    surprised  0.7 ramp(d browOuterUp) | 0.3 ramp(d browInnerUp) | 0.5 ramp(d eyeWide), times (1 - frown)
-    angry      0.85 ramp(d browDown) | 0.3 squint
-    happy      0.8 smile | 0.5 squint (1 - ramp(d browDown))          squint = ramp(max(d eyeSquint, d cheekSquint))
-    sad        frown (0.55 + 0.45 ramp(d browInnerUp) (1 - ramp(d browOuterUp)))
-smile / frown: ramp(d mouthSmile / d mouthFrown) once it has stayed above SMILE_ON / FROWN_ON for SUSTAIN_S (dips
-shorter than GAP_S are bridged), ramping in over SUSTAIN_RAMP_S; 0 before.
-Scores are EMA-smoothed with time constant smooth_s / 2 (on crop.t deltas); neutral = 1 - max(other scores). The
-candidate is the best non-neutral label if its score >= MARGIN, else neutral; the published label switches only once
-the same candidate has won for switch_s. No face: the label is held while the scores decay to 0 with NOFACE_TAU_S;
-once the held label's score is below MARGIN / 2 it drops to neutral. Before the baseline is complete: neutral.
-
-Labels: the canonical set CANON is scored internally; label_map {canonical: published name or None} renames them
-(None drops one, e.g. if the TTS has no 'surprised'); two canonicals may share a name (max wins). Output scores have
-exactly the `labels` keys, all in [0, 1], so every Emotion passes bus.validate.
-
-    tagger = EmotionTagger()                                    # labels=EMOTIONS, label_map={'happy': 'joy', ...}
-    for crop in crops:
-        emotion = tagger.push(crop)                             # Emotion(label, confidence, scores), ~30 us
-    tagger.reset_baseline()                                     # new person in front of the camera
-
-EmotionWorker wraps it for the crop thread: submit() every frame (never raises), current() from the tick thread.
-"""
+"""Emotion tag for cam.tick: rules on MediaPipe blendshapes (EmotionTagger) or the expression network (NetTagger)."""
 import logging
 import math
 import os
