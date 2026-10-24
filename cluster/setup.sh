@@ -1,38 +1,52 @@
 #!/usr/bin/env bash
-# One-time setup of a working copy on a cluster (Moira or Conrad, PBS). Run on a login or interactive node:
-#   bash setup.sh /path/to/calhacks2026
-# Pulls code, data and checkpoints from the private bucket, extracts the Berkeley dataset, builds the venv.
+# Set up or update the working copy on a cluster (PBS), from the private bucket only (no git needed):
+#   hf sync hf://buckets/austinkomachi/Austin_CH/repo <working copy>    # the code first: this script is part of it
+#   bash <working copy>/cluster/setup.sh
+# Code: the bucket's repo/, a snapshot of a pushed commit uploaded with cluster/upload_snapshot.sh (cluster/VERSION). Data: data/ (the Berkeley
+# tarball, the causal cache + scale statistics, the lexicon) and Gaddy's checkpoints. Builds venv-svr if missing (venv-camera
+# only with WITH_CAMERA=1). Rerunning is safe: sync only adds and updates, never deletes.
+# Never sync the bucket's calhacks2026/ folder here: it is a full snapshot of Austin's machine, environments included.
 set -euo pipefail
-WORK=${1:-$PWD/calhacks2026}
+cd "$(dirname "$0")/.."
+WORK=$PWD
 B=hf://buckets/austinkomachi/Austin_CH
-mkdir -p "$WORK" && cd "$WORK"
+. cluster/env.sh  # from here on, caches, tmp and the HF token stay inside the working copy
+HF=$(command -v hf || true); [ -n "$HF" ] || HF=venv-svr/bin/hf
+"$HF" sync $B/repo .
+echo "code: $(cat cluster/VERSION 2>/dev/null || echo 'unknown: snapshot not stamped (upload with cluster/upload_snapshot.sh)')"
 
-hf sync $B/repo .
-hf sync $B/data ./data
+# Data (sync only adds and updates; never pass --delete)
+"$HF" sync $B/data ./data
 mkdir -p baseline_gaddy/checkpoints silent_speech
-hf sync $B/checkpoints/gaddy baseline_gaddy/checkpoints
+"$HF" sync $B/checkpoints/gaddy baseline_gaddy/checkpoints
 [ -d silent_speech/emg_data ] || tar -C silent_speech -xzf data/emg_data.tar.gz
 
 # Python 3.12 + the exact package set of the working environment (torch 2.11, CUDA 13 build).
-if command -v uv > /dev/null; then
-  uv venv --python 3.12 venv
-  uv pip install --python venv/bin/python -r requirements-cluster.txt
-else
-  python3.12 -m venv venv
-  venv/bin/pip install -r requirements-cluster.txt
+# A copy set up before the rename keeps its old venv/ (the scripts fall back to it).
+if [ ! -x venv-svr/bin/python ] && [ ! -x venv/bin/python ]; then
+  if command -v uv > /dev/null; then
+    uv venv --python 3.12 venv-svr
+    uv pip install --python venv-svr/bin/python -r requirements-cluster.txt
+  else
+    python3.12 -m venv venv-svr
+    venv-svr/bin/pip install -r requirements-cluster.txt
+  fi
+  # FlashAttention-2 for H100/H200 (SVR-1 uses it; Gaddy-architecture baselines do not need it).
+  { command -v uv > /dev/null && uv pip install --python venv-svr/bin/python flash-attn --no-build-isolation; } \
+    || venv-svr/bin/python -m pip install flash-attn --no-build-isolation \
+    || echo "flash-attn not installed: SVR-1 will fall back to SDPA"
 fi
-# FlashAttention-2 for H100/H200 (SVR-1 uses it; Gaddy-architecture baselines do not need it).
-{ command -v uv > /dev/null && uv pip install --python venv/bin/python flash-attn --no-build-isolation; } \
-  || venv/bin/python -m pip install flash-attn --no-build-isolation \
-  || echo "flash-attn not installed: SVR-1 will fall back to SDPA"
+PY=venv-svr/bin/python; [ -x "$PY" ] || PY=venv/bin/python
+$PY -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
 
-venv/bin/python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
-
-# Camera baselines: separate environment (MediaPipe needs numpy<2), then all their weights
-if command -v uv > /dev/null; then
-  uv venv --python 3.11 venv-camera && uv pip install --python venv-camera/bin/python -r requirements-camera.txt
-else
-  python3.11 -m venv venv-camera && venv-camera/bin/pip install -r requirements-camera.txt
+# Camera baselines (optional, WITH_CAMERA=1): separate environment (MediaPipe needs numpy<2), then their weights.
+# Skipped by default: SVR-1 doesn't need them, and some weights come from Google Drive, which can fail (404, quota).
+if [ "${WITH_CAMERA:-0}" = "1" ] && [ ! -x venv-camera/bin/python ]; then
+  if command -v uv > /dev/null; then
+    uv venv --python 3.11 venv-camera && uv pip install --python venv-camera/bin/python -r requirements-camera.txt
+  else
+    python3.11 -m venv venv-camera && venv-camera/bin/pip install -r requirements-camera.txt
+  fi
+  PY=venv-camera/bin/python bash camera/download_weights.sh
 fi
-PY=venv-camera/bin/python bash camera/download_weights.sh
 echo "setup done in $WORK"

@@ -4,7 +4,7 @@ The sampler is deterministic (seed, epoch), so every micro-batch of the run is k
 Candidates: the top 3 by window count (activations) and the top 3 by B * T_max * (2 * S_max + 1)
 (CTC lattice). Each runs fwd + bwd + AdamW step; peak memory is reset between candidates.
 
-    venv/bin/python -m tests.smoke_worst_batches 448000 [epochs] [vram cap in GB, default 90% of the card]
+    venv-svr/bin/python -m tests.smoke_worst_batches 448000 [epochs] [vram cap in GB, default 90% of the card]
 """
 import json
 import os

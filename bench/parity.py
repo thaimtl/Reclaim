@@ -12,7 +12,7 @@ Compares one difference at a time, with the pass bars from the benchmark plan:
 Also reports how close the model inputs and the per-frame log-probs are, at 8 and 4 channels.
 Run after score.py:
 
-    venv/bin/python -m bench.parity
+    venv-svr/bin/python -m bench.parity
 """
 import json
 import os

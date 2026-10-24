@@ -3,7 +3,7 @@
 #   qsub -v ARGS="<run name> [svr.train args...]" cluster/smoke_job.sh
 #   qsub -v SMOKE=smoke_svr1,ARGS="SVR1_full" cluster/smoke_job.sh        (SVR-1; args with commas: quote as in train_job.sh)
 # Generous memory on purpose: the smoke test measures peak RAM, which then sizes train_job.sh.
-#PBS -N svr_smoke
+#PBS -N Austin-Train
 #PBS -q development
 #PBS -l select=1:ncpus=8:mem=96gb:ngpus=1:vntype=gpu
 #PBS -l place=free

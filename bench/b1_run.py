@@ -4,7 +4,7 @@ Same outputs as b0_dump.py (inputs, per-frame log-probs, timings), but everythin
 from our code: svr.preprocess for the input, svr.model for the network. Beam search is run
 later by score.py with our decoder.
 
-    venv/bin/python -m bench.b1_run
+    venv-svr/bin/python -m bench.b1_run
 """
 from bench.common import GADDY_CHECKPOINT
 from bench.run_model import run

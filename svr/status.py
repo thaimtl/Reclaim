@@ -1,6 +1,6 @@
 """One-screen status of a supervised training run.
 
-    venv/bin/python -m svr.status B1T
+    venv-svr/bin/python -m svr.status B1T
 """
 import glob
 import json
@@ -28,7 +28,7 @@ def main():
     rows = [epochs[k] for k in sorted(epochs)]
     out = [f'== {name}  ({time.strftime("%Y-%m-%d %H:%M:%S")})']
     if rows:
-        last = rows[-1]
+        last = rows[-1]  # SVR-1 runs log dev_homophene10_top1 and train_speak / train_cut_rows from the first alignment
         recent = rows[-5:]
         epoch_s = sum(r.get('epoch_wall_seconds', 0) for r in recent) / len(recent)
         remaining = cfg['epochs'] - last['epoch']
@@ -39,6 +39,10 @@ def main():
                    + (f"  beam+LM {100 * beams[-1]['dev_wer_beam_lm']:.1f}% (epoch {beams[-1]['epoch']})" if beams else '')
                    + (f"  dev homophene-10 {100 * last['dev_homophene10_top1']:.1f}%"
                       if 'dev_homophene10_top1' in last else ''))
+        if 'best_epoch' in last:
+            out.append(f"best so far: epoch {last['best_epoch']}, dev WER greedy {100 * last['best_dev_wer_greedy']:.1f}% "
+                       f"(model.pt; early stop after {cfg.get('patience', 0)} epochs without improvement, "
+                       f"not before epoch {cfg.get('min_epochs', 0)})")
         out.append(f"epoch time {epoch_s:.0f} s  ETA {remaining * epoch_s / 3600:.2f} h  lr {last['lr']:.2e}  "
                    f"optimizer step {last['opt_step']}")
         tflops = [r['achieved_tflops'] for r in recent if 'achieved_tflops' in r]
@@ -51,13 +55,16 @@ def main():
         p = json.loads(open(progress).read().strip().split('\n')[-1])
         out.append(f"in-epoch: epoch {p['epoch']} micro-batch {p['micro_batch']}/{p['micro_batches_in_epoch']}  "
                    f"recent loss {p['recent_loss']:.3f}  ({time.time() - p['time']:.0f} s ago)")
-    pynvml.nvmlInit()
-    h = pynvml.nvmlDeviceGetHandleByIndex(0)
-    mem = pynvml.nvmlDeviceGetMemoryInfo(h)
-    out.append(f"now: GPU {pynvml.nvmlDeviceGetUtilizationRates(h).gpu}%  VRAM {mem.used / 2 ** 30:.1f}/"
-               f"{mem.total / 2 ** 30:.1f} GB  {pynvml.nvmlDeviceGetPowerUsage(h) / 1000:.0f} W  "
-               f"{pynvml.nvmlDeviceGetTemperature(h, pynvml.NVML_TEMPERATURE_GPU)} C  |  "
-               f"RAM {psutil.virtual_memory().percent:.0f}%  CPU {psutil.cpu_percent(interval=1):.0f}%")
+    try:  # this machine's GPU: only meaningful on the node running the job (a login node may have none)
+        pynvml.nvmlInit()
+        h = pynvml.nvmlDeviceGetHandleByIndex(0)
+        mem = pynvml.nvmlDeviceGetMemoryInfo(h)
+        out.append(f"now: GPU {pynvml.nvmlDeviceGetUtilizationRates(h).gpu}%  VRAM {mem.used / 2 ** 30:.1f}/"
+                   f"{mem.total / 2 ** 30:.1f} GB  {pynvml.nvmlDeviceGetPowerUsage(h) / 1000:.0f} W  "
+                   f"{pynvml.nvmlDeviceGetTemperature(h, pynvml.NVML_TEMPERATURE_GPU)} C  |  "
+                   f"RAM {psutil.virtual_memory().percent:.0f}%  CPU {psutil.cpu_percent(interval=1):.0f}%")
+    except pynvml.NVMLError:
+        out.append('now: no GPU on this node (the job runs elsewhere; see qstat)')
     trainers = [p for p in psutil.process_iter(['cmdline', 'ppid'])
                 if 'svr.train' in ' '.join(p.info['cmdline'] or []) and f'--name {name}' in ' '.join(p.info['cmdline'] or [])]
     out.append(f"processes: {len(trainers)} (trainer + Erbium monitor = 2 expected)  "

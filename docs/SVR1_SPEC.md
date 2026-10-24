@@ -2,7 +2,7 @@
 
 SVR-1 is our EMG model: it reads 4 channels of face-muscle signals and, every 100 ms, gives the fusion decoder per-frame letter and sound probabilities, a speaking-or-not signal, the speaking pace and effort, and a verifier that settles disputed look-alike words. This page specifies it precisely enough to implement: inputs, layers, outputs, losses, training, live use, and the models that sit on top of it (the decoder and the lock model). How it fits the whole system: [REALTIME_PIPELINE.md](REALTIME_PIPELINE.md).
 
-The code is in `svr/` (model, training, fine-tuning), `bench/` (benchmarks), `cluster/` (H100/H200 jobs) and `tests/`. It currently implements the previous design; the last section lists every change.
+The code is in `svr/` (model, training, fine-tuning, live wrapper), `bench/` (benchmarks), `cluster/` (H100/H200 jobs, [runbook](../cluster/RUNBOOK.md)) and `tests/`. It implements this design; the last section maps each part to its file. The decoder and the lock model (section 6) are not written yet.
 
 ![SVR-1 architecture: EMG path on top, camera and fusion in the middle, training ideas A to F and the real-time loop G below](../figures/svr1_architecture.png)
 
@@ -23,15 +23,19 @@ The figure is drawn by `figures/make_architecture.py` (also as `figures/svr1_arc
 
 In code: `RIG_TO_SLOT = [2, 1, 5, 0]`, `KEEP = [0, 1, 2, 5]` (the existing `4ch` channel set in `bench/common.py`).
 
-**Filtering: one filter everywhere.** Every EMG signal the model sees, live, in our recordings, and in Berkeley's pretraining data, goes through Thai's causal filter `rig/filters.py`: a 4th-order Butterworth high-pass at 20 Hz plus notches at 60, 120 and 180 Hz (Q = 10), applied with `scipy.signal.sosfilt` in time order, its state initialised from the first sample and carried across chunks. Never `filtfilt`. Berkeley's raw 1 kHz recordings are re-filtered this way and re-cached; Gaddy's original zero-phase notch and 2 Hz high-pass are no longer used.
+**Filtering: one filter everywhere.** Every EMG signal the model sees, live, in our recordings, and in Berkeley's pretraining data, goes through Thai's causal filter `rig/filters.py`: a 4th-order Butterworth high-pass at 20 Hz plus notches at 60, 120 and 180 Hz (Q = 10), applied with `scipy.signal.sosfilt` in time order, its state initialised from the first sample and carried across chunks. Never `filtfilt`. Berkeley's raw 1 kHz recordings are re-filtered this way and re-cached (`data/preprocessed_causal/`); Gaddy's original zero-phase notch and 2 Hz high-pass remain only for reproducing his released model.
+
+Live, the filter has been running for minutes before anyone speaks. A recording starts cold, so the filter first runs over the recording's first second played backwards (it joins the recording with no jump), then over the recording itself. The 20 Hz high-pass and the notches settle in about 0.1 s. Filtering a clip in 10-sample chunks gives exactly the same output as filtering it whole.
 
 **Resampling and frames.** As in Gaddy and Klein: linear resampling from 1,000 Hz to 689.06 Hz, then frames of 8 samples, so 86.13 frames per second (11.6 ms per frame).
 
 **Scaling.** Our ADC counts and Berkeley's units differ, so each channel is scaled to Berkeley's level before the usual soft clip:
 
-1. Per channel, the robust spread of the filtered signal over a session is `1.4826 × median(|x − median(x)|)`, computed over all of that session's clips (live: over the calibration minute).
-2. Multiply channel *c* by `s_c = target_c / spread_c`, where `target_c` is the same statistic over Berkeley's filtered data for that site (stored once in `data/svr1_targets/scale.json`).
+1. Per channel, the robust spread of the filtered signal (resampled to 689 Hz) over a session is `1.4826 × median(|x − median(x)|)`, computed over all of that session's clips (live: over the calibration minute).
+2. Multiply channel *c* by `s_c = target_c / spread_c`, where `target_c` is the same statistic over all of Berkeley's filtered data for that site. Berkeley's own sessions are scaled the same way, each to the pooled target, so every session, Berkeley's or Austin's, reaches the model at the same level. The targets are in `data/svr1_targets/scale.json` and travel inside every checkpoint (`scale_target`), so fine-tuning and the live loop don't need the Berkeley data.
 3. Then Gaddy's soft clip: `x / 20`, then `50 · tanh(x / 50)`.
+
+The cache holds the filtered, resampled signal before scaling; the gain and soft clip are applied when it is loaded.
 
 The session adapter (below) learns whatever difference remains.
 
@@ -66,10 +70,17 @@ flowchart TD
 | Letter log-probabilities | frames × 38 | Proposing words (CTC prefix search) and grading any candidate (CTC log-likelihood) inside the joint search; the space symbol marks word ends |
 | Phoneme log-probabilities | frames × 40 | Grading candidates by sound (CTC log-likelihood), used only when every candidate has a pronunciation |
 | Speaking probability | frames | Sentence start and end, word boundaries, gating the camera's activity signal |
-| Rate | 1 per utterance | The voice's speed (`generation_config`), and the gate |
-| Effort | frames | Not learned: RMS of the filtered, scaled signal over 100 ms, normalised by the session's speaking median; the voice's volume |
+| Rate | 1 per utterance | The voice's speed (`pace` on `voice.say`), and the gate |
+| Effort | frames | Not learned: RMS of the filtered, scaled signal over 100 ms, normalised by the session's speaking median; the voice's volume (`effort` on `voice.say`) |
 | Verifier score | 1 per candidate | Settling the few disputed words between close candidates |
 | Articulator positions | frames × 13 | Training only: 12 tongue/lip/jaw trajectories + loudness from SPARC |
+
+**Pace and effort for the voice.** `voice.say` carries both as relative numbers, 1.0 = Austin's normal, so the voice side never needs to know about EMG:
+
+- `pace = exp(0.37 · z) / pace_ref`: z is the rate head's output (the z-score of log letters per second, so `exp(0.37 · z)` is the speaking rate relative to Berkeley's average), and `pace_ref` is its median over Austin's plain natural-pace clips (saved by fine-tuning, refreshed by the calibration minute).
+- `effort = RMS over the last 100 ms / effort_ref`: `effort_ref` is the median of that RMS over the session's speaking frames (from fine-tuning, refreshed by calibration).
+
+Effort is sent with every message, not once per sentence, so the voice can stress single words. Frank maps pace to Cartesia speed 0.6 to 1.5 and effort to volume 0.5 to 2.0. Sonic ignores `generation_config` changes inside a context but honours inline `<speed>`, `<volume>` and `<emotion>` tags, which is how a change reaches the middle of a sentence.
 
 **Candidate score.** For candidate sentence *y*, SVR-1's score is
 
@@ -109,6 +120,10 @@ The same alignments give the speaking targets.
 - **Hardware simulation** with probability 0.8: small channel mixing, gain ±15%, a random first-order high-pass between 2 and 70 Hz half the time, 10-bit quantisation, noise.
 - **Time masking:** up to 3 spans of up to 8 frames.
 - **Channel dropout**, only in 8-slot pretraining: p = 0.25, at least 3 channels kept.
+- **Delivery styles**, the ones Austin records ([RECORDING.md](../RECORDING.md)), applied to muscle amplitude (the soft clip undone, then redone):
+    - **Slow speech:** 15% of the speed-augmented rows are slowed to 0.5 to 0.8× instead. A row is never slowed past the point where its micro-batch's padded size grows by more than 1.25× (the size all rows at 0.8× would give), so peak memory is unchanged.
+    - **Effort:** half the rows have every channel multiplied by 0.5 to 2×, like soft or emphatic articulation.
+    - **Held expression:** a quarter of the rows get tonic muscle noise ramped in over 0.1 to 0.5 s, strongest on slot 0 (site 1, the cheek above the mouth, near the smile muscles), then slot 5, then the chin slots, like a smile, frown or surprise held while mouthing.
 
 **Optimisation:**
 - AdamW, betas 0.9 / 0.98, learning rate 4e-4, weight decay 0.01 (none on norms, biases and the adapter).
@@ -116,7 +131,7 @@ The same alignments give the speaking targets.
 - EMA of weights 0.999, with a warm-up of `min(0.999, (1 + step) / (10 + step))`.
 - bf16.
 - Batches: one utterance per row, sorted within chunks of 1,024 and filled to 112,000 padded samples (about 97% real signal, about 405 steps per epoch).
-- 150 epochs, about 61,000 steps.
+- 150 epochs, about 61,000 steps (Gaddy and Klein: 200 epochs of larger steps, about 50,000). After every epoch the EMA model is scored on Berkeley's dev set (greedy WER): `model.pt` keeps the best epoch, `model_last.pt` the latest. Early stopping ends the run after 20 epochs without a better dev WER, never before epoch 60.
 
 ### Stages
 
@@ -124,15 +139,17 @@ The same alignments give the speaking targets.
 | --- | --- | --- | --- |
 | 0. Targets | Berkeley (19 h, 1 speaker) | nothing | Re-filter and re-cache with `rig/filters.py`; SPARC articulators; phonemes; scale statistics |
 | 1. Pretrain | Berkeley, slots 0, 1, 2, 5 | everything | Main run `SVR1_4ch`; optional 8-slot run with channel dropout, then 50 epochs on the 4 slots (`--init-from`). Cluster: H100/H200 |
-| 2. Fine-tune | Austin, sessions 1 and 2 | everything, lr 1e-4, 40 epochs, EMA 0.998 | Rest clips as negatives for speaking; camera N-best negatives for the judge; 10% of session 2 held out for early stopping |
+| 2. Fine-tune | Austin, sessions 1 and 2 | everything, lr 1e-4, 40 epochs, EMA 0.998 | Rest clips as negatives for speaking (and all-blank letter targets); camera N-best negatives for the judge; 10% of session 2 held out for early stopping; clips with a recorder warning (flat or pinned channel, short EMG) skipped; session 3's scale factors come from its first ~60 s of clips only, like the demo-day calibration minute; no hardware simulation (it is the real rig); the deliveries are real data here, and results are broken down by pace, expression and effort |
 | 3. Calibrate | ~1 min before the demo | adapter only, 50 steps | Also recomputes the scale factors s_c |
 
 The comparison baseline is Gaddy and Klein's architecture retrained on the same 4 slots with their recipe (`G4`), on the Berkeley benchmarks and on Austin's session 3.
 
 ## 5. Live use, every 100 ms
 
-1. The EMG reader keeps the filtered, scaled signal of the current segment in a ring buffer. The filter is causal, so it runs once per sample as samples arrive; nothing is re-filtered.
-2. Every 100 ms, SVR-1 re-reads the whole current segment (up to 8 s; longer segments keep the last 2 s as context) and publishes per-frame letter and phoneme log-probabilities, the speaking probability, the rate and the effort.
+`svr/live.py` (`LiveSVR1`) does this inside the decoder process: `feed()` each `emg.raw` message, `read()` every 100 ms, `verify()` for disputed candidates, `calibrate()` on the demo-day minute.
+
+1. The EMG reader keeps the filtered signal (60 s) in a ring buffer. The filter is causal, so it runs once per sample as samples arrive; nothing is re-filtered.
+2. Every 100 ms, SVR-1 re-reads the whole current segment (up to 8 s; longer segments keep the last 2 s as context), or the last 2 s while nobody is speaking, and returns per-frame letter and phoneme log-probabilities with frame times, the speaking probability, the rate, `pace` and `effort`.
 3. The decoder calls the verifier only for the disputed candidates of words about to lock.
 4. A segment starts when the speaking probability (or the camera's mouth activity) rises, including 300 ms before, and ends after 0.5 s below threshold on both.
 
@@ -200,18 +217,21 @@ At the end of a sentence, the final pass rescores with the camera's attention be
 
 Reference points: Gaddy and Klein report 76.8% of words wrong for their best 4 sites against 68.0% for all 8, on their audio-output metric. Our Gaddy-architecture retrain on 6 sites reached 33.2% WER (beam + LM) and 84.0% homophene-10. The 4-site numbers come from the `G4` and `SVR1_4ch` runs.
 
-## 8. Changes from the current code
+## 8. Code map
 
-| File | Change |
-| --- | --- |
-| `svr/preprocess.py`, `svr/data.py` | Replace the zero-phase notch + 2 Hz high-pass with `rig/filters.py` run in order; re-cache Berkeley to a new cache folder; add the scale statistics |
-| `svr/svr1.py` | Add the speaking head (`Linear(512, 1)`, output `speak_logit`); keep `n_fixed = 0` (the fixed-sentence head is unused) |
-| `svr/train_svr1.py` | Default `--keep-channels 0,1,2,5`; add the speaking loss, forced alignments every 10 epochs, and partial-sentence training; nothing closed-mouth remains |
-| `svr/finetune.py` | Rig columns → slots `[2, 1, 5, 0]`; `rig/filters.py` and the scale factors instead of the old filter; drop the fixed-sentence head, "none" and closed-lips transfer; camera N-best negatives from recorded video; read the recorder's file format |
-| `svr/recordings.py` | Load the recorder's 4-channel EMG and per-sample timestamps (format set with the recorder) |
-| `svr/live.py` (new) | The live wrapper: ring buffer, causal filter state, scaling, re-read every 100 ms, outputs as in section 3 |
-| `fusion/decoder.py`, `fusion/lock.py` (new) | The joint decoder, gate and lock model of section 6 |
-| `bench/` | Run the benchmarks at 4 slots with the new preprocessing |
-| `cluster/svr1_sweep.sh` | Main run `SVR1_4ch`, baseline `G4`; the old 6-site runs are retired |
-| `tests/smoke_svr1_units.py` | 4 slots, the speaking head, partial-sentence cuts |
-| `figures/make_architecture.py` | The figure on this page |
+| Part | File | Status |
+| --- | --- | --- |
+| Causal filtering, resampling, scaling, rig slots `[2, 1, 5, 0]` | `svr/preprocess.py` (filter from `rig/filters.py`) | Done |
+| Berkeley splits, causal cache, scale statistics | `svr/data.py`, `python -m svr.precompute_svr1 cache` | Done |
+| Network with the speaking head (`speak_logit`); `n_fixed = 0` | `svr/svr1.py` | Done; checkpoints from before the speaking head still load |
+| Forced alignment, speaking targets, partial-sentence targets | `svr/align.py` | Done |
+| Pretraining: 4 slots by default, speaking loss, alignments every 10 epochs from epoch 20, partial sentences, delivery augmentation | `svr/train_svr1.py` | Done; `--device cpu` for tiny correctness runs |
+| Articulator targets on the causal cache | `svr/precompute_svr1.py` (`sparc`, `align`) | Done |
+| `G4` baseline on the causal inputs | `svr/train.py --preprocess causal` (default) | Done |
+| Fine-tuning on the recorder's format; calibration mode; `G4` fine-tune | `svr/finetune.py` | Done; the fixed-sentence head, "none" and closed-lips transfer are gone |
+| Live wrapper | `svr/live.py` | Done; library, no bus code (the decoder process owns the bus) |
+| Benchmarks at 4 slots with the checkpoint's own preprocessing | `bench/run_model.py` | Done |
+| Cluster runs `SVR1_4ch` and `G4`, smoke tests, runbook | `cluster/` | Done |
+| Unit checks: 4 slots, speaking head, causal filter, alignment, cuts, delivery augmentation, live wrapper | `tests/smoke_svr1_units.py` | Done |
+| Joint decoder, gate, lock model | `fusion/decoder.py`, `fusion/lock.py` | Not started |
+| The figure on this page | `figures/make_architecture.py` | Done |

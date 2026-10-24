@@ -4,7 +4,7 @@ Uses the worst real micro-batch (most 200-frame windows) over 5 epochs of the sa
 measured peak is an upper bound for the full run. Runs fwd + bwd + AdamW step 4 times under the
 same per-process VRAM cap as training.
 
-    venv/bin/python -m tests.smoke_vram_sweep 384000
+    venv-svr/bin/python -m tests.smoke_vram_sweep 384000
 """
 import json
 import os

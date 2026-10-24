@@ -7,7 +7,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 NAME=$1; shift
-PY=venv/bin/python
+PY=${PY:-venv-svr/bin/python}; [ -x "$PY" ] || PY=venv/bin/python  # venv: cluster copies set up before venv-svr
 OUT=checkpoints/_smoke_cluster
 rm -rf "$OUT/$NAME"
 mkdir -p "$OUT"

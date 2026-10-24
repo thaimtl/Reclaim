@@ -1,6 +1,6 @@
 """Build benchmark_results/LEADERBOARD.md from every <model>/summary.json.
 
-    venv/bin/python -m bench.report
+    venv-svr/bin/python -m bench.report
 """
 import glob
 import json
