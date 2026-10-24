@@ -358,8 +358,7 @@ class EmotionWorker:
     def _run_net(self, slot):
         try:
             with self._lock:
-                emotion = self.net_tagger.push(*slot)
-            self._net = (emotion, time.monotonic())
+                self._net = (self.net_tagger.push(*slot), time.monotonic())
             self.net_failures = 0
         except Exception:  # noqa: BLE001
             self.net_failures += 1
