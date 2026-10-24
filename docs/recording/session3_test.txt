@@ -1,0 +1,100 @@
+s3_001	Hello, thanks for picking up.
+s3_002	Can you hear me clearly?
+s3_003	I'm doing great today, thanks for asking.
+s3_004	It's really nice to talk to you.
+s3_005	I'm calling from the hackathon.
+s3_006	We've been working since Friday night.
+s3_007	I've had way too much coffee.
+s3_008	I think I slept about three hours.
+s3_009	The food here has been pretty good.
+s3_010	I had a burrito for lunch.
+s3_011	Where are you right now?
+s3_012	Is it cold outside where you are?
+s3_013	It's been windy here all day.
+s3_014	What do you like to do for fun?
+s3_015	I like playing video games with friends.
+s3_016	I also go running when I can.
+s3_017	I'm learning to play the guitar.
+s3_018	My fingers hurt after practice.
+s3_019	Do you have any pets?
+s3_020	I have a cat named Pepper.
+s3_021	She sleeps on my keyboard.
+s3_022	She knocks everything off my desk.
+s3_023	I grew up in California.
+s3_024	My parents still live there.
+s3_025	I visit them during the holidays.
+s3_026	My mom makes amazing dumplings.
+s3_027	I've tried to make them myself.
+s3_028	Mine always fall apart.
+s3_029	What's your favorite movie?
+s3_030	I watched a great movie last week.
+s3_031	It was about a robot that learns to paint.
+s3_032	I didn't expect it to be so sad.
+s3_033	I'd recommend it to anyone.
+s3_034	What did you study in school?
+s3_035	I'm studying computer science.
+s3_036	I really like machine learning.
+s3_037	It's hard but very rewarding.
+s3_038	I want to build things that help people.
+s3_039	My first project was a simple game.
+s3_040	It was full of bugs.
+s3_041	I learned so much from it.
+s3_042	Have you been to a hackathon before?
+s3_043	The energy here is incredible.
+s3_044	Everyone is so creative.
+s3_045	I met a team building a robot arm.
+s3_046	Another team made a music app.
+s3_047	I'm a little nervous right now.
+s3_048	I hope everything works.
+s3_049	We tested it all night.
+s3_050	I'm really proud of my team.
+s3_051	They worked so hard this weekend.
+s3_052	We should all get some sleep tonight.
+s3_053	I can't wait to go home and rest.
+s3_054	What time is it where you are?
+s3_055	It's almost dinner time here.
+s3_056	I'm thinking about getting sushi.
+s3_057	Do you like sushi?
+s3_058	I always order the salmon.
+s3_059	I'd like to visit Japan someday.
+s3_060	I've heard the food is amazing.
+s3_061	I want to see the cherry blossoms.
+s3_062	Maybe I'll go next spring.
+s3_063	Have you traveled much?
+s3_064	I went to Mexico last year.
+s3_065	The beaches were beautiful.
+s3_066	I got a really bad sunburn.
+s3_067	I should have worn more sunscreen.
+s3_068	I'll be more careful next time.
+s3_069	How was your day so far?
+s3_070	That sounds really busy.
+s3_071	You should take a break.
+s3_072	Make sure you drink some water.
+s3_073	I'm glad you could call today.
+s3_074	Thanks for being so patient with me.
+s3_075	Sorry, could you repeat that?
+s3_076	I think I missed what you said.
+s3_077	Oh, that makes sense now.
+s3_078	Yes, I completely agree.
+s3_079	No, I don't think so.
+s3_080	Maybe, I'm not sure yet.
+s3_081	I'll have to think about it.
+s3_082	Let me get back to you on that.
+s3_083	That's a really interesting idea.
+s3_084	I never thought of it like that.
+s3_085	I learned something new today.
+s3_086	It was great talking to you.
+s3_087	I hope we can talk again soon.
+s3_088	Good luck with the rest of the judging.
+s3_089	Enjoy the rest of your evening.
+s3_090	Take care and have a good night.
+s3_091	Bye for now.
+s3_092	I'll send you a message later.
+s3_093	My friend just walked in.
+s3_094	He says hello.
+s3_095	We're going to get dinner together.
+s3_096	I'll call you tomorrow.
+s3_097	Thanks again for everything.
+s3_098	Have a safe trip home.
+s3_099	See you soon.
+s3_100	I'm really happy with how today went.

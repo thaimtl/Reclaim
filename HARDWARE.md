@@ -39,8 +39,8 @@ The 2 extras go on once the core 4 are clean, and they double as spares if a cor
 | A1 | 2 | Left corner of the chin | Lower lip and jaw |
 | A2 | 6 | Right cheek, just below the mouth | Lower lip |
 | A3 | 1 | Left cheek, just above the mouth | Upper lip |
-| A4 | 5 | Right side of the jaw, midway | Jaw, and the jaw-clench cancel gesture |
-| A5 | 8 | Back of the right cheek, 4 cm in front of the ear | The chewing muscle, and the jaw-clench cancel gesture |
+| A4 | 5 | Right side of the jaw, midway | Jaw |
+| A5 | 8 | Back of the right cheek, 4 cm in front of the ear | The chewing muscle, at the back of the cheek |
 
 The chin channel matters most.
 The muscles that move the tongue sit just above the skin under the chin, so the pad reads the tongue, which no camera can see.

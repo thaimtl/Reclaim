@@ -1,0 +1,250 @@
+s2_001	Good morning, how did you sleep?
+s2_002	I'm calling to check in on you.
+s2_003	Is now a good time to talk?
+s2_004	Sorry, the connection is a bit bad.
+s2_005	I can hear you much better now.
+s2_006	Give me one second to find a quiet spot.
+s2_007	Okay, I'm back.
+s2_008	What were you saying before?
+s2_009	That makes a lot of sense.
+s2_010	I completely agree with you.
+s2_011	I see your point, but I'm not so sure.
+s2_012	Let me think about that for a moment.
+s2_013	Honestly, I have no idea.
+s2_014	That's a really good question.
+s2_015	I've never thought about it that way.
+s2_016	Can you explain that a little more?
+s2_017	I didn't catch the last part.
+s2_018	So what do you think we should do?
+s2_019	I'd go with the first option.
+s2_020	The second one looks cheaper.
+s2_021	Let's compare them side by side.
+s2_022	I made a list of pros and cons.
+s2_023	We can decide after dinner.
+s2_024	I'm starving, what's for lunch?
+s2_025	How about a sandwich and some soup?
+s2_026	I'll have a turkey sandwich.
+s2_027	Could you put mustard on it?
+s2_028	No onions for me please.
+s2_029	I'm allergic to peanuts.
+s2_030	Is there any milk in this?
+s2_031	I'll just have water, thanks.
+s2_032	The soup is too hot right now.
+s2_033	Let it cool down for a minute.
+s2_034	I spilled coffee on my shirt.
+s2_035	Do you have a napkin?
+s2_036	I need to change before the meeting.
+s2_037	I'm meeting my manager at noon.
+s2_038	She wants to talk about my project.
+s2_039	I think it's going pretty well.
+s2_040	We're a little behind schedule.
+s2_041	We need two more days to finish.
+s2_042	I'll stay late tonight to catch up.
+s2_043	Could you help me with this part?
+s2_044	I'm stuck on the same problem.
+s2_045	I've tried everything I can think of.
+s2_046	Maybe we should ask someone else.
+s2_047	Let's look at it with fresh eyes.
+s2_048	Oh, I see the mistake now.
+s2_049	It was just a missing number.
+s2_050	That was a lot easier than I thought.
+s2_051	Thanks, you saved me hours.
+s2_052	I owe you one.
+s2_053	How was your weekend?
+s2_054	I went hiking with some friends.
+s2_055	We climbed all the way to the top.
+s2_056	My legs are still sore.
+s2_057	The view from the top was incredible.
+s2_058	We saw a deer on the way down.
+s2_059	It started to snow a little.
+s2_060	I wish I had brought gloves.
+s2_061	My hands were freezing.
+s2_062	We stopped for hot chocolate after.
+s2_063	What did you do this weekend?
+s2_064	I mostly stayed home and rested.
+s2_065	I cleaned my whole apartment.
+s2_066	I finally did my laundry.
+s2_067	I found twenty dollars in my pocket.
+s2_068	That made my whole day.
+s2_069	I'm thinking about getting a cat.
+s2_070	Cats are easier than dogs.
+s2_071	My landlord doesn't allow pets.
+s2_072	I might have to move next year.
+s2_073	Rent is getting really expensive.
+s2_074	I'd love to live near the ocean.
+s2_075	I grew up near the mountains.
+s2_076	Winters there were very long.
+s2_077	I learned to ski when I was five.
+s2_078	I broke my arm the first year.
+s2_079	I was in a cast for six weeks.
+s2_080	It itched the whole time.
+s2_081	Do you play any instruments?
+s2_082	I've always wanted to learn guitar.
+s2_083	My roommate plays the drums.
+s2_084	He practices every night at ten.
+s2_085	I bought him headphones for his birthday.
+s2_086	What kind of music do you like?
+s2_087	I listen to a little bit of everything.
+s2_088	I went to a concert last month.
+s2_089	The band played for three hours.
+s2_090	I lost my voice from singing along.
+s2_091	We got home at two in the morning.
+s2_092	I was so tired the next day.
+s2_093	I drank four cups of coffee.
+s2_094	I should really cut back on caffeine.
+s2_095	I'm trying to drink more water.
+s2_096	I started running in the mornings.
+s2_097	I can run three miles now.
+s2_098	My goal is to run a half marathon.
+s2_099	I signed up for a race in May.
+s2_100	Will you come cheer for me?
+s2_101	I'll make a sign for you.
+s2_102	That would be really fun.
+s2_103	Where should we go for vacation?
+s2_104	I've heard Hawaii is beautiful.
+s2_105	Flights are cheaper in the fall.
+s2_106	Let's book it before prices go up.
+s2_107	I'll need to ask for time off.
+s2_108	My boss is pretty flexible.
+s2_109	I haven't taken a day off in months.
+s2_110	I really need a break.
+s2_111	Let's go somewhere warm.
+s2_112	I want to lie on the beach all day.
+s2_113	I'll bring a good book.
+s2_114	Don't forget your passport.
+s2_115	I renewed mine last year.
+s2_116	The photo looks nothing like me.
+s2_117	Everyone says that about their photo.
+s2_118	What time does the store open?
+s2_119	I think it opens at eight.
+s2_120	I need to buy groceries.
+s2_121	We're out of bread and eggs.
+s2_122	Can you pick up some bananas?
+s2_123	Get the ones that are a little green.
+s2_124	I'll make banana bread on Sunday.
+s2_125	My grandma taught me how to bake.
+s2_126	She makes the best apple pie.
+s2_127	I visit her every holiday.
+s2_128	She's turning ninety next month.
+s2_129	We're planning a big party for her.
+s2_130	The whole family is coming.
+s2_131	My cousins are flying in from Texas.
+s2_132	I haven't seen them in five years.
+s2_133	I wonder if they've changed much.
+s2_134	I'll bring my camera to the party.
+s2_135	We should take a family photo.
+s2_136	My uncle always tells the same jokes.
+s2_137	They still make me laugh every time.
+s2_138	Family is really important to me.
+s2_139	I call my parents every Sunday.
+s2_140	My dad just retired last year.
+s2_141	He spends all day in the garden.
+s2_142	He grows tomatoes and peppers.
+s2_143	The tomatoes taste so much better.
+s2_144	My mom is a nurse.
+s2_145	She works long night shifts.
+s2_146	I don't know how she does it.
+s2_147	She's the strongest person I know.
+s2_148	I want to make her proud.
+s2_149	I'm the first in my family to go to college.
+s2_150	It hasn't always been easy.
+s2_151	I had a lot of help along the way.
+s2_152	My teachers believed in me.
+s2_153	One teacher changed my life.
+s2_154	She stayed after class to help me.
+s2_155	I still email her sometimes.
+s2_156	She was so happy when I graduated.
+s2_157	What advice would you give your younger self?
+s2_158	I'd tell myself to worry less.
+s2_159	Most things turn out fine.
+s2_160	It's okay to ask for help.
+s2_161	Nobody has it all figured out.
+s2_162	I'm still learning every day.
+s2_163	I think curiosity is really important.
+s2_164	I ask a lot of questions.
+s2_165	Sometimes too many questions.
+s2_166	My friends tease me about it.
+s2_167	I don't mind, it's who I am.
+s2_168	Are you free on Thursday?
+s2_169	I have a doctor's appointment at ten.
+s2_170	It's just a regular checkup.
+s2_171	I'll be done by eleven.
+s2_172	Let's meet at the coffee shop on Main Street.
+s2_173	I'll get us a table.
+s2_174	Text me when you're on your way.
+s2_175	I'm leaving the house now.
+s2_176	I'm five minutes away.
+s2_177	I'm parking right now.
+s2_178	I see you by the door.
+s2_179	Wow, you cut your hair.
+s2_180	It looks really good.
+s2_181	I needed a change.
+s2_182	I donated the hair I cut.
+s2_183	That's a really nice thing to do.
+s2_184	I try to give back when I can.
+s2_185	I volunteer at the food bank.
+s2_186	We packed three hundred boxes last week.
+s2_187	It feels good to help.
+s2_188	You should come with me next time.
+s2_189	I'd love to.
+s2_190	Just tell me when and where.
+s2_191	It's every Saturday at nine.
+s2_192	Wear comfortable shoes.
+s2_193	We'll be standing most of the day.
+s2_194	Bring a water bottle too.
+s2_195	Did you finish the report?
+s2_196	I sent it last night.
+s2_197	Let me know if anything is missing.
+s2_198	I added the new numbers.
+s2_199	The chart is on page four.
+s2_200	Sales went up by ten percent.
+s2_201	That's better than last year.
+s2_202	The team worked really hard.
+s2_203	We should thank them.
+s2_204	Let's bring them donuts on Monday.
+s2_205	Everybody loves donuts.
+s2_206	I'll get a dozen.
+s2_207	Get some with sprinkles.
+s2_208	Is it supposed to rain tomorrow?
+s2_209	I think it's going to be sunny.
+s2_210	Perfect weather for a picnic.
+s2_211	Let's go to the park.
+s2_212	I'll bring a blanket and some fruit.
+s2_213	Don't forget the frisbee.
+s2_214	We can play until it gets dark.
+s2_215	The park gets busy on weekends.
+s2_216	Let's go early to find a good spot.
+s2_217	Can you believe how fast this year went?
+s2_218	It feels like it just started.
+s2_219	I'm excited for next year.
+s2_220	I have so many plans.
+s2_221	I want to learn a new language.
+s2_222	Maybe Spanish or French.
+s2_223	I took Spanish in high school.
+s2_224	I only remember how to order food.
+s2_225	That's the most important part.
+s2_226	I need to call the bank.
+s2_227	There's a charge I don't recognize.
+s2_228	It was only five dollars.
+s2_229	I still want to check it.
+s2_230	They said it was a mistake.
+s2_231	I'll get the money back in a week.
+s2_232	I lost my wallet once.
+s2_233	Someone found it and mailed it back.
+s2_234	Nothing was missing.
+s2_235	That restored my faith in people.
+s2_236	Mom made beef stew for dinner.
+s2_237	Please put the plates by the sink.
+s2_238	The baby finally fell asleep.
+s2_239	Bob and Pam are coming over later.
+s2_240	My thumb hurts from typing all day.
+s2_241	I think the van needs new brakes.
+s2_242	Five of us went to the movies.
+s2_243	The dentist said my teeth look fine.
+s2_244	I'd like a dozen tulips for my mom.
+s2_245	The kids are playing in the yard.
+s2_246	Grab a bag of ice on your way.
+s2_247	Could you turn the volume down a little?
+s2_248	I keep forgetting to water the plants.
+s2_249	Let me know what you decide and I'll book the tickets.
+s2_250	We could split the cost if that works for you.

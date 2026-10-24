@@ -1,8 +1,8 @@
 # Evan: the real-time camera reader
 
-Your job: turn the webcam into a live stream of lip-reading probabilities, a "is he mouthing" signal and a facial-expression tag, fast enough that words appear on screen about 0.3 s after Austin mouths them. You use Auto-AVSR as is: no recording, no training. Everything runs on Austin's laptop (RTX 5060, 8 GB).
+Your job: turn the webcam into a live stream of lip-reading probabilities, a "is he mouthing" signal and a facial-expression tag, every 100 ms, fast enough that words appear on screen within about 0.2 s of Austin mouthing them. You use Auto-AVSR as is: no recording, no training. Everything runs on Austin's laptop (RTX 5060, 8 GB). You can prototype on your MacBook (Lipflow was built for Macs and runs there), but timing and real tests happen only on Austin's laptop.
 
-You do not decide the final words. You publish what the camera sees, every 200 ms, and Austin's decoder combines it with EMG and Claude. That keeps your part independent: you can build and test it alone with a webcam.
+You do not decide the final words. You publish what the camera sees every 100 ms, and Austin's decoder combines it with EMG and Claude and decides when each word is confident enough to lock. Your part is a small separate program that publishes messages; Austin's decoder, Frank's dashboard and the logger subscribe to them.
 
 How it fits: [ARCHITECTURE.md](ARCHITECTURE.md). Message formats shared with everyone: [PLAN.md](PLAN.md#interfaces).
 
@@ -13,7 +13,7 @@ flowchart TD
     mp --> act["Mouthing activity<br/>and segments"]
     mp --> emo["Expression → emotion tag"]
     crop --> fe["Resample to 25 fps<br/>front end once per frame, cached"]
-    fe --> loop["Every 200 ms: Conformer re-reads the segment<br/>→ CTC probabilities"]
+    fe --> loop["Every 100 ms: Conformer re-reads the segment<br/>→ CTC probabilities"]
     loop --> pub["Publish cam.tick"]
     act --> pub
     emo --> pub
@@ -53,7 +53,7 @@ Done when: a debug window shows the crop, it looks like Lipflow's offline crops 
 
 ### E2. The re-read loop (2 to 3 hours)
 
-This is the core. Every 200 ms:
+This is the core. Every 100 ms:
 
 1. Take all crops of the current segment (see E4 for where a segment starts and ends), resample them to 25 fps with `LipReader.resample`, and encode the whole segment.
 2. Compute the CTC log-probabilities per frame (`model.ctc.log_softmax(enc)`; blank is token 0).
@@ -61,7 +61,7 @@ This is the core. Every 200 ms:
 
 Why every frame's probabilities and not just the best sentence: the decoder needs to ask "how well does *this* sentence match the lips?" for sentences the camera did not rank first. That is how EMG and Claude can overrule a look-alike mistake.
 
-Done when: a terminal shows the greedy text updating while you mouth, each tick's compute time is logged, and a second process can subscribe to `cam.tick` and print it.
+Done when: a terminal shows the greedy text updating while you mouth, each pass's compute time is logged, and a second program can subscribe to `cam.tick` and print it.
 
 ### E3. Make it fast (about 2 hours)
 
@@ -72,7 +72,7 @@ Measure first, then cut the biggest cost:
 3. Cap a segment at about 8 s. If someone talks longer without pausing, start a new segment that keeps the last 2 s as context, and tell the decoder through the segment fields in `cam.tick`.
 4. Run MediaPipe and the GPU work in different threads, so face tracking never waits for the encoder.
 
-Target: tick compute under 40 ms at the 95th percentile with an 8 s segment. Log per tick: number of frames, front-end time, Conformer time, total.
+Target: under 40 ms per pass at the 95th percentile with an 8 s segment. The whole pass (your camera re-read, SVR-1 and the decoder) has to fit well inside 100 ms, and the GPU is shared, so the camera gets about 40 ms. Put per-pass timings in `cam.tick` as `timing_ms`: number of frames, MediaPipe, front end, Conformer, total. The logger records everything you publish, so every slow pass can be found later.
 
 ### E4. Mouthing activity and segments (about 1 hour)
 
@@ -95,10 +95,11 @@ Done when: smiling, raising eyebrows and frowning while mouthing each produce th
 
 When a segment ends, run Auto-AVSR's own beam search (beam 5, with the subword language model at Lipflow's weight) on the whole segment in a background thread, and publish the 5 best sentences with scores as `cam.final`. Austin's decoder uses it to polish the captions. It must never block the next tick.
 
-### E7. Recording and replay (about 1 hour, needed before the recording session)
+### E7. Recording and replay (about 1 hour; recording is needed for session 1, now)
 
 1. `--record DIR`: save the raw video (MP4) and the per-frame timestamps (`*_video_ts.npy`) of each utterance, named as in our recording format (`svr/recordings.py` in the main folder). Thai's EMG reader stamps with the same `time.monotonic()` clock on the same laptop, so the two line up exactly.
-2. `--replay FILE`: feed a recorded video through the same pipeline at real speed, as if it were the webcam. This lets everyone test the full system without a person mouthing in front of the laptop.
+2. `--replay FILE`: feed a recorded video through the same pipeline at real speed, as if it were the webcam. This lets the team test the full system on Austin's laptop without someone mouthing in front of it every time.
+3. E7's recording mode is needed for session 1, so do it right after E1.
 
 ## Pitfalls
 
@@ -115,7 +116,7 @@ When a segment ends, run Auto-AVSR's own beam search (beam 5, with the subword l
 | When | What |
 | --- | --- |
 | End of E0 | The three encode times, and whether fp16 changes the transcript |
-| End of E2 | A screen recording of live greedy text, plus the per-tick log |
-| End of E3 | p50 and p95 tick times for 2, 4 and 8 s segments |
+| End of E2 | A screen recording of live greedy text, plus the per-pass log |
+| End of E3 | p50 and p95 pass times for 2, 4 and 8 s segments, on Austin's laptop |
 | End of E5 | A short clip showing each emotion label switching |
 | Any time | Anything in Lipflow or Auto-AVSR that does not match this plan |
