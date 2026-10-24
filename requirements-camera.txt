@@ -18,3 +18,6 @@ unidecode
 # Lip reader (venv-live): team bus and replay
 pyzmq>=26
 msgpack>=1.0
+# Emotion tag (lipread/expression.py): HSEmotion ONNX on CPU; the head is fitted with scikit-learn
+onnxruntime>=1.18
+scikit-learn>=1.3
