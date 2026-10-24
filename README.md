@@ -75,6 +75,7 @@ All code lives in this repo; datasets, checkpoints, results and Python environme
 | `camera/` | Camera-only baselines (Auto-AVSR, BRAVEn, LipLearner) |
 | `rig/` | EMG rig: Arduino firmware, serial reader, live hum filter, signal check |
 | `recorder/` | The recording app: camera + EMG + the session sentences ([recorder/README.md](recorder/README.md)) |
+| `call/` | The phone call: Twilio, Austin's cloned voice (Cartesia Sonic) and the judge's captions (Cartesia Ink) ([call/README.md](call/README.md)) |
 | `figures/` | The SVR-1 architecture figure and the script that draws it |
 | `tests/` | Smoke and unit tests |
 | `docs/` | Plans and specs, Markdown with PDF copies |
