@@ -280,6 +280,10 @@ class Camera(threading.Thread):
                         self.cap.set(prop, value)
             if not self.cap.isOpened():
                 sys.exit(f'Cannot open camera {source}. Try --camera 1, or --list-cameras.')
+            if not self.file:
+                # Auto exposure on (0.75 means auto for DirectShow and V4L2): a camera keeps a manual exposure that
+                # another program set until it is unplugged, and the C920 came up nearly black that way.
+                self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
             # a property a backend can't report reads 0 or -1 (DirectShow gives fps -1 after open parameters)
             got = [self.cap.get(p) for p in (cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT, cv2.CAP_PROP_FPS)]
             self.width = int(got[0]) if got[0] > 0 else width
