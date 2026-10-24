@@ -373,6 +373,8 @@ def parse_args(argv=None):
                     metavar='WxH',
                     help='shrink larger frames to fit this before cropping (0: never)')
     ap.add_argument('--half', action='store_true', help='encoder in fp16 (.half())')
+    ap.add_argument('--face-adapter', default=None, metavar='PTH',
+                    help="Lipflow face adapter over the base weights (lipread/adapt.py; same cost per read)")
     ap.add_argument('--segments', choices=('auto', 'stream'), default='auto',
                     help='auto: E4 activity segments; stream: one segment always open (8 s cap)')
     ap.add_argument('--tick-ms', type=int, choices=(100, 200), default=TICK_MS, help='tick period')
@@ -416,8 +418,9 @@ def main(argv=None):
             starter = threading.Thread(target=lambda: box.update(final=FinalPass(None, pub.send)), name='final-start',
                                        daemon=True)
             starter.start()
-        model = LiveModel(half=args.half)
-        log.info('model ready (warm-up %.1f s)', model.warmup_s)
+        model = LiveModel(half=args.half, face_adapter=args.face_adapter)
+        log.info('model ready (warm-up %.1f s%s)', model.warmup_s,
+                 f', face adapter {args.face_adapter}' if args.face_adapter else '')
         if not args.no_final:
             starter.join()
             final = box.get('final')
