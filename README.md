@@ -69,7 +69,7 @@ All code lives in this repo; datasets, checkpoints, results and Python environme
 
 | Folder | What it is |
 | --- | --- |
-| `svr/` | SVR-1, the EMG model: model, training, fine-tuning, preprocessing ([docs/SVR1_SPEC.md](docs/SVR1_SPEC.md)) |
+| `svr/` | SVR-1, the EMG model: model, training, fine-tuning, preprocessing ([docs/SVR1_SPEC.md](docs/SVR1_SPEC.md)); the live EMG reader (`python -m svr.serve`) and offline replay of recordings (`python -m svr.infer`) |
 | `bench/` | Benchmarks and their frozen test splits |
 | `cluster/` | H100/H200 job scripts (PBS), smoke tests, runbook |
 | `camera/` | Camera-only baselines (Auto-AVSR, BRAVEn, LipLearner) |

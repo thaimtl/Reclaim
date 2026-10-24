@@ -31,6 +31,7 @@ SNDHWM = 10000  # a fast replay must not drop at the default 100
 TIME_FIELDS = {
     '': ('t_pub',),
     'emg.raw': ('t0',),
+    'emg.read': ('frame_t', 'seg_start'),
     'cam.tick': ('frame_t', 'seg_start'),
     'cam.face': ('t',),
     'dec.lock': ('words[].t',),

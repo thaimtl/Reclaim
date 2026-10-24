@@ -3,8 +3,8 @@
 One endpoint per producer on the laptop's loopback (TCP, because ipc:// doesn't work on Windows), each overridable by
 RECLAIM_<NAME>_PUB. Each producer binds its endpoint (a second one on the same port fails with EADDRINUSE);
 consumers connect to the ones they need and name their topics. Messages carry v, seq (per topic from 1) and t_pub
-(bus.now() at send). cam.tick / cam.final / cam.face are checked with bus.validate, exactly as bus.Subscriber does (decode(...,
-validate=False) skips it, for logs).
+(bus.now() at send). cam.tick / cam.final / cam.face are checked with bus.validate, exactly as bus.Subscriber does
+(decode(..., validate=False) skips it, for logs).
 
 ZeroMQ sockets are not thread-safe: use one Pub or Sub per thread and never share one. Decoded arrays are
 writeable copies.

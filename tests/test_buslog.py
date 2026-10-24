@@ -143,6 +143,11 @@ def test_retime_nested_and_untouched_fields():
     assert msg['t0'] == 3.0 and msg['fs'] == 1000 and msg['counter'] == 7
     _, msg = decode(retime(encode('dec.hyp', {'utt_id': 3, 't0': 50.0, 'locked': ['hi']}, seq=2, t_pub=51.0), 5.0))
     assert msg['t0'] == 55.0 and msg['t_pub'] == 56.0 and msg['locked'] == ['hi']
+    read = {'seg_id': 2, 'seg_start': 9.5, 'frame_t': np.array([9.6, 9.7]), 'ok': True}
+    _, msg = decode(retime(encode('emg.read', read, seq=3, t_pub=10.0), 2.0))
+    assert msg['seg_start'] == 11.5 and msg['frame_t'].tolist() == [11.6, 11.7] and msg['t_pub'] == 12.0
+    _, msg = decode(retime(encode('emg.read', dict(read, seg_start=None), seq=4, t_pub=10.0), 2.0))
+    assert msg['seg_start'] is None   # outside a segment
 
 
 def test_read_raw_skips_bad_records_and_warns(tmp_path, capsys):

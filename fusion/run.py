@@ -1,13 +1,14 @@
-"""The fusion decoder on the bus: cam.tick, cam.final, claude.predict, claude.repair in; dec.hyp, dec.lock,
+"""The fusion decoder on the bus: cam.tick, cam.final, claude.predict, claude.repair, emg.read in; dec.hyp, dec.lock,
 dec.repeat, voice.say and timing.dec out (endpoint 'dec').
 
 One thread, one socket each way. Every loop drains what has arrived, keeps only the newest cam.tick per seg_id
-(each tick re-reads the whole segment), hands messages to the Decoder in arrival order, then pumps it so the
-repair window and sentence end advance even when nothing arrives. A malformed message is counted, logged on
-timing.dec (stage dec.bad_msg) and skipped, and so is an exception from the decoder: the loop never dies on one.
+(each tick re-reads the whole segment) and the newest emg.read (handed over first), hands messages to the Decoder
+in arrival order, then pumps it so the repair window and sentence end advance even when nothing arrives. A
+malformed message is counted, logged on timing.dec (stage dec.bad_msg) and skipped, and so is an exception from the
+decoder: the loop never dies on one.
 SIGTERM stops it like Ctrl-C.
 
-    RECLAIM_WORKDIR=... python -m fusion.run [--units PATH] [--window 0.3]
+    RECLAIM_WORKDIR=... python -m fusion.run [--units PATH] [--window 0.3] [--no-emg]
 """
 import argparse
 import signal
@@ -17,10 +18,11 @@ import traceback
 import bus
 from bus.team import Pub, Sub
 from fusion.decoder import REPAIR_WINDOW_S, Decoder
+from fusion.emg import EmgSupport
 from fusion.words import SPM, UNITS, load_lookalikes, load_units
 
-SOURCES = ('cam', 'claude')
-TOPICS = ('cam.tick', 'cam.final', 'claude.predict', 'claude.repair')
+SOURCES = ('cam', 'claude', 'svr')
+TOPICS = ('cam.tick', 'cam.final', 'claude.predict', 'claude.repair', 'emg.read')
 POLL_MS = 10
 
 
@@ -41,9 +43,13 @@ def drain(sub, poll_ms, bad):
 
 
 def newest_ticks(msgs):
-    """Drop every cam.tick that a later tick of the same seg_id replaces."""
+    """Drop every cam.tick that a later tick of the same seg_id replaces, and every emg.read but the newest, which
+    goes first so this loop's passes see it."""
     last = {m['seg_id']: i for i, (t, m) in enumerate(msgs) if t == 'cam.tick' and 'seg_id' in m}
-    return [(t, m) for i, (t, m) in enumerate(msgs) if t != 'cam.tick' or last.get(m.get('seg_id')) == i]
+    reads = [i for i, (t, _) in enumerate(msgs) if t == 'emg.read']
+    rest = [(t, m) for i, (t, m) in enumerate(msgs)
+            if t != 'emg.read' and (t != 'cam.tick' or last.get(m.get('seg_id')) == i)]
+    return [msgs[reads[-1]]] + rest if reads else rest
 
 
 def handle(dec, topic, msg, now):
@@ -55,6 +61,8 @@ def handle(dec, topic, msg, now):
         return dec.on_predict(msg, now)
     if topic == 'claude.repair':
         return dec.on_repair(msg, now)
+    if topic == 'emg.read':
+        return dec.on_emg(msg, now)
     return []
 
 
@@ -92,10 +100,11 @@ def main():
     ap.add_argument('--spm', default=SPM, help='the camera\'s unigram5000.model, for look-alike word frequencies (default %(default)s)')
     ap.add_argument('--window', type=float, default=REPAIR_WINDOW_S, help='repair window in seconds')
     ap.add_argument('--no-lookalikes', action='store_true', help='no lip look-alikes in the alts')
+    ap.add_argument('--no-emg', action='store_true', help='ignore emg.read: camera and Claude only')
     args = ap.parse_args()
     units = load_units(args.units)
     dec = Decoder(units, None if args.no_lookalikes else load_lookalikes(units, args.spm),
-                  repair_window_s=args.window)
+                  emg=None if args.no_emg else EmgSupport(), repair_window_s=args.window)
     sub, pub = Sub(SOURCES, TOPICS), Pub('dec')
     signal.signal(signal.SIGTERM, signal.default_int_handler)  # stop the same way as on Ctrl-C
     try:

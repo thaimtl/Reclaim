@@ -41,8 +41,11 @@ segment after 0.5 s still), or ticks stall for STALL_S. Closing locks what it ca
 waits for cam.final: its n-best settles the unlocked words. A word still below threshold, and everything after
 it, is not guessed: dec.repeat says why, and voice.say final=True closes the sentence with the locked words.
 
-EMG hook: pass emg= an object with support(word) -> 0..1 or None (it gets the Word, with t0/t1 in capture
-time) and the gate in lock.py weighs it against the camera. With emg=None (today) the camera has full weight.
+EMG: pass emg=fusion.emg.EmgSupport() and feed it emg.read with on_emg (svr/serve.py). Each pass, before Claude
+looks, a look-alike EMG clearly prefers while the camera can't tell them apart replaces the word (source 'emg'),
+then the word's EMG support (0..1, or None when EMG can't say) goes to the gate in lock.py, and voice.say takes
+EMG's pace and effort. With emg=None, or no fresh emg.read (the Uno pulled), the camera has full weight and the
+voice runs at 1.0.
 """
 import difflib
 import time
@@ -64,7 +67,7 @@ NEAR_TIE = 0.15         # a CTC competitor this close to the greedy word's prob 
 CLAUDE_SWAP_MARGIN = 0.3  # Claude's weight must favour the tied alternative by this much to swap
 NBEST_W = 0.7           # after cam.final, camera confidence = (1 - NBEST_W) * greedy + NBEST_W * n-best support
 PHRASE_WEIGHT = 0.5     # weight of a word that appears only in a predicted phrase
-PACE = 1.0              # voice.say pace and effort, relative to normal (1.0 = normal); EMG will set them
+PACE = 1.0              # voice.say pace and effort without EMG, relative to normal (1.0 = normal)
 EFFORT = 1.0
 KEEP_UTTS = 50          # past utterances kept for late repairs
 CAP_T_MIN = 190         # frames the old segment must have reached for a new one to continue it (cap at 200)
@@ -169,9 +172,11 @@ class Decoder:
         prefix = utt.carry + utt.locked + [w for w in utt.unlocked if w.frozen]
         tail = words[cut(prefix, words, float(frame_t[0])):]
         for w in tail:
+            if self.emg is not None:
+                self._emg_choose(w, now)
             w.claude = self._claude(w.w, now)
             self._choose(w, now)
-            w.emg = self.emg.support(w) if self.emg is not None else None
+            w.emg = self.emg.support(w, now) if self.emg is not None else None
             w.paused = len(act) - 1 - w.f1 >= QUIET_FRAMES and float(act[-QUIET_FRAMES:].max()) < ACT_QUIET
             w.face_ok = bool(msg['face_ok'])
         carry_passes([w for w in utt.unlocked if not w.frozen], tail)
@@ -201,8 +206,18 @@ class Decoder:
         utt.segs.append(seg)
         utt.last_T = 0
 
+    def _emg_choose(self, w, now):
+        """Swap the greedy word for a camera-tied look-alike that EMG clearly prefers (fusion.emg.choose)."""
+        pick = self.emg.choose(w, now)
+        if pick is not None:
+            p_cam = dict(w.alts)[pick[0]]
+            w.alts = [x for x in w.alts if x[0] != pick[0]] + [(w.w, w.cam)]
+            w.w, w.cam, w.source = pick[0], p_cam, 'emg'
+
     def _choose(self, w, now):
-        """Swap the greedy word for a camera-tied alternative that Claude clearly prefers."""
+        """Swap the greedy word for a camera-tied alternative that Claude clearly prefers; never one EMG chose."""
+        if w.source == 'emg':
+            return
         best, best_c = None, w.claude + CLAUDE_SWAP_MARGIN
         for a, p in w.alts:
             c = self._claude(a, now)
@@ -258,6 +273,11 @@ class Decoder:
         if not utt.unlocked or utt.segs[-1] in utt.nbest:
             out += self._settle(utt, now)
         return out
+
+    def on_emg(self, msg, now):
+        if self.emg is not None:
+            self.emg.on_read(msg, now)
+        return []
 
     def on_final(self, msg, now):
         utt = self.seg_utt.get(msg['seg_id'])
@@ -343,8 +363,9 @@ class Decoder:
         if not ready and not final:
             return []
         utt.final_sent = final   # sent even with no words, so the voice always closes its context
+        pace, effort = self.emg.voice(now) if self.emg is not None else (PACE, EFFORT)
         return [('voice.say', {'utt_id': utt.utt_id, 'words': ready, 'final': final,
-                               'pace': PACE, 'effort': EFFORT})]
+                               'pace': pace, 'effort': effort})]
 
 
 def _norm(x):

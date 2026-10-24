@@ -11,6 +11,9 @@ clip_t0 / clip_t1 on the recorder's bus.now() (time.perf_counter())). Two modes:
                       --set lock.THRESHOLD=0.68 --set decoder.NBEST_W=0.6. Every logged tick is read (live, the
                       decoder may skip stale ones), and a logged claude.repair answered the live decoder's
                       locks, so one whose 'from' no longer matches is ignored.
+                      With EMG: the session's own emg.read (a live session), or --emg LOG, the log svr.infer
+                      wrote from the same recordings; without either, or with --no-emg, camera and Claude only.
+                      --set emg.SWAP_MARGIN=0.2 tunes fusion/emg.py too.
 
 Clocks. Live, frame_t (capture times) and t_pub are both the laptop's bus.now(), and so are the
 recorder's clip_t0 / clip_t1. When the camera replays a recorded clip, frame_t is the recording's video_ts: the
@@ -33,7 +36,11 @@ frames contain t gives offset = t_pub - frame_t[-1] of its first cam.tick, and t
 t_pub - (t + offset). That measures from the camera's first read of the word instead of from capture, leaving
 out the camera's own lag; the report counts these words separately.
 
-    python -m fusion.evaluate SESSION --manifest PATH [--json OUT] [--decode [--set lock.THRESHOLD=0.7]]
+    python -m fusion.evaluate SESSION --manifest PATH [--json OUT] [--decode [--emg LOG] [--no-emg] [--set ...]]
+
+svr.infer's emg.read are stamped on the recorder's clock (t_pub = the read's sample time). A camera replay's t_pub
+is its live clock, so each read is moved by the offset of the camera segment nearest to it (segment_clocks) before
+the inputs are merged in t_pub order.
 """
 import argparse
 import json
@@ -44,8 +51,10 @@ import numpy as np
 
 import buslog
 from fusion import decoder as decoder_mod
+from fusion import emg as emg_mod
 from fusion import lock as lock_mod
 from fusion.decoder import Decoder
+from fusion.emg import EmgSupport
 from fusion.run import TOPICS as IN_TOPICS
 from fusion.run import handle
 from fusion.words import SPM, UNITS, load_lookalikes, load_units
@@ -54,7 +63,7 @@ OUT_TOPICS = ('dec.hyp', 'dec.lock', 'dec.repeat', 'voice.say')
 CLOCK_OK_S = 5.0                                     # |t_pub - frame time| above this: different clocks
 PUMP_STEP_S = 0.02                                   # the live loop pumps about every 10 to 20 ms
 REST_SET = 'B'                                       # recorder sets: C training, E test, B rest (no prompt)
-TUNABLE = {'lock': lock_mod, 'decoder': decoder_mod}
+TUNABLE = {'lock': lock_mod, 'decoder': decoder_mod, 'emg': emg_mod}
 
 
 def settle_s(window):
@@ -67,10 +76,28 @@ def logged_events(session):
     return [(m.get('t_pub', t), topic, m) for t, topic, m in buslog.read(session, OUT_TOPICS)]
 
 
-def decode_events(session, dec, step=PUMP_STEP_S):
-    """Run `dec` over the session's inputs offline; [(now, topic, msg)] of what it would have published."""
+def emg_on_camera_clock(emg_events, segs):
+    """[(t_recv, 'emg.read', msg)] from svr.infer (t_pub = recorder clock) -> the same, t_pub moved by the offset of
+    the camera segment nearest in frame time. Unchanged without camera segments."""
+    if not segs:
+        return list(emg_events)
+    out = []
+    for t_recv, topic, m in emg_events:
+        t = m.get('t_pub', t_recv)
+        off = min(segs, key=lambda s: 0.0 if s[0] <= t <= s[1] else min(abs(t - s[0]), abs(t - s[1])))[2]
+        out.append((t_recv + off, topic, dict(m, t_pub=t + off)))
+    return out
+
+
+def decode_events(session, dec, step=PUMP_STEP_S, emg=None):
+    """Run `dec` over the session's inputs offline; [(now, topic, msg)] of what it would have published. emg: a
+    second log whose emg.read join the inputs (svr.infer's)."""
     out, last, settle = [], None, settle_s(dec.window)
-    inputs = sorted(buslog.read(session, IN_TOPICS), key=lambda r: r[2].get('t_pub', r[0]))
+    inputs = list(buslog.read(session, IN_TOPICS))
+    if emg is not None:
+        inputs = [r for r in inputs if r[1] != 'emg.read']
+        inputs += emg_on_camera_clock(buslog.read(emg, ['emg.read']), segment_clocks(session))
+    inputs.sort(key=lambda r: r[2].get('t_pub', r[0]))
     for t_recv, topic, msg in inputs:
         now = msg.get('t_pub', t_recv)
         if last is not None:
@@ -239,7 +266,8 @@ def apply_overrides(pairs):
         mod, _, const = name.partition('.')
         cur = getattr(TUNABLE.get(mod), const, None) if const.isupper() else None
         if isinstance(cur, bool) or not isinstance(cur, (int, float)):
-            raise SystemExit(f'--set {p}: expected lock.NAME=number or decoder.NAME=number for an existing constant')
+            raise SystemExit(f'--set {p}: expected lock.NAME=number, decoder.NAME=number or emg.NAME=number for an '
+                             'existing constant')
         try:
             x = float(value)
         except ValueError:
@@ -275,24 +303,27 @@ def main(argv=None):
     ap.add_argument('--json', help='write the full result here')
     ap.add_argument('--decode', action='store_true', help='re-run the decoder offline over cam.* and claude.*')
     ap.add_argument('--set', action='append', default=[], metavar='MOD.NAME=X',
-                    help='with --decode: override a constant of fusion.lock or fusion.decoder, repeatable')
+                    help='with --decode: override a constant of fusion.lock, fusion.decoder or fusion.emg, repeatable')
     ap.add_argument('--units', default=UNITS, help='with --decode: unigram5000_units.txt (default %(default)s)')
     ap.add_argument('--spm', default=SPM, help='with --decode: unigram5000.model (default %(default)s)')
     ap.add_argument('--no-lookalikes', action='store_true')
     ap.add_argument('--window', type=float, help='with --decode: repair window, s (default decoder.REPAIR_WINDOW_S)')
+    ap.add_argument('--emg', help="with --decode: svr.infer's log of emg.read for the same recordings")
+    ap.add_argument('--no-emg', action='store_true', help='with --decode: ignore EMG, camera and Claude only')
     args = ap.parse_args(argv)
     if args.decode:
         apply_overrides(args.set)
         units = load_units(args.units)
         dec = Decoder(units, None if args.no_lookalikes else load_lookalikes(units, args.spm),
-                      repair_window_s=args.window)
-        events = decode_events(args.session, dec)
-    elif args.set:
-        raise SystemExit('--set only applies with --decode')
+                      emg=None if args.no_emg else EmgSupport(), repair_window_s=args.window)
+        events = decode_events(args.session, dec, emg=None if args.no_emg else args.emg)
+    elif args.set or args.emg or args.no_emg:
+        raise SystemExit('--set, --emg and --no-emg only apply with --decode')
     else:
         events = logged_events(args.session)
     res = dict(score(events, load_manifest(args.manifest), segment_clocks(args.session)), session=str(buslog.resolve(args.session)),
-               mode='decode' if args.decode else 'logged', overrides=args.set)
+               mode='decode' if args.decode else 'logged', overrides=args.set,
+               emg=None if not args.decode or args.no_emg else (args.emg or 'session'))
     report(res)
     if args.json:
         with open(args.json, 'w') as f:

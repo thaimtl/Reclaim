@@ -32,7 +32,7 @@ Nothing is trained on the pitch or on a script: the judge can ask anything.
 3. Add the speaking-or-not output, partial-sentence training, and augmentation for the recorded deliveries (slow, effort, held expression). Code done.
 4. Train on the cluster: `SVR1_4ch` plus the Gaddy-architecture baseline `G4` on the same 4 sites ([cluster/RUNBOOK.md](../cluster/RUNBOOK.md)).
 5. The recording tool: done, `recorder/record.py` (camera + EMG + the session prompts, in `svr/recordings.py`'s format).
-6. Live EMG reader: subscribe to `emg.raw`, filter, run SVR-1 every 100 ms, compute pace and effort. The SVR-1 side is `svr/live.py`; the bus side comes with the decoder.
+6. Live EMG reader: subscribe to `emg.raw`, filter, run SVR-1 every 100 ms, compute pace and effort. Code done: `svr/live.py` (SVR-1) and `svr/serve.py` (the bus side, its own process, publishing `emg.read`); `fusion/emg.py` turns `emg.read` into word support. `svr/infer.py` replays recordings through the same path for offline scoring.
 7. Fusion decoder: the joint search over camera and EMG probabilities, with look-alike expansion, Claude's predicted words and the gate.
 8. Confidence locking: compute the lock ingredients per word, train the lock model on sessions 1 and 2, and set the dynamic threshold from Claude's predictability.
 9. "Please repeat" when the final pass still isn't confident, with the reasons in the debug log.
@@ -95,6 +95,7 @@ flowchart TD
 | Topic | From → to | Rate | Main fields |
 | --- | --- | --- | --- |
 | `emg.raw` | Thai → Austin | every 10 ms | `t0`, `fs` = 1000, `samples` (n × 4, raw 0 to 1023), `counter` |
+| `emg.read` | Austin's EMG reader → decoder | every 100 ms | `seg_id`, `in_segment`, `segment_started`, `segment_ended`, `seg_start`, `frame_t` (F), `letter_logp` (F × 38, float16), `speak_prob` (F), `rate_z`, `pace`, `effort`, `quality` {`pinned`, `flat`} per pin, `ok` (False: rig gone or channels bad, arrays empty), `gap_ms`, `timing_ms` |
 | `cam.tick` | Evan → Austin, Frank | every 100 ms | `seg_id`, `seg_start`, `frame_t` (T), `topk_ids` (T × 32), `topk_logp` (T × 32), `blank_logp` (T), `greedy`, `activity` (T), `face_ok`, `emotion` {`label`, `confidence`, `scores`}, `timing_ms` |
 | `cam.final` | Evan → Austin | at segment end | `seg_id`, `nbest` [{`text`, `score`}] |
 | `cam.face` | Evan → dashboard | ~12.5 Hz | `t`, `w`, `h`, `face_ok`, `pts` (478 × 2, normalised), `blend` (52), `pose` (yaw, pitch, roll) |
@@ -123,6 +124,7 @@ Each producer binds one loopback port, overridable by `RECLAIM_<NAME>_PUB`; the 
 | `dec` | 5557 | `dec.hyp`, `dec.lock`, `dec.repeat`, `voice.say`, `timing.dec` (`fusion/run.py`) |
 | `claude` | 5558 | `claude.predict`, `claude.repair`, `timing.claude` (`claude_service`) |
 | `call` | 5559 | `partner.text`, `timing.call` (`call/`) |
+| `svr` | 5560 | `emg.read`, `timing.svr` (`svr/serve.py`) |
 
 ## Order of work
 
