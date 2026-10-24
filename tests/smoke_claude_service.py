@@ -75,21 +75,25 @@ def unit():
 
     target = b.next_request(0.1)
     r, log = b.ask()
-    out, _ = b.apply(r, target, 0.2)
+    out, _ = b.apply(r, target, 0.6)
     check('predict only when nothing is under review', [t for t, _ in out] == ['claude.predict'])
     p = out[0][1]
     check('predict words cleaned and clipped', p['words'] == [{'w': 'yes', 'weight': 1.0}], p['words'])
     check('predictability clipped', p['predictability'] == 0.0)
     check('predict fields', set(p) == {'words', 'phrases', 'predictability', 'ttl_s', 't'})
-    check('log has request, reply and delay', {'request', 'reply', 'ms', 'cache_read'} <= set(log))
+    check('predict counts from the request', p['t'] == 0.1 and abs(p['ttl_s'] - (brain_mod.PREDICT_TTL_S - 0.5)) < 1e-9, p)
+    check('log has lane, request, reply and delay', {'lane', 'request', 'reply', 'ms', 'cache_read'} <= set(log))
 
     b.locked(lock(7, ('a', ['the']), ('little', ['lid']), ('nerve', ['nervous', 'nerf'])))
-    check('due after a lock', b.due(0.3, mouthing=False))
-    target = b.next_request(0.3)
-    check('request lists the review', 'Review:' in b.messages[-1]['content'] and 'nervous' in b.messages[-1]['content'])
+    check('a lock waits for its repair call', bool(b.review) and not b.due(0.7, mouthing=False))
+    n = len(b.messages)
+    msgs, target = b.next_review(0.7)
+    check('repair call: the conversation plus one review', msgs[:-1] == b.messages and 'Review:' in msgs[-1]['content']
+          and 'nervous' in msgs[-1]['content'] and not b.review)
     b.locked(lock(8, ('hi', [])))  # Austin moves on while Claude thinks
-    r, _ = b.ask()
-    out, rejected = b.apply(r, target, 0.5)
+    r, log = b.ask(msgs)
+    check('repair call appends nothing', len(b.messages) == n and log['lane'] == 'repair')
+    out, rejected = b.apply(r, target, 0.9)
     rep = dict(out)['claude.repair']
     check('only the valid edit survives', rep['edits'] == [{'index': 2, 'from': 'nerve', 'to': 'nervous'}], rep['edits'])
     check('three edits rejected', len(rejected) == 3)
@@ -97,18 +101,38 @@ def unit():
     check('repaired word can swap back', target['words'][2]['w'] == 'nervous' and 'nerve' in target['words'][2]['alts'])
     check('new utterance untouched', b.utts[8][0]['w'] == 'hi')
 
-    b.next_request(0.6)
-    target = {'utt_id': 8, 'words': b.utts[8], 'review': []}
+    check('locks and repairs told after the interval', not b.due(1.0, mouthing=False) and b.due(2.2, mouthing=False))
+    target = b.next_request(2.2)
+    req = b.messages[-1]['content']
+    check('conversation hears the locks and the repair', 'utterance 7' in req and 'nervous' in req
+          and 'nerve -> nervous' in req and 'utterance 8' in req and 'Review:' not in req, req)
     r, _ = b.ask()
-    out, rejected = b.apply(r, target, 0.7)
+    out, rejected = b.apply(r, target, 2.3)
     check('no repair without review', [t for t, _ in out] == ['claude.predict'] and len(rejected) == 1)
 
-    calls = fake.calls
-    check('append-only prefix', all(c['messages'] == n['messages'][:len(c['messages'])] for c, n in zip(calls, calls[1:])))
+    convo = [c for c in fake.calls if 'Review:' not in c['messages'][-1]['content']]
+    check('append-only conversation', all(c['messages'] == n['messages'][:len(c['messages'])] for c, n in zip(convo, convo[1:])))
+    check('repair calls read the conversation prefix', all(c['messages'][:-1] == b.messages[:len(c['messages']) - 1]
+                                                           for c in fake.calls if c not in convo))
     check('frozen system, schema, settings', all(c['system'] == SYSTEM and c['output_config']['format']['schema'] == SCHEMA
-                                                 and c['output_config']['effort'] == 'low' for c in calls))
-    check('model', all(c['model'] == 'claude-opus-5-5' for c in calls))
-    check('roles alternate', [m['role'] for m in calls[-1]['messages']] == ['user', 'assistant'] * 2 + ['user'])
+                                                 and c['output_config']['effort'] == 'low' for c in fake.calls))
+    check('model', all(c['model'] == 'claude-opus-5-5' for c in fake.calls))
+    check('roles alternate', [m['role'] for m in b.messages] == ['user', 'assistant'] * 2)
+
+
+def stale_predict():
+    """A prediction from an older request never replaces a newer one; refresh resends the newest while mouthing."""
+    b = Brain(FakeClient([]))
+    out, _ = b.apply(reply(words=(('new', 0.9),)), {'utt_id': None, 'words': [], 'review': [], 'sent': 2.0}, 2.5)
+    check('stale: newer prediction sent', [t for t, _ in out] == ['claude.predict'])
+    out, _ = b.apply(reply(words=(('old', 0.9),)), {'utt_id': 1, 'words': [], 'review': [], 'sent': 1.0}, 3.0)
+    check('stale: older one dropped', out == [] and b.predict['words'][0]['w'] == 'new')
+    check('refresh: not while still', b.refresh(10.0, mouthing=False) is None)
+    check('refresh: not before the interval', b.refresh(3.0, mouthing=True) is None)
+    again = b.refresh(5.0, mouthing=True)
+    check('refresh: same words, fresh ttl', again is not None and again['words'][0]['w'] == 'new'
+          and again['ttl_s'] == brain_mod.PREDICT_TTL_S and again['t'] == 5.0, again)
+    check('refresh: once per interval', b.refresh(6.0, mouthing=True) is None)
 
 
 def late_lock():
@@ -121,20 +145,19 @@ def late_lock():
     b.locked(lock(2, ('sure', [])))
     check('late lock: indices per utterance', [w['w'] for w in b.utts[1]] == ['i', 'feel', 'vine']
           and [w['w'] for w in b.utts[2]] == ['yes', 'sure'])
-    t1 = b.next_request(0.0)
+    m1, t1 = b.next_review(0.0)
     check('late lock: oldest utterance reviewed first', t1['utt_id'] == 1 and t1['review'] == [0, 1, 2], t1['review'])
-    r, _ = b.ask()
+    m2, t2 = b.next_review(0.0)
+    check('late lock: then the newer one, at once', t2['utt_id'] == 2 and t2['review'] == [0, 1] and not b.review, t2)
+    r, _ = b.ask(m1)
     out, rejected = b.apply(r, t1, 0.1)
     rep = dict(out)['claude.repair']
     check('late lock: repair hits the right word', rep['utt_id'] == 1 and not rejected
           and rep['edits'] == [{'index': 2, 'from': 'vine', 'to': 'fine'}], rep)
-    check('late lock: other utterance still due', b.due(0.1, mouthing=False))
-    t2 = b.next_request(0.1)
-    check('late lock: then the newer one', t2['utt_id'] == 2 and t2['review'] == [0, 1], t2)
     b = Brain(FakeClient([]))
     for u in range(brain_mod.MAX_UTTS + 1):
         b.locked(lock(u, ('a', [])))
-    check('late lock: bounded', len(b.utts) == brain_mod.MAX_UTTS and 0 not in b.utts)
+    check('late lock: bounded', len(b.utts) == brain_mod.MAX_UTTS and 0 not in b.utts and 0 not in b.updated)
     b.locked(lock(0, ('late', [])))
     check('late lock: dropped utterance ignored', 0 not in b.utts and b.utt_id == brain_mod.MAX_UTTS)
 
@@ -165,8 +188,8 @@ def bad_words():
                                            {'w': 'vine', 'alts': ['fine', 3]}]})
     check('bad words: counted, slots kept', bad == 1 and [w['w'] for w in b.utts[1]] == ['hi', '?', 'a', 'vine'])
     try:
-        t = b.next_request(0.0)
-        r, _ = b.ask()
+        m, t = b.next_review(0.0)
+        r, _ = b.ask(m)
         out, rejected = b.apply(r, t, 0.1)
         ok = t['review'] == [0, 2, 3] and dict(out)['claude.repair']['edits'] == [{'index': 3, 'from': 'vine', 'to': 'fine'}]
     except Exception as e:
@@ -214,21 +237,20 @@ def cadence():
     check('cadence: same words again, no call', not b.due(10.0, mouthing=True))
 
 
-def trim():
-    """History stays bounded, starts on a user turn, and is append-only between trims."""
+def no_trim():
+    """The conversation is never trimmed or edited, however long, and repair calls never touch it."""
     fake = FakeClient(lambda kw: reply())
     b = Brain(fake)
-    for k in range(brain_mod.MAX_MESSAGES):
+    for k in range(300):
         b.partner({'text': f'line {k}', 'is_final': True})
         b.next_request(float(k))
         b.ask()
-    lens = [len(c['messages']) for c in fake.calls]
-    check('trim: bounded', max(lens) <= brain_mod.MAX_MESSAGES and len(b.messages) <= brain_mod.MAX_MESSAGES, max(lens))
-    check('trim: starts on a user turn', all(c['messages'][0]['role'] == 'user' for c in fake.calls))
-    pairs = list(zip(fake.calls, fake.calls[1:]))
-    breaks = [k for k, (c, n) in enumerate(pairs) if c['messages'] != n['messages'][:len(c['messages'])]]
-    trims = [k for k, (c, n) in enumerate(pairs) if len(n['messages']) < len(c['messages'])]
-    check('trim: append-only between trims', breaks == trims and len(trims) >= 1, f'breaks {breaks}, trims {trims}')
+        if k % 50 == 0:
+            b.locked(lock(k, ('vine', ['fine'])))
+            b.ask(b.next_review(float(k))[0])
+    convo = [c for c in fake.calls if 'Review:' not in c['messages'][-1]['content']]
+    check('no trim: append-only all the way', len(convo) == 300 and all(
+        c['messages'] == n['messages'][:len(c['messages'])] for c, n in zip(convo, convo[1:])), len(convo))
 
 
 def requirements():
@@ -310,8 +332,8 @@ def live():
     b.apply(r1, target, 0.0)
     print('  predict:', [w['w'] for w in r1['predict_words']][:10], r1['predictability'], f"{log1['ms']:.0f} ms")
     b.locked(lock(1, ('yes', ['jess']), ('a', []), ('little', []), ('nerve', ['nervous', 'nerf'])))
-    target = b.next_request(1.0)
-    r2, log2 = b.ask()
+    msgs, target = b.next_review(1.0)
+    r2, log2 = b.ask(msgs)
     check('live: second reply parses', r2 is not None, log2.get('error'))
     if r2 is None:
         return
@@ -325,11 +347,12 @@ if __name__ == '__main__':
     ap.add_argument('--live', action='store_true')
     args = ap.parse_args()
     unit()
+    stale_predict()
     late_lock()
     empty_reply()
     bad_words()
     cadence()
-    trim()
+    no_trim()
     requirements()
     bus()
     if args.live:
