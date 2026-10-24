@@ -1,0 +1,50 @@
+tune|What do you need
+tune|I would like some water please
+tune|Can you help me sit up
+tune|I'm feeling a little cold
+tune|Please turn off the light
+tune|When is the doctor coming
+tune|I need to use the bathroom
+tune|Could you open the window a bit
+tune|My back hurts today
+tune|Thank you for being here
+tune|I want to call my son
+tune|Can I have something to eat
+tune|The television is too loud
+tune|Please pass me my glasses
+tune|I didn't sleep well last night
+tune|What time is it now
+tune|I would like to go outside for a while
+tune|Can you fix my pillow
+tune|I'm not hungry right now
+tune|Please ask the nurse to come in
+tune|How was your day at work
+tune|I feel much better this morning
+tune|Could you read me the news
+tune|Where did you put my phone
+tune|I need my medicine now
+tune|Let's watch a movie together tonight
+tune|Can you scratch my left shoulder
+tune|Tell my wife I love her
+tune|I'd like a cup of tea with milk
+tune|Please don't leave yet
+heldout|Is anyone else coming to visit today
+heldout|I'm a little thirsty
+heldout|Can you move my legs for me
+heldout|The room feels too warm
+heldout|Please close the curtains
+heldout|I want to brush my teeth
+heldout|Did the mail come yet
+heldout|Could you put on some music
+heldout|My hands are very tired
+heldout|I'd like to talk to my doctor
+heldout|What are we having for dinner
+heldout|Please help me lie down
+heldout|I miss my old house
+heldout|Can you hold my hand for a minute
+heldout|It's nice to see you again
+heldout|I need another blanket
+heldout|Please write that down for me
+heldout|Who is on the phone
+heldout|I think I'm ready to rest now
+heldout|Could you bring my book from the table

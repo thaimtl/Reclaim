@@ -1,0 +1,126 @@
+# Camera reader on the team bus: `cam.tick`, `cam.final`, `cam.face`
+
+Fields come from the team's `docs/PLAN.md#interfaces`. This page adds the wire details. Status: **proposal, v = 2**.
+Austin still has to confirm the encoding. Code: `live/bus.py`; stub: `live/stub_bus.py`.
+
+## Transport
+
+- ZeroMQ PUB/SUB over a local Unix socket. The camera reader **binds** `ipc:///tmp/reclaim/cam.tick`, which the env
+  `RECLAIM_CAM_PUB` overrides (`tcp://127.0.0.1:5556` still works). Subscribers **connect**; they may connect before
+  the publisher exists. The publisher creates `/tmp/reclaim/`, replaces a socket file left by a crashed run, refuses
+  to bind if another live publisher holds the path, and removes its file on `close()`.
+- Each message is multipart `[topic, payload]`, with the topic `b'cam.tick'`, `b'cam.final'` or `b'cam.face'`.
+  Subscribe to `b'cam.tick'` and `b'cam.final'` (the `Subscriber` default). Only the dashboard should add `b'cam.face'`
+  (~12.5 per second): ZeroMQ filters topics on the publisher side, so other subscribers never queue faces, and the
+  20-message `SNDHWM` can't push out a `cam.final` behind them. `b'cam.'` still matches all three.
+- The payload is msgpack: `packb(obj, use_bin_type=True)` / `unpackb(b, raw=False)`.
+- The publisher's `SNDHWM` is 20, so a slow subscriber loses old ticks instead of falling behind. In a burst of
+  over 20 messages a subscriber can also lose a `cam.final`. At about 10 messages per second this does not happen;
+  a gap in `seq` shows it. If `seq` goes back down, the camera process restarted and counts from 1 again, so
+  treat it as a restart, not a gap. `Publisher.close()` waits up to 0.5 s so the last `cam.final` still goes out; a `send()` after `close()` (the final-pass
+  thread during shutdown) is dropped and returns 0.
+- `live.bus.validate` rejects NaN, booleans where numbers belong, duplicate ids within a row and unsorted rows.
+  It allows `-inf` log-probs (log 0). `decode` raises `ValueError` on any malformed message.
+
+## numpy arrays
+
+Each array is a msgpack map:
+
+```
+{'nd': 1, 'dtype': '<f4', 'shape': [T, 32], 'data': <bin: the array's bytes, C order>}
+```
+
+Decode with `np.frombuffer(d['data'], np.dtype(d['dtype'])).reshape(d['shape'])`. This is a read-only view with no
+copy. Any msgpack library can read it without an extension hook.
+
+## `cam.tick`
+
+Sent every 100 ms (2.5 new 25 fps frames on average: 3, 2, 3, 2, ...) while a segment is open, plus one last read
+when the segment closes or is capped. **Each tick re-reads the whole segment.** Past
+frames' probabilities change between ticks (the Conformer looks both ways), so keep only the newest tick per `seg_id`.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `v` | int | schema version, 2 |
+| `seq` | int | counts up per topic from 1; a gap means a dropped message |
+| `t_pub` | float | `time.monotonic()` at send, for latency logs |
+| `seg_id` | int ≥ 1 | the segment; a new id starts a new segment |
+| `seg_start` | float | capture time of the segment's first frame |
+| `frame_t` | `<f8` (T,) | capture time of each 25 fps model frame, increasing |
+| `topk_ids` | `<i4` (T, 32) | token ids, most likely first; blank (0) can be among them |
+| `topk_logp` | `<f4` (T, 32) | CTC log-probs of `topk_ids`, sorted from highest to lowest |
+| `blank_logp` | `<f4` (T,) | CTC log-prob of blank |
+| `greedy` | str | CTC best path, UPPERCASE; for debugging only |
+| `activity` | `<f4` (T,) | mouthing activity, 0 to 1 |
+| `face_ok` | bool | face found on the newest frame |
+| `timing_ms` | map | cost of this pass, required: `T` (int, == len(`frame_t`)), `mediapipe`, `frontend`, `conformer`, `ctc`, `total` (ms, finite, ≥ 0) |
+| `emotion` | map | `label` (one of neutral, happy, sad, angry, surprised; placeholder until Frank confirms), `confidence` 0 to 1, `scores` {label: 0 to 1} |
+
+**Token ids** are the model's ids: blank is 0, and ids 1..5047 (`<unk>` = 1) are the line numbers of
+`third_party/lipflow/lipflow/unigram5000_units.txt` (the same as `auto_avsr/spm/unigram/unigram5000_units.txt`), and
+`<eos>` is 5048, so the vocabulary is 5049. **These are not the SentencePiece model's own ids** (`▁WATER` is 4899 here
+but 334 in `unigram5000.model`). Map ids to pieces with the units file. `▁` marks the start of a word.
+
+**Segments:** a segment starts with 300 ms of pre-roll and ends after 0.5 s without mouthing. At 8 s (T = 200)
+the segment is capped: a new `seg_id` starts, and its first 2 s (50 frames) repeat the end of the previous segment.
+The new `seg_start` is the time of the first repeated frame.
+
+Size: about 55 KB per tick at T = 200 (53.5 KB max measured with the stub, timing_ms adds ~70 B), so about 550 KB/s
+at 10 ticks/s: twice the v1 message rate and bandwidth, still trivial on ipc.
+
+## `cam.final`
+
+Sent once per segment, about 1.1 s or more after the segment ends (beam 5 + LM runs in the background). It is also
+sent for a segment closed by the 8 s cap.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `v`, `seq`, `t_pub`, `seg_id` | | as in `cam.tick` |
+| `nbest` | list of {`text`, `score`} | up to 5, best first; text UPPERCASE; score = log-prob, where higher is better |
+
+## `cam.face`
+
+The newest face for the dashboard's mesh (Frank), sent from the crop thread on every 2nd frame (~12.5 Hz at 25 fps)
+with `Publisher.send(msg, block=False)`: if the tick or final-pass thread is sending, the face is dropped, never
+waited for (`dropped_busy` counts them; dropped faces use no `seq`). `run.py --no-face` turns it off. About 2.2 KB
+with a face, 72 bytes without.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `v`, `seq`, `t_pub` | | as in `cam.tick` (no `seg_id`: faces are not tied to segments) |
+| `t` | float | capture time of the frame |
+| `w`, `h` | int | the processed frame size the points are normalised by (1280 x 720 by default, `--process-size`) |
+| `face_ok` | bool | a face was found; when false, `pts`, `blend` and `pose` are nil |
+| `pts` | `<f2` (N, 2) | MediaPipe landmarks, x / w and y / h, N = 478 (468 mesh + 10 iris); may sit slightly outside 0..1 at the frame edge, validate allows -1..2 |
+| `blend` | `<f2` (52,) or nil | MediaPipe blendshape scores 0..1, in the order of `live.crop.BLEND_NAMES` |
+| `pose` | `<f4` (3,) or nil | head yaw, pitch, roll in radians from MediaPipe's facial transformation matrix; nil with `--no-pose` |
+
+Head pose costs +0.02 ms per frame at 1280 x 720 (dev box), so it is on by default, and the landmarks are
+bit-identical with it on or off (`tests/live/test_cam_face.py`).
+
+## Subscriber in 10 lines
+
+```python
+import msgpack, numpy as np, zmq
+
+sock = zmq.Context.instance().socket(zmq.SUB)
+sock.connect('ipc:///tmp/reclaim/cam.tick')
+sock.setsockopt(zmq.SUBSCRIBE, b'cam.')
+nd = lambda v: np.frombuffer(v['data'], v['dtype']).reshape(v['shape']) if isinstance(v, dict) and v.get('nd') else v
+while True:
+    topic, payload = sock.recv_multipart()
+    msg = {k: nd(v) for k, v in msgpack.unpackb(payload, raw=False).items()}
+    print(topic, msg['seg_id'], msg.get('greedy'), msg.get('nbest'))
+```
+
+To try it without a camera: run `python -m live.stub_bus`, then `python -m live.bus_listen` (which validates each
+message and prints one line per message).
+
+## Changes since v1 (for Austin)
+
+- `v` is 2; `validate` refuses v1 messages.
+- Address: `ipc:///tmp/reclaim/cam.tick` instead of `tcp://127.0.0.1:5556` (the env `RECLAIM_CAM_PUB` still overrides).
+- `cam.tick` every 100 ms instead of 200 ms: 3 or 2 new frames per tick, about twice the messages.
+- New required field `timing_ms` on `cam.tick` (see the table). A tick without it is invalid; there is no
+  `None` fallback.
+- `cam.final` is unchanged apart from `v`.

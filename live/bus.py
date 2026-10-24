@@ -1,0 +1,436 @@
+"""Team bus (docs/PLAN.md#interfaces): ZeroMQ PUB/SUB on a local ipc:// socket, msgpack payloads, numpy arrays as raw
+bytes.
+
+Wire format (live/bus_schema.md): multipart [topic, payload], topic b'cam.tick', b'cam.final' or b'cam.face',
+payload a msgpack map with the PLAN.md fields plus v (schema version), seq (per-topic counter) and t_pub
+(time.monotonic() at send).
+Every numpy array is the map {'nd': 1, 'dtype': '<f4', 'shape': [T, 32], 'data': <bin, C order>}.
+
+    pub = Publisher()                       # binds CAM_PUB (env RECLAIM_CAM_PUB overrides; tcp:// works too)
+    pub.send(cam_tick)                      # CamTick / CamFinal / CamFace, from any thread; a no-op after close()
+    pub.send(cam_face, block=False)         # the crop thread: drops the message (returns 0) instead of waiting
+    sub = Subscriber()                      # connects; cam.tick + cam.final (add FACE for the dashboard's cam.face)
+    topic, msg = sub.recv(timeout_ms=1000)  # msg: dict with numpy arrays decoded; None on timeout
+
+encode/decode/validate work without sockets (tests, logs); encode refuses what validate refuses.
+"""
+import errno
+import logging
+from dataclasses import dataclass
+import math
+import os
+import re
+import socket
+import threading
+import time
+
+import msgpack
+import numpy as np
+import zmq
+
+from live.types import EMOTIONS, TIMING_KEYS, TOPK, VOCAB, CamFinal, CamTick, Emotion
+
+log = logging.getLogger(__name__)
+DEFAULT_CAM_PUB = 'ipc:///tmp/reclaim/cam.tick'
+CAM_PUB = os.environ.get('RECLAIM_CAM_PUB', DEFAULT_CAM_PUB)
+TICK, FINAL, FACE = 'cam.tick', 'cam.final', 'cam.face'
+VERSION = 2                 # v2: cam.tick carries timing_ms (required), ticks every 100 ms, ipc:// default
+TICK_S = 0.1                # cam.tick period while a segment is open (2.5 model frames)
+SNDHWM = 20                 # a slow subscriber drops old ticks instead of building a backlog
+_TEXT = re.compile(r"^([A-Z0-9']+( [A-Z0-9']+)*)?$")      # what validate accepts as greedy / nbest text
+_SPECIAL = re.compile(r'<[a-z]+>')                          # <blank>, <unk>, <eos>
+_NOT_TEXT = re.compile(r"[^A-Z0-9' ]")
+# dtype of each array field on the wire (explicit little-endian)
+DTYPES = {'frame_t': '<f8', 'topk_ids': '<i4', 'topk_logp': '<f4', 'blank_logp': '<f4', 'activity': '<f4',
+          'pts': '<f2', 'blend': '<f2', 'pose': '<f4'}
+FACE_POINTS = (468, 478)    # MediaPipe face mesh, without / with the 10 iris points
+FACE_RANGE = (-1.0, 2.0)    # normalised landmarks may sit off-frame (face at the edge), never this far
+
+
+@dataclass(frozen=True)
+class CamFace:
+    """The newest face for the dashboard (topic cam.face, ~12.5 Hz), from the crop thread. pts are normalised to the
+    processed frame (x / w, y / h), so the dashboard needs no frame size; w, h say what they are relative to."""
+    t: float                    # capture time of the frame (time.monotonic())
+    w: int                      # processed frame size the points were normalised by (1280x720 by default)
+    h: int
+    face_ok: bool               # False: no face on this frame; pts, blend and pose are then None
+    pts: np.ndarray = None      # (N, 2) float16, N = 478 (468 mesh + 10 iris) or 468
+    blend: np.ndarray = None    # (52,) float16 MediaPipe blendshapes, order live.crop.BLEND_NAMES; None if off
+    pose: np.ndarray = None     # (3,) float32 yaw, pitch, roll radians; None with run.py --no-pose
+
+
+def face_msg(t, last_face, last_pose, w, h):
+    """LiveCropper.last_face / last_pose of a w x h frame -> CamFace (the run loop's one-liner)."""
+    if last_face is None:
+        return CamFace(float(t), int(w), int(h), False)
+    _, pts, blend = last_face
+    pts = np.asarray(pts, np.float32) / np.array([w, h], np.float32)
+    return CamFace(float(t), int(w), int(h), True, pts, blend, last_pose)
+
+
+def cast_nd(a, dtype=None):
+    """Contiguous array; dtype: cast to it, but only within a kind (float64 -> float32, int64 -> int32 in range),
+    never float -> int."""
+    a = np.asarray(a)
+    if dtype is not None:
+        dt = np.dtype(dtype)
+        if not np.can_cast(a.dtype, dt, 'same_kind'):
+            raise TypeError(f'{a.dtype} -> {dt}: not a same-kind cast')
+        if dt.kind in 'iu' and a.size and (a.min() < np.iinfo(dt).min or a.max() > np.iinfo(dt).max):
+            raise TypeError(f'{a.dtype} -> {dt}: values out of range')
+    return np.ascontiguousarray(a, dtype=dtype)
+
+
+def pack_nd(a, dtype=None):
+    a = cast_nd(a, dtype)
+    return {'nd': 1, 'dtype': a.dtype.str, 'shape': list(a.shape), 'data': a.tobytes()}
+
+
+def unpack_nd(d):
+    """Read-only view on the payload bytes (no copy)."""
+    return np.frombuffer(d['data'], dtype=np.dtype(d['dtype'])).reshape(d['shape'])
+
+
+def _is_nd(v):
+    return isinstance(v, dict) and v.get('nd') == 1 and 'data' in v
+
+
+def bus_text(pieces):
+    """Joined SentencePiece pieces (CTC best path or a beam hypothesis) -> the text validate accepts: '▁' starts a
+    word, special tokens are dropped (as LipReader's greedy text, which never shows <unk>), UPPERCASE, nothing but
+    A-Z, 0-9 and '. The one place that decides it."""
+    text = _SPECIAL.sub('', pieces.replace('▁', ' ')).upper()
+    return ' '.join(_NOT_TEXT.sub('', text).split())
+
+
+def zero_timing(T):
+    """timing_ms for a tick nobody timed (tests, tools): every stage 0 ms."""
+    return {'T': int(T), **{k: 0.0 for k in TIMING_KEYS[1:]}}
+
+
+def to_msg(obj):
+    """CamTick / CamFinal -> (topic, dict of plain msgpack types and numpy arrays)."""
+    if isinstance(obj, CamTick):
+        e = obj.emotion
+        return TICK, {'seg_id': int(obj.seg_id), 'seg_start': float(obj.seg_start),
+                      'frame_t': obj.frame_t, 'topk_ids': obj.topk_ids, 'topk_logp': obj.topk_logp,
+                      'blank_logp': obj.blank_logp, 'greedy': obj.greedy, 'activity': obj.activity,
+                      'face_ok': bool(obj.face_ok), 'timing_ms': _timing_out(obj.timing_ms),
+                      'emotion': {'label': e.label, 'confidence': float(e.confidence),
+                                  'scores': {k: float(v) for k, v in e.scores.items()}}}
+    if isinstance(obj, CamFinal):
+        return FINAL, {'seg_id': int(obj.seg_id), 'nbest': [{'text': t, 'score': float(s)} for t, s in obj.nbest]}
+    if isinstance(obj, CamFace):
+        return FACE, {'t': float(obj.t), 'w': int(obj.w), 'h': int(obj.h), 'face_ok': bool(obj.face_ok),
+                      'pts': obj.pts, 'blend': obj.blend, 'pose': obj.pose}
+    raise TypeError(f'not a bus message: {type(obj).__name__}')
+
+
+def _timing_out(tm):
+    """timing_ms -> plain msgpack map (numpy scalars to int / float). None stays None (encode's validate refuses it)."""
+    if tm is None:
+        return None
+    def plain(v):
+        if isinstance(v, (bool, np.bool_)):
+            return bool(v)              # left for validate to refuse
+        if isinstance(v, (int, np.integer)):
+            return int(v)
+        if isinstance(v, (float, np.floating)):
+            return float(v)
+        return v
+    return {k: plain(v) for k, v in dict(tm).items()}
+
+
+def from_msg(topic, msg):
+    """Decoded dict -> CamTick / CamFinal (inverse of to_msg)."""
+    if topic == TICK:
+        e = msg['emotion']
+        return CamTick(msg['seg_id'], msg['seg_start'], msg['frame_t'], msg['topk_ids'], msg['topk_logp'],
+                       msg['blank_logp'], msg['greedy'], msg['activity'], msg['face_ok'],
+                       Emotion(e['label'], e['confidence'], dict(e['scores'])),
+                       dict(msg['timing_ms']))
+    if topic == FINAL:
+        return CamFinal(msg['seg_id'], tuple((n['text'], n['score']) for n in msg['nbest']))
+    if topic == FACE:
+        return CamFace(msg['t'], msg['w'], msg['h'], msg['face_ok'], msg.get('pts'), msg.get('blend'), msg.get('pose'))
+    raise ValueError(f'unknown topic {topic!r}')
+
+
+def encode(obj, seq=0, t_pub=None):
+    """CamTick / CamFinal -> [topic bytes, msgpack bytes], arrays cast to DTYPES. Validates first: a message
+    validate() would refuse raises ValueError here (TypeError for a lossy array cast), so none reaches the wire."""
+    topic, msg = to_msg(obj)
+    body = {'v': VERSION, 'seq': int(seq), 't_pub': time.monotonic() if t_pub is None else float(t_pub)}
+    for k, v in msg.items():
+        body[k] = cast_nd(v, DTYPES[k]) if k in DTYPES and v is not None else v
+    validate(topic, body)
+    return [topic.encode(), msgpack.packb({k: pack_nd(v) if k in DTYPES and v is not None else v
+                                           for k, v in body.items()}, use_bin_type=True)]
+
+
+def decode(frames):
+    """[topic bytes, msgpack bytes] -> (topic, dict) with every array map turned back into numpy.
+    Any malformed message raises ValueError."""
+    try:
+        topic, payload = frames
+        msg = msgpack.unpackb(payload, raw=False)
+        if not isinstance(msg, dict):
+            raise ValueError(f'map expected, got {type(msg).__name__}')
+        return bytes(topic).decode(), {k: unpack_nd(v) if _is_nd(v) else v for k, v in msg.items()}
+    except ValueError:
+        raise
+    except Exception as e:  # noqa: BLE001  (msgpack, unicode, numpy errors: one type for listeners)
+        raise ValueError(f'undecodable message: {type(e).__name__}: {e}') from e
+
+
+def _need(msg, keys, where):
+    missing = [k for k in keys if k not in msg]
+    if missing:
+        raise ValueError(f'{where}: missing {missing}')
+
+
+def _arr(msg, key, ndim, where):
+    a = msg[key]
+    if not isinstance(a, np.ndarray) or a.dtype != np.dtype(DTYPES[key]) or a.ndim != ndim:
+        got = f'{a.dtype}{a.shape}' if isinstance(a, np.ndarray) else type(a).__name__
+        raise ValueError(f'{where}.{key}: {ndim}-d {DTYPES[key]} array expected, got {got}')
+    return a
+
+
+def _int(msg, key, where, lo):
+    v = msg[key]
+    if isinstance(v, bool) or not isinstance(v, int) or v < lo:
+        raise ValueError(f'{where}.{key}: int >= {lo} expected, got {v!r}')
+
+
+def _num(v, where, lo=-math.inf, hi=math.inf):
+    """A finite number in [lo, hi] (bools are not numbers here)."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or not lo <= v <= hi:
+        raise ValueError(f'{where}: finite number in [{lo}, {hi}] expected, got {v!r}')
+
+
+def validate(topic, msg):
+    """Raise ValueError unless msg (as decode returns it) is a valid cam.tick / cam.final / cam.face. Returns msg.
+
+    NaN anywhere is rejected; -inf log-probs are allowed (log 0)."""
+    if not isinstance(msg, dict):
+        raise ValueError(f'{topic}: map expected, got {type(msg).__name__}')
+    _need(msg, ('v', 'seq', 't_pub'), topic)
+    if msg['v'] != VERSION:
+        raise ValueError(f'{topic}.v: {VERSION} expected, got {msg["v"]!r}')
+    _int(msg, 'seq', topic, 0)
+    _num(msg['t_pub'], f'{topic}.t_pub')
+    if topic == FACE:
+        return _validate_face(msg)
+    _need(msg, ('seg_id',), topic)
+    _int(msg, 'seg_id', topic, 1)
+    if topic == TICK:
+        _need(msg, ('seg_start', 'frame_t', 'topk_ids', 'topk_logp', 'blank_logp', 'greedy', 'activity',
+                    'face_ok', 'emotion', 'timing_ms'), topic)
+        _num(msg['seg_start'], f'{topic}.seg_start')
+        ft = _arr(msg, 'frame_t', 1, topic)
+        T = len(ft)
+        if T < 1:
+            raise ValueError(f'{topic}.frame_t: at least one frame expected')
+        if not np.all(np.isfinite(ft)) or (T > 1 and not np.all(np.diff(ft) > 0)):
+            raise ValueError(f'{topic}.frame_t: finite and increasing expected')
+        if ft[0] < msg['seg_start'] - 1e-6:
+            raise ValueError(f'{topic}.frame_t: starts before seg_start')
+        for key, shape in (('topk_ids', (T, TOPK)), ('topk_logp', (T, TOPK)), ('blank_logp', (T,)),
+                           ('activity', (T,))):
+            a = _arr(msg, key, len(shape), topic)
+            if a.shape != shape:
+                raise ValueError(f'{topic}.{key}: shape {shape} expected, got {a.shape}')
+        ids, logp, blank = msg['topk_ids'], msg['topk_logp'], msg['blank_logp']
+        if ids.min() < 0 or ids.max() >= VOCAB:
+            raise ValueError(f'{topic}.topk_ids: ids in [0, {VOCAB}) expected')
+        if np.any(np.diff(np.sort(ids, axis=1), axis=1) == 0):
+            raise ValueError(f'{topic}.topk_ids: ids in a row must be distinct')
+        if np.isnan(logp).any() or np.isnan(blank).any():
+            raise ValueError(f'{topic}: NaN log-prob')
+        if np.any(logp > 1e-4) or np.any(blank > 1e-4):
+            raise ValueError(f'{topic}: log-probs must be <= 0')
+        with np.errstate(invalid='ignore'):     # -inf - -inf = NaN: equal, so sorted
+            if np.any(np.diff(logp, axis=1) > 1e-4):
+                raise ValueError(f'{topic}.topk_logp: each row must be sorted, most likely first')
+        act = msg['activity']
+        if not np.all((act >= 0) & (act <= 1)):  # also rejects NaN
+            raise ValueError(f'{topic}.activity: values in [0, 1] expected')
+        if not isinstance(msg['greedy'], str) or not _TEXT.match(msg['greedy']):
+            raise ValueError(f'{topic}.greedy: UPPERCASE words expected, got {msg["greedy"]!r}')
+        if not isinstance(msg['face_ok'], bool):
+            raise ValueError(f'{topic}.face_ok: bool expected')
+        e = msg['emotion']
+        if not isinstance(e, dict) or e.get('label') not in EMOTIONS:
+            raise ValueError(f'{topic}.emotion.label: one of {EMOTIONS} expected, got {e!r}')
+        _num(e.get('confidence'), f'{topic}.emotion.confidence', 0, 1)
+        if not isinstance(e.get('scores'), dict) or set(e['scores']) != set(EMOTIONS):
+            raise ValueError(f'{topic}.emotion.scores: one score per label in {EMOTIONS} expected')
+        for k, v in e['scores'].items():
+            _num(v, f'{topic}.emotion.scores.{k}', 0, 1)
+        tm = msg['timing_ms']
+        if not isinstance(tm, dict) or set(tm) != set(TIMING_KEYS):
+            raise ValueError(f'{topic}.timing_ms: map with exactly the keys {TIMING_KEYS} expected, got {tm!r}')
+        if isinstance(tm['T'], bool) or not isinstance(tm['T'], int) or tm['T'] != T:
+            raise ValueError(f'{topic}.timing_ms.T: int == len(frame_t) = {T} expected, got {tm["T"]!r}')
+        for k in TIMING_KEYS[1:]:
+            _num(tm[k], f'{topic}.timing_ms.{k}', 0)
+    elif topic == FINAL:
+        _need(msg, ('nbest',), topic)
+        nb = msg['nbest']
+        if not isinstance(nb, list) or not nb:
+            raise ValueError(f'{topic}.nbest: at least one entry expected')
+        for i, n in enumerate(nb):
+            if not isinstance(n, dict) or not isinstance(n.get('text'), str) or not _TEXT.match(n['text']):
+                raise ValueError(f'{topic}.nbest[{i}].text: UPPERCASE words expected, got {n!r}')
+            _num(n.get('score'), f'{topic}.nbest[{i}].score')
+    else:
+        raise ValueError(f'unknown topic {topic!r}')
+    return msg
+
+
+def _validate_face(msg):
+    where = FACE
+    _need(msg, ('t', 'w', 'h', 'face_ok', 'pts', 'blend', 'pose'), where)
+    _num(msg['t'], f'{where}.t')
+    _int(msg, 'w', where, 1)
+    _int(msg, 'h', where, 1)
+    if not isinstance(msg['face_ok'], bool):
+        raise ValueError(f'{where}.face_ok: bool expected')
+    if not msg['face_ok']:
+        if any(msg[k] is not None for k in ('pts', 'blend', 'pose')):
+            raise ValueError(f'{where}: no face, so pts / blend / pose must be nil')
+        return msg
+    pts = _arr(msg, 'pts', 2, where)
+    if pts.shape[0] not in FACE_POINTS or pts.shape[1] != 2:
+        raise ValueError(f'{where}.pts: shape (468 or 478, 2) expected, got {pts.shape}')
+    if not np.all(np.isfinite(pts)) or pts.min() < FACE_RANGE[0] or pts.max() > FACE_RANGE[1]:
+        raise ValueError(f'{where}.pts: finite normalised coordinates in {FACE_RANGE} expected')
+    if msg['blend'] is not None:
+        b = _arr(msg, 'blend', 1, where)
+        if b.shape != (52,) or not np.all((b >= 0) & (b <= 1)):
+            raise ValueError(f'{where}.blend: 52 scores in [0, 1] expected')
+    if msg['pose'] is not None:
+        p = _arr(msg, 'pose', 1, where)
+        if p.shape != (3,) or not np.all(np.abs(p) <= math.pi + 1e-3):
+            raise ValueError(f'{where}.pose: (yaw, pitch, roll) radians in [-pi, pi] expected')
+    return msg
+
+
+def _ipc_path(addr):
+    return addr[len('ipc://'):] if addr.startswith('ipc://') else None
+
+
+def _prepare_ipc(path):
+    """Make the socket's directory; remove a socket file left by a crashed publisher, refuse one that is live."""
+    os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
+    if not os.path.exists(path):
+        return
+    probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        probe.settimeout(0.5)
+        probe.connect(path)
+    except OSError as e:
+        if e.errno not in (errno.ECONNREFUSED, errno.ENOENT, errno.ENOTSOCK):
+            raise
+        log.info('removing stale bus socket %s (%s)', path, errno.errorcode.get(e.errno, e.errno))
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+        return
+    finally:
+        probe.close()
+    # libzmq would silently unlink and steal the path from the live publisher; make that an error instead
+    raise zmq.ZMQError(errno.EADDRINUSE, f'{path}: another publisher is bound here')
+
+
+class Publisher:
+    """One PUB socket for the camera reader. send() is thread-safe (tick thread and final-pass thread), and close()
+    takes the same lock: a send racing close() either goes out before it or is dropped (send returns 0), never
+    touches a closed socket."""
+
+    def __init__(self, addr=CAM_PUB, bind=True, ctx=None):
+        self.ctx = ctx or zmq.Context.instance()
+        path = _ipc_path(addr)
+        if bind and path:
+            _prepare_ipc(path)
+        self.sock = self.ctx.socket(zmq.PUB)
+        self.sock.setsockopt(zmq.SNDHWM, SNDHWM)
+        self.sock.setsockopt(zmq.LINGER, 0)
+        try:
+            (self.sock.bind if bind else self.sock.connect)(addr)
+        except zmq.ZMQError:
+            self.sock.close()
+            raise
+        self.addr = self.sock.getsockopt_string(zmq.LAST_ENDPOINT) if bind else addr
+        self._ipc = (path, os.stat(path).st_ino) if bind and path else None
+        self.seq = {TICK: 0, FINAL: 0, FACE: 0}
+        self.dropped_busy = 0       # non-blocking sends dropped because another thread was sending
+        self.lock = threading.Lock()
+        self.closed = False
+        self.dropped_after_close = 0
+
+    def send(self, obj, block=True):
+        """Returns the number of payload bytes sent; 0 after close() (the message is dropped and counted).
+        block=False (the crop thread's cam.face): if another thread is sending, drop this message and return 0."""
+        topic = TICK if isinstance(obj, CamTick) else FACE if isinstance(obj, CamFace) else FINAL
+        frames = None
+        if not self.lock.acquire(blocking=block):
+            self.dropped_busy += 1
+            return 0
+        try:
+            if self.closed:
+                self.dropped_after_close += 1
+                if self.dropped_after_close == 1:
+                    log.warning('bus send after close: %s dropped', topic)
+                return 0
+            frames = encode(obj, self.seq[topic] + 1)   # an invalid message raises here and uses no seq
+            self.sock.send_multipart(frames, copy=False)
+            self.seq[topic] += 1
+            return len(frames[1])
+        finally:
+            self.lock.release()
+
+    def close(self, linger_ms=500):
+        """Waits up to linger_ms for queued messages (the last cam.final) to go out; LINGER is 0 until now.
+        Idempotent; later send() calls are no-ops."""
+        with self.lock:
+            if self.closed:
+                return
+            self.closed = True
+            self.sock.close(linger=linger_ms)
+            if self._ipc:
+                # libzmq 4.3 leaves the socket file behind; remove it if it is still ours, so the next bind (this
+                # process or a restart) is clean. Connected subscribers keep their connection for the linger.
+                path, ino = self._ipc
+                try:
+                    if os.stat(path).st_ino == ino:
+                        os.unlink(path)
+                except FileNotFoundError:
+                    pass
+
+
+class Subscriber:
+    """SUB socket for listeners and tests. Subscribers should keep only the newest cam.tick (each one is a full
+    snapshot of the segment) but never drop a cam.final. The default topics leave out cam.face (~12.5 Hz): a
+    subscriber that doesn't draw faces shouldn't queue them (ZeroMQ filters topics on the publisher side)."""
+
+    def __init__(self, addr=CAM_PUB, topics=(TICK, FINAL), ctx=None, rcvhwm=100):
+        self.ctx = ctx or zmq.Context.instance()
+        self.sock = self.ctx.socket(zmq.SUB)
+        self.sock.setsockopt(zmq.RCVHWM, rcvhwm)
+        self.sock.setsockopt(zmq.LINGER, 0)
+        for t in topics:
+            self.sock.setsockopt(zmq.SUBSCRIBE, t.encode())
+        self.sock.connect(addr)
+
+    def recv(self, timeout_ms=None):
+        """(topic, msg) or None on timeout; msg as decode() returns it."""
+        if timeout_ms is not None and not self.sock.poll(timeout_ms):
+            return None
+        return decode(self.sock.recv_multipart())
+
+    def close(self):
+        self.sock.close()

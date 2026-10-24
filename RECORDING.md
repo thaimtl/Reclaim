@@ -44,6 +44,7 @@ Only natural-pace sentences get a delivery (demo-pace in session 3), at most one
 - [ ] 12 pads (4 boards × 3), alcohol prep pads, and a skin marker, plus 12 spares
 - [ ] Austin's laptop on battery with the charger unplugged, and no other cable from wall power on the laptop
 - [ ] The webcam at the height and distance used in the demo, the face lit from the front, nothing bright behind Austin
+- [ ] The camera (Logitech C920) at 1920×1080, 30 fps, MJPG, with exposure and focus locked, so the frame rate doesn't drop in dim light. Recordings stay 1080p; the live reader shrinks them to 720p on replay, just as it does with the live feed.
 - [ ] A chair and a quiet corner, plus water for Austin
 - [ ] `RECLAIM_WORKDIR` points at a local folder, not one synced by OneDrive, Dropbox or iCloud
 
