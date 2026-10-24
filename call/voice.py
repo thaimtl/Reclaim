@@ -43,6 +43,7 @@ FIRST_WORDS, NEXT_WORDS, MAX_WORDS = 2, 3, 5
 PAUSE_S = 0.5               # Austin stopped mouthing for this long: speak what is waiting
 CONTEXT_TIMEOUT_S = 20.0    # a context that hears nothing from Sonic for this long is given up (dead socket)
 REUSE_S = 10.0              # a message for a finished utt_id older than this starts a new utterance (decoder restart)
+STALE_S = 3.0               # an open utterance silent this long, with a newer one waiting to play, is closed (lost final)
 FUNCTION_WORDS = {'a', 'an', 'the', 'to', 'of', 'and', 'or', 'but', 'in', 'on', 'at', 'for', 'with', 'my', 'your',
                   'his', 'her', 'our', 'their', 'is', 'are', 'was', 'were', 'i', 'you', 'we', 'they', 'it', 'that',
                   'this', 'very', 'so', 'if', 'than', 'from', 'by', 'as', 'be', 'have', 'has', 'had', 'will',
@@ -125,6 +126,7 @@ class Utterance:
         self.broken = False                 # streaming failed twice: every later word goes to `lost`, keeping order
         self.pace = self.effort = None      # the last pace and effort the decoder sent (a message may leave them out)
         self.t_first_text = self.t_first_audio = self.t_final = None
+        self.t_last = time.perf_counter()   # last voice.say for this utt_id
 
     def new_words(self, words, offset=None):
         words = [w for w in words if w]
@@ -219,6 +221,7 @@ class Voice:
                 u = self.utts[utt_id] = Utterance(utt_id)
                 self._prune()
             u.seq += 1
+            u.t_last = time.perf_counter()
             if u.t_first_text is None and words:
                 u.t_first_text = time.perf_counter()
             u.pending += u.new_words(words, offset)
@@ -375,11 +378,29 @@ class Voice:
         while True:
             u, run = await self.order.get()
             heard = False
-            while (b := await run.get()) is not None:
+            while True:
+                try:
+                    b = await asyncio.wait_for(run.get(), 0.5)
+                except TimeoutError:
+                    self._close_if_stale(u)
+                    continue
+                if b is None:
+                    break
                 await self.sink(b)
                 heard = True
             if heard and self.on_done:
                 await self.on_done(u.utt_id, u.t_first_text)
+
+    def _close_if_stale(self, u):
+        """A lost final (decoder crash, dropped message) would hold every later sentence behind this one."""
+        if not u.final and not self.order.empty() and time.perf_counter() - u.t_last > STALE_S:
+            log.warning('utterance %s got no final for %.0f s while another waits: closing it', u.utt_id, STALE_S)
+            u.final, u.t_final = True, time.perf_counter()     # once; a late message for it is ignored as usual
+            self._spawn(self._close_stale(u))
+
+    async def _close_stale(self, u):
+        async with self._lock:
+            await self._finish(u)
 
     def _prune(self):
         """Forget utterances whose audio finished a while ago."""

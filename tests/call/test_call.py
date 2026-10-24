@@ -17,6 +17,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from call import bus, twilio_media  # noqa: E402
+from call import voice as voice_mod  # noqa: E402
 from call.config import Config  # noqa: E402
 from call.voice import Utterance, Voice, generation_config  # noqa: E402
 
@@ -675,4 +676,21 @@ async def test_after_a_double_failure_the_rest_keeps_its_order():
     v.utts[8] = u
     await v._send(u, 1)
     assert u.lost == ['A', 'B', 'C'] and conn.contexts == []
+    await v.close()
+
+
+async def test_a_lost_final_does_not_hold_the_next_sentence(monkeypatch):
+    monkeypatch.setattr(voice_mod, 'STALE_S', 0.2)
+    heard = []
+
+    async def sink(b):
+        heard.append(b)
+    v, conn = await make_voice(sink)
+    await v.say(1, ['I', 'WANT'])                       # its final never arrives
+    await v.say(2, ['HELLO', 'THERE'], final=True)
+    await asyncio.sleep(1.2)
+    assert heard == [b'I want', b'.', b'Hello there.'], 'the open sentence is closed, then the next one plays'
+    await v.say(1, ['COFFEE'], final=True)              # its late final: ignored, never spoken out of order
+    await asyncio.sleep(0.1)
+    assert len(heard) == 3
     await v.close()
