@@ -217,7 +217,7 @@ const PLACEHOLDER_WER = { lips: 22, lips_muscles: 14, claude: 4 };    // design 
 const TONES = { warm: 'Warm', concerned: 'Concerned', calm: 'Calm', surprised: 'Surprised', firm: 'Firm' };
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const use = (id, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><use href="#${id}"/></svg>`;
-const liveIcon = k => document.querySelector(`.stage[data-k="${k}"] .ib svg`).outerHTML;
+const liveIcon = k => document.querySelector(`.stage[data-k="${k}"] .ib svg`)?.outerHTML || '';
 const ARCHIE = '<img src="/static/icons/cartesia-archie.svg" alt="">';
 let endKey = null;
 
@@ -227,7 +227,7 @@ function renderEnd(s) {
   endKey = key;
   const L = m.latency, num = v => v == null ? '--' : v;
   $('end-call').textContent = `Call ended ${mmss(m.seconds)}${s.number ? ' on ' + s.number : ''}`;
-  const [n, unit] = m.seconds < 60 ? [m.seconds, 'second'] : [Math.round(m.seconds / 60), 'minute'];
+  const [n, unit] = m.seconds < 120 ? [m.seconds, 'second'] : [Math.round(m.seconds / 60), 'minute'];
   $('end-head').innerHTML = `Austin held a <span class="num">${n}</span>-${unit} phone call without making a sound.`;
 
   const r = m.repairs[0];
@@ -236,7 +236,8 @@ function renderEnd(s) {
     ['s-lips', ARCHIE, 'Lips to voice', L.lips_to_voice == null ? '--' : (L.lips_to_voice / 1000).toFixed(2), 's',
      `Read ${num(L.read)}, lock ${num(L.lock)}, Claude ${num(L.claude)}, voice ${num(L.sonic)} ms.`],
     ['s-claude', use('claude-mark'), 'Fixed by Claude', String(m.repairs.length), '',
-     r ? `“${r.frm}” to “${r.to}”, a lip look-alike.` : 'No look-alikes needed fixing.'],
+     !r ? 'No look-alikes needed fixing.' : m.repairs.length === 1 ? `“${r.frm}” to “${r.to}”, a lip look-alike.`
+       : `${m.repairs.length} lip look-alikes, like “${r.frm}” to “${r.to}”.`],
     ['s-repeat', use('repeat-icon'), 'Asked to repeat', String(m.repeats.length), '',
      m.repeats.length ? 'Readers disagreed, so nothing was spoken.' : 'Every word was clear enough to speak.'],
   ];
@@ -266,7 +267,7 @@ function renderEnd(s) {
     `<div class="sv"><b>${num(ms)}</b><span>ms</span></div></div></div>`).join('');
 
   renderThread(m.transcript);
-  document.fonts.ready.then(() => renderThread(m.transcript));   // trim again once the font's metrics are final
+  document.fonts.ready.then(() => { if (endKey === key) renderThread(m.transcript); });   // re-trim with final font metrics
   document.querySelectorAll('#end .num').forEach((el, k) => roll(el, k));
   setTimeout(() => document.querySelectorAll('#end .st i').forEach(x => x.classList.add('go')), reduceMotion ? 0 : 700);
 }
@@ -301,8 +302,9 @@ function renderTones(tones) {
       `style="stroke:var(--tone-${t});stroke-dasharray:${Math.max(0, len - 4).toFixed(1)} ${C.toFixed(1)};stroke-dashoffset:${(-off).toFixed(1)}"/>`;
     off += len; return seg;
   }).join('') : `<circle cx="72" cy="72" r="${R}" class="seg empty"/>`;
-  $('end-legend').innerHTML = entries.map(([t, c]) =>
-    `<div class="lg" data-name="${t}"><i style="background:var(--tone-${t})"></i><span>${TONES[t] || t}</span><b>${c}</b></div>`).join('');
+  $('end-legend').innerHTML = total ? entries.map(([t, c]) =>
+    `<div class="lg" data-name="${t}"><i style="background:var(--tone-${t})"></i><span>${TONES[t] || t}</span><b>${c}</b></div>`).join('')
+    : '<p class="lg-empty">No tone data on this call.</p>';
   const donut = document.querySelector('#end .donut'), legend = $('end-legend');
   const show = name => {
     const seg = name && donut.querySelector(`.seg[data-name="${name}"]`);

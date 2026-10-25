@@ -199,6 +199,7 @@ body { font-family: var(--font); font-variant-numeric: tabular-nums; color: var(
 #end .lg { display: grid; grid-template-columns: 12px 1fr auto; column-gap: 12px; align-items: center; font-size: 22px; cursor: default; }
 #end .lg i { width: 12px; height: 12px; border-radius: var(--r-sm); }
 #end .lg b { font-weight: 700; }
+#end .lg-empty { font-size: 22px; color: var(--text-muted); }
 #end .tone-legend.hot .lg { opacity: .45; } #end .tone-legend.hot .lg.on { opacity: 1; }
 #end .wide { grid-column: 1 / -1; }
 #end .label small { font-weight: 400; font-size: 18px; }
