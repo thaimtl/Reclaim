@@ -11,6 +11,7 @@ SOS = np.array([
 ZI = np.array([[-0.8484752955243585, 0.8484752955243586], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
 
 FLOOR_DOWN, FLOOR_UP = 0.2, 0.002   # floor drops fast, rises slowly
+FLOOR_HOLD = 0.0001                 # floor rise while the pad is active (~100 s), so held activity stays lit
 FLOOR_MARGIN = 2.0                  # activity starts at this many times the floor
 MIN_SPAN = 2.0                      # smallest RMS range a full meter stands for
 PEAK_DECAY = 0.995                  # running peak decay per message
@@ -65,7 +66,8 @@ class PadLevels:
         first = ~np.isfinite(self.floor) & contact
         self.floor[first] = rms[first]
         with np.errstate(invalid='ignore'):     # inf floor = never on skin yet
-            rate = np.where(rms < self.floor, FLOOR_DOWN, FLOOR_UP)
+            rising = np.where(rms < FLOOR_MARGIN * self.floor, FLOOR_UP, FLOOR_HOLD)
+            rate = np.where(rms < self.floor, FLOOR_DOWN, rising)
             self.floor = np.where(contact, self.floor + rate * (rms - self.floor), self.floor)
             rest = FLOOR_MARGIN * self.floor
             self.peak = np.where(contact, np.maximum(self.peak * PEAK_DECAY, rms), self.peak)
