@@ -37,6 +37,7 @@ TIME_FIELDS = {
     'dec.hyp': ('t0',),
     'claude.': ('t',),
     'partner.text': ('t',),
+    'call.state': ('t',),
     'timing.': ('t',),
 }
 
