@@ -569,8 +569,7 @@ async def test_whole_sentence_fallback_when_streaming_keeps_failing():
 
 
 async def test_a_change_mid_sentence_rides_on_that_push():
-    """Unpaced: every push carries the generation_config of its moment (the SDK would otherwise resend the context's
-    first one, which overrides inline tags)."""
+    """Unpaced: every push carries the generation_config of its moment."""
     conn = FakeConn()
     v = Voice(cfg(), lambda b: asyncio.sleep(0), client=SimpleNamespace(tts=FakeTTS(conn)))
     await v.start()
@@ -692,8 +691,7 @@ async def test_a_lost_final_does_not_hold_the_next_sentence(monkeypatch):
 
 
 def test_gate_drops_a_bystander_who_talks_between_the_callers_sentences():
-    """The phone silences the room between words (floor ~ -70 dBFS), so a bystander at -35 dBFS is far above the floor;
-    only the caller's own level (~ -14 dBFS) tells them apart."""
+    """A bystander far above the floor is still cut: only the caller's own level tells them apart."""
     import numpy as np
     from call.ink import FRAME, NoiseGate
     from call.audio import to_mulaw

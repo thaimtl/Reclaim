@@ -1,8 +1,4 @@
-"""Audio helpers for the voice: trim Sonic's padding off a phrase, and encode it to Twilio's mu-law.
-
-Sonic answers each flush (one phrase) with its speech padded by ~0.5 s of silence (measured 2026-10-25, sonic-3.6).
-Played as is, that padding becomes a gap Austin never made, so each phrase is cut to its speech plus a natural pause.
-"""
+"""Voice audio: trim Sonic's ~0.5 s of padding off each phrase, and encode it to Twilio's mu-law."""
 import numpy as np
 
 RATE = 8000                 # Twilio's mu-law 8 kHz; Sonic is asked for linear 16-bit at the same rate
@@ -30,14 +26,11 @@ def trim(pcm, post_s=0.04):
 
 
 class StreamTrim:
-    """trim(), as the audio streams in: leading silence is dropped as soon as speech shows, then the speech is passed on
-    up to its last loud frame so far; whatever follows (a pause inside the phrase, or Sonic's ~0.5 s of padding) is held
-    until more speech comes or end() trims it to post_s. Loud means above TRIM_FLOOR and TRIM_REL of the loudest frame
-    so far, as in trim(). So a phrase starts playing with its first sound, not after Sonic has made all of it."""
+    """trim() while audio streams in: plays from the first sound, holds a possible tail until end()."""
 
     def __init__(self, post_s=0.04):
         self.post_s = post_s
-        self.buf = np.zeros(0, np.int16)    # the phrase from its first sound (before: leading silence, being looked at)
+        self.buf = np.zeros(0, np.int16)    # the phrase from its first sound
         self.started, self.sent, self.peak, self.last = False, 0, 0.0, 0    # last: end of the last loud frame
 
     def _frames(self, x):
@@ -56,7 +49,7 @@ class StreamTrim:
             k = int(FADE_S * RATE)
             self.buf = np.concatenate([fade_in(self.buf[a:a + k]), self.buf[a + k:]])
             self.started, old = True, 0
-        first = old // TRIM_FRAME             # frames not looked at yet (from the one the last push cut short)
+        first = old // TRIM_FRAME             # re-check the frame the last push cut short
         rms = self._frames(self.buf[first * TRIM_FRAME:])
         if len(rms):
             self.peak = max(self.peak, float(rms.max()))
@@ -100,8 +93,7 @@ def fade(x):
 
 
 def _mulaw_encode_table():
-    """G.711 mu-law encoder for every int16 value, as a lookup table: the Sun reference (CPython's audioop), 14-bit
-    magnitude + bias 33, clipped at 8159, segment from the highest set bit."""
+    """G.711 mu-law lookup table for every int16 value (the Sun reference, as in CPython's audioop)."""
     v = np.arange(-32768, 32768, dtype=np.int32) >> 2
     mask = np.where(v < 0, 0x7F, 0xFF)
     mag = np.minimum(np.where(v < 0, -v, v), 8159) + 33

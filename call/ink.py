@@ -5,10 +5,8 @@ final text.
 NoiseGate: at the expo the judge's phone also hears everyone nearby, and Ink transcribes them too (first live call:
 bystanders' sentences in the judge's captions, and turns that never ended). The judge holds the phone to their ear, so
 their voice is far louder at the mic than voices across the room. The gate passes only audio clearly above the
-background AND close to the caller's own speaking level (a bystander a few metres away is ~20 dB below it, even while
-talking: a floor alone doesn't stop them, since phones already silence the background between words; on a test call
-it passed 65% of the audio). The rest becomes mu-law silence, so Ink hears the caller alone and turns end when they
-stop. The phone itself is the first line: an iPhone at the ear with Voice Isolation (call/README.md).
+background and within BELOW_TALKER_DB of the caller's own level; the rest becomes mu-law silence, so Ink hears the
+caller alone and turns end when they stop.
 """
 import asyncio
 import logging
@@ -94,9 +92,7 @@ class NoiseGate:
                 self.talk = deque((i, x) for i, x in self.talk if x < lv + self.below_talker_db)
             self.talk.append((self.total, lv))
             self.last_pass = self.total
-        # the floor learns from background, not from speech (a long sentence would raise it and shut the gate; speech
-        # too far below the caller's is still speech, a bystander or the caller further from the phone), but frames
-        # above it still count 1 in LOUD_EVERY, so a room that gets louder lifts the floor over ~10 s
+        # the floor learns from background, plus 1 in LOUD_EVERY frames above it, so a louder room lifts it
         if not above_floor or len(self.levels) < LEARN_FRAMES or self.total % LOUD_EVERY == 0:
             self.levels.append(lv)
         self.hold = self.hangover if loud else max(0, self.hold - 1)

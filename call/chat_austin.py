@@ -2,12 +2,9 @@
 
     venv-call/bin/python -m call.chat_austin            # with call.server running; start this first, then the call
 
-Hears the other person through partner.text (Cartesia Ink), asks Claude for a short reply, and "mouths" it the way
-Austin's decoder will send it: a cam.tick with the sentence's emotion (as the camera's face label would), then word by
-word at mouthing pace, each word locked LOCK_S after it ends: dec.hyp every 100 ms, dec.lock, and voice.say with only
-the new word (bare, uppercase, as the lip reader gives it) and its offset; he pauses at commas. So the voice (which
-ends its phrases on his pauses, from dec.hyp) and the dashboard see what they will see on the day. Binds
-RECLAIM_DEC_PUB and RECLAIM_CAM_PUB, so don't run it while the real decoder or camera reader is publishing.
+Hears the other person through partner.text (Cartesia Ink), asks Claude for a short reply, and "mouths" it as
+Austin's decoder would: cam.tick with the emotion, then dec.hyp, dec.lock and voice.say word by word at mouthing pace.
+Binds RECLAIM_DEC_PUB and RECLAIM_CAM_PUB, so don't run it while the real decoder or camera reader is publishing.
 Needs ANTHROPIC_API_KEY in call/keys.env.
 """
 import argparse
@@ -85,13 +82,12 @@ class Bot:
         return word.strip('.,!?;:"').upper()
 
     async def mouth(self, utt, words):
-        """One sentence the way the decoder sends it: he mouths the words back to back (GAP_S apart), each locks LOCK_S
-        after he finishes it, while he is already on the next; dec.hyp every 100 ms, dec.lock and voice.say per word."""
+        """One sentence as the decoder sends it: dec.hyp every 100 ms, dec.lock and voice.say per word."""
         t, times = time.perf_counter(), []
         for w in words:
             times.append((t, t + mouthing_s(w)))
             t += mouthing_s(w) + (COMMA_PAUSE_S if w.endswith(',') else GAP_S)
-        bare = [self.bare(w) for w in words]       # the lip reader's words: uppercase, no punctuation
+        bare = [self.bare(w) for w in words]
         locked = 0
         while locked < len(words):
             now = time.perf_counter()

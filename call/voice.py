@@ -4,15 +4,9 @@ One Sonic context per utterance (utt_id), continue=True ("more to come"), the fi
 while Austin is still mouthing. Every chunk carries a leading space after the first and the last one closing
 punctuation, so Sonic joins them as one sentence, in one continuous recording.
 
-Phrases (the default, CARTESIA_PACED=1): Sonic only sounds like a person when it sees a few words together; a word sent
-alone is said like a whole sentence (a test call: "spitting word by word"), and words cut from separate requests and
-joined glitch. So locked words go to Sonic as natural phrases, each its own flush with no server buffer: when Austin
-pauses (his decoder's dec.hyp shows nothing being mouthed, PHRASE_PAUSE_S; or no new word for PHRASE_IDLE_S), or after
-PHRASE_WORDS words that don't end on a function word. Sonic pads each flush with ~0.5 s of silence; that is trimmed to a
-natural pause (call/audio.py), and each phrase plays as soon as it arrives. Only locked words are ever spoken; the
-pause signal is his own model's. Measured 2026-10-25 (sonic-3.6, a sentence mouthed in 5.5 s with two pauses): first
-sound 0.6 s after he started, finished 1.0 s after him. With a 120 ms server buffer instead, Sonic held 14 of 15 words
-until the sentence ended (4.9 s of silence).
+Phrases (the default, CARTESIA_PACED=1): Sonic sounds natural only with a few words at once, so locked words go as
+phrases, each its own flush, cut at his pauses (dec.hyp) or every PHRASE_WORDS words. Sonic's padding is trimmed
+(call/audio.py) and each phrase plays as soon as it arrives.
 
 Unpaced (CARTESIA_PACED=0): audio is played as it arrives, with the server buffer CARTESIA_MAX_BUFFER_MS, and
 optionally words grouped client-side (CARTESIA_PHRASE_WORDS=3 with CARTESIA_MAX_BUFFER_MS=0).
@@ -32,9 +26,8 @@ spoken in one non-streaming request (tts.generate), after whatever did stream.
 voice.say may carry only the new words or the whole utterance so far; Utterance.new_words() handles both, and an
 explicit `offset` (index of the first word in the message) removes the guesswork when the decoder sends it.
 Emotion comes from the newest cam.tick (Evan's camera reader); pace and effort from voice.say. All three go through
-generation_config: emotion name, speed 0.6-1.5, volume 0.5-2.0, sent with every push (Cartesia's documented way to
-change them mid-stream). Phrases: a change of face mid-sentence starts a new recording for the rest of it (Sonic keeps
-one recording's mood); a clench is an inline <volume> on that word.
+generation_config: emotion name, speed 0.6-1.5, volume 0.5-2.0, sent with every push. Phrases: a face held
+FACE_HOLD_S mid-sentence starts a new recording (Sonic keeps one recording's mood); a clench is an inline <volume>.
 """
 import asyncio
 import logging
@@ -50,8 +43,7 @@ log = logging.getLogger(__name__)
 OUTPUT = {'container': 'raw', 'encoding': 'pcm_mulaw', 'sample_rate': 8000}
 PCM = {'container': 'raw', 'encoding': 'pcm_s16le', 'sample_rate': RATE}     # phrases: trimmed here, then mu-law
 # camera label (live/types.py EMOTIONS) -> Sonic emotion; all five exist in Sonic's list
-# "happy" is in Sonic's list but weak; "excited" carries (its primary emotions: neutral, calm, angry, content, sad,
-# scared)
+# "happy" is weak in Sonic; "excited" carries
 EMOTION = {'neutral': 'neutral', 'happy': 'excited', 'sad': 'sad', 'angry': 'angry', 'surprised': 'surprised'}
 EXCLAIM = {'excited', 'surprised', 'angry'}    # Sonic emotions whose sentences end in '!'
 MIN_CONFIDENCE = 0.5        # below this the face label is a guess: speak neutral
@@ -102,9 +94,7 @@ def is_question(sent):
 
 
 def end_mark(sent, emotion=None):
-    """Closing punctuation for a finished sentence (Sonic waits for it; without it audio starts late). The lip reader
-    gives words without punctuation, and Sonic takes most of its emotion from the text, so his face picks it: a
-    question '?', an excited, surprised or angry face '!', else '.'."""
+    """Closing punctuation (Sonic waits for it): '?' for a question, '!' for an excited face, else '.'."""
     if is_question(sent):
         return '?'
     return '!' if emotion in EXCLAIM else '.'
@@ -137,8 +127,7 @@ def ready(pending, spoken, phrase_words=1):
 
 
 def phrase_ready(pending, spoken=1):
-    """Phrases: how many pending words to send now without waiting for a pause (0: wait). spoken: words of the
-    sentence already sent (none: the first phrase, which goes sooner)."""
+    """Phrases: how many pending words to send now without waiting for a pause (0: wait)."""
     n = len(pending)
     need = PHRASE_FIRST if not spoken else PHRASE_WORDS
     if n >= PHRASE_MAX or (n >= need and pending[-1].lower() not in FUNCTION_WORDS):
@@ -256,8 +245,8 @@ class Voice:
                 u.reader.cancel()
             u.ctx = u.reader = None
             self._salvage(u)                # paced: what came plays, words Sonic never answered go to the fallback
-            if u.final and not u.finishing:     # nothing more will be pushed (mid-_finish, _finish ends it itself):
-                if u.lost:                      # speak what was lost, then let the player on
+            if u.final and not u.finishing:     # nothing more will be pushed (_finish ends its own)
+                if u.lost:
                     self._spawn(self._lost_then_end(u))
                 else:
                     log.warning('utterance %s lost its remaining audio in the reconnect', u.utt_id)
@@ -310,8 +299,8 @@ class Voice:
             if final:
                 await self._finish(u)
                 return
-            if self.cfg.paced:              # a question waits for his pause or its end (it rises at its '?'), up to
-                q = is_question(u.sent)     # PHRASE_MAX words
+            if self.cfg.paced:              # a question waits for his pause, up to PHRASE_MAX words
+                q = is_question(u.sent)
                 n = (len(u.pending) if len(u.pending) >= PHRASE_MAX else 0) if q else \
                     phrase_ready(u.pending, u.spoken)
             else:
@@ -321,12 +310,7 @@ class Voice:
             self._arm(u)
 
     async def _new_part(self, u):
-        """Phrases: his face changed mid-sentence. Sonic keeps one recording's mood (measured on his clone: a sad
-        setting mid-recording after happy words still sounded happy; a fresh one sounded sad; Cartesia: "for an
-        important shift, send each part in its own generation context"). So the words so far finish this part, and
-        the rest of the sentence goes to a new one under the same utt_id, played after it. The part so far ends like a
-        sentence in its own mood ("I got the job!"), and the new part starts like one. Words already sent keep their
-        punctuation: a mark sent alone afterwards can't change speech Sonic already made."""
+        """Phrases: his face changed mid-sentence. Sonic keeps one recording's mood, so the rest gets a new part."""
         gen, u.gen = u.gen, u.said_gen      # the words still waiting were mouthed with the old face
         u.pending_gen = [dict(g, emotion=u.said_gen['emotion']) for g in u.pending_gen]
         u.continued = True                  # the sentence goes on in the next part: one on_done, at its end
@@ -366,7 +350,7 @@ class Voice:
     async def _send(self, u, n, end=False, pause=False):
         """Send the first n pending words as one chunk; they leave `pending` only once Sonic accepted them. Sonic joins
         continued chunks exactly as written: a leading space after the first chunk, closing punctuation on the last.
-        pause: Austin paused after these words: phrases get a comma there, so the voice breathes where he did."""
+        pause: he paused after these words."""
         words, gens = u.pending[:n], u.pending_gen[:n]
         if self.cfg.paced and words:        # the phrase's face and pace; a loud word only where he clenched
             loud = [g.get('volume') or 1.0 for g in gens]
@@ -402,8 +386,7 @@ class Voice:
                     u.lost += words
                     break
                 ctx = u.ctx or self._open(u, gen)
-                # each push carries its own generation_config (Cartesia's documented way to change it mid-stream;
-                # the SDK otherwise resends the context's first one with every push, and that beats inline tags)
+                # each push carries its own generation_config, or the SDK resends the context's first one
                 if self.cfg.paced:      # its own flush: Sonic tags its audio with this flush_id, so it can be trimmed
                     fid = u.n_flush = u.n_flush + 1
                     u.flushes[fid] = Flush(words, dict(gen or {}), text)
@@ -441,8 +424,7 @@ class Voice:
             u.timer = asyncio.get_running_loop().call_later(delay, lambda: self._spawn(self._on_pause(u, seq)))
 
     def mouthing(self, utt_id, active):
-        """Phrases: his decoder's dec.hyp. Nothing being mouthed: he paused, so the waiting words go after
-        PHRASE_PAUSE_S; a word in his mouth: keep waiting for it."""
+        """Phrases: dec.hyp. Nothing mouthed: send after PHRASE_PAUSE_S. A word in his mouth: keep waiting."""
         u = self.utts.get(utt_id)
         if self.cfg.paced and u is not None and not u.final and u.pending and (active or not u.pause_armed):
             self._arm(u, PHRASE_IDLE_S if active else PHRASE_PAUSE_S)
@@ -512,8 +494,7 @@ class Voice:
         u.end_audio()
 
     def _salvage(self, u):
-        """Phrases, a context ended early (error, timeout, reconnect): flushes Sonic didn't finish. Audio that came is
-        played; words with none go to the whole-sentence fallback, in order."""
+        """Phrases, a context ended early: play the audio that came, send unanswered words to the fallback."""
         for fid in sorted(u.flushes):
             if u.flushes[fid].got:
                 self._phrase_done(u, fid)
@@ -524,9 +505,7 @@ class Voice:
 
     @staticmethod
     def _flush_no(u, ev):
-        """Our number (1, 2, ...) of the flush an event belongs to. Sonic's flush_id counts our flushes in order from a
-        base its docs give as 1 and the service sends as 0, so the base is learned from the first id seen (the first
-        flush always answers first). Without an id: the oldest flush still open."""
+        """Our flush number (1, 2, ...) for an event: the base is learned from Sonic's first id; no id: the oldest."""
         fid = getattr(ev, 'flush_id', None)
         if fid is None:
             return min(u.flushes, default=None)
@@ -540,8 +519,7 @@ class Voice:
 
     @staticmethod
     def _phrase_audio(u, f, audio):
-        """Phrases: a chunk of a flush's audio -> its speech so far to the player at once (StreamTrim holds back only
-        what might be Sonic's trailing padding), so a phrase plays from its first sound."""
+        """Phrases: a chunk of a flush's audio -> its trimmed speech so far, to the player at once."""
         data, f.carry = f.carry + audio, b''
         if len(data) % 2:
             data, f.carry = data[:-1], data[-1:]

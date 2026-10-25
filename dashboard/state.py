@@ -38,8 +38,7 @@ EMG_FLAT = 1.0              # standard deviation below this (raw units): no cont
 
 
 def pretty(words, first=True):
-    """The lip reader's words (UPPERCASE) as people write them: lowercase, 'I' and its contractions capitalised, and
-    the sentence's first word (first: these words start the sentence)."""
+    """The lip reader's UPPERCASE words as written: lowercase, 'I' capitalised, and the first word if first."""
     out = []
     for i, w in enumerate(words):
         w = str(w).lower()
@@ -195,8 +194,7 @@ class CallState:
 
     @staticmethod
     def _said(u):
-        """What the call heard: the voice's own phrases (cased, with the punctuation it gave them) once it reports
-        them, else the words sent to it, cased."""
+        """What the call heard: the voice's own phrases once reported, else the words sent to it."""
         return ' '.join(u['said']) if u['said'] else pretty(u['spoken'])
 
     def _close(self, u, t):
@@ -273,7 +271,7 @@ class CallState:
             self.seen['voice'] = now
             u = self.utts.get(msg.get('utt_id'))
             if stage == 'voice_phrase' and u and msg.get('text'):
-                u['said'].append(str(msg['text']))     # what the call heard, with its punctuation
+                u['said'].append(str(msg['text']))
                 for entry in reversed(self.transcript if u['final'] else []):   # open: its entry doesn't exist yet
                     if entry['who'] == 'austin' and entry.get('utt_id') == u['utt_id']:
                         entry['text'] = self._said(u)

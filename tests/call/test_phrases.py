@@ -1,5 +1,4 @@
-"""The voice in phrases (call/voice.py, call/audio.py), with a fake Sonic that numbers its flushes from 0 and pads each
-with silence, as the real one does (measured 2026-10-25).
+"""The voice in phrases (call/voice.py, call/audio.py), with a fake Sonic that numbers flushes from 0 and pads them.
 
     venv-call/bin/python -m pytest tests/call -q
 """
@@ -73,8 +72,7 @@ def test_phrase_policy():
 
 # --- the voice with a fake Sonic -------------------------------------------------------------------------------------
 class PhraseCtx:
-    """Answers each flushed push after `latency` with speech padded by silence, tagged with flush_id from 0, then a
-    flush_done; the closing no_more_inputs gets a flush_done of its own with no audio."""
+    """Answers each push with padded speech and a flush_done (ids from 0); no_more_inputs gets a bare flush_done."""
 
     def __init__(self, cid, latency=0.03, **defaults):
         self.cid, self.defaults, self.latency = cid, defaults, latency
@@ -231,8 +229,6 @@ async def test_a_face_held_mid_sentence_splits_it(monkeypatch):
 
 
 async def test_a_change_of_face_mid_sentence_starts_a_fresh_recording(monkeypatch):
-    """Sonic keeps one recording's mood (measured on his clone), so when his face changes the words so far finish the
-    current context and the rest of the sentence gets its own, with the new emotion, played after it."""
     monkeypatch.setattr(cv, 'FACE_HOLD_S', 0.0)
     v, conn, heard, timing, _ = await make()
     v.set_emotion('happy', 0.9)
@@ -274,8 +270,7 @@ async def test_a_light_clench_is_not_tagged_and_a_strong_one_is_clearly_louder()
 
 
 async def test_a_sonic_error_mid_sentence_never_shifts_words_onto_the_wrong_audio():
-    """Audio is matched to phrases by flush_id: an error before the second phrase's audio sends that phrase, and
-    the rest of the sentence after it, to the whole-sentence fallback, in order."""
+    """An error before the second phrase's audio sends it and the rest of the sentence to the fallback, in order."""
     class ErrCtx(PhraseCtx):
         async def push(self, transcript, generation_config=None, flush=False):
             if not self.pushed:
@@ -316,8 +311,7 @@ async def test_a_reconnect_mid_sentence_sends_unanswered_phrases_to_the_fallback
 
 
 async def test_his_face_and_pauses_write_the_punctuation():
-    """The lip reader gives bare words; Sonic takes its emotion mostly from the text. While his face is excited every
-    phrase ends in '!'; otherwise his pause gives a ','; a question word gives '?'. Decided at send: no added delay."""
+    """An excited face ends phrases in '!', a pause gives ',', a question word gives '?'."""
     v, conn, _, _, _ = await make()
     v.set_emotion('happy', 0.9)
     await v.say(1, ['I', 'GOT', 'THE', 'JOB'])
