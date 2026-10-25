@@ -52,6 +52,19 @@ You can feel it with two fingers under your chin while saying "ta ta ta", then "
 - Wipe each spot with alcohol, and mark it with a skin marker so pads go back in the same place every session.
 - Run every cable back behind the ears, so the webcam can still see the lips.
 
+### On Austin
+
+Austin wearing the full 4-channel rig at Cal Hacks 13.0.
+
+<img src="images/rig-setup.jpg" width="520" alt="Austin at our table wearing the pads, with the Arduino Uno and breadboard in front of him, the BioAmp boards by his hand, and the laptop that runs everything">
+
+The whole rig at our table, with the Arduino Uno and the breadboard in front, the 4 BioAmp boards by Austin's hand with their cables running up to his pads, and the laptop that runs everything.
+
+| Front | Right side | Left side |
+|---|---|---|
+| <img src="images/austin-front.jpg" width="260" alt="Austin from the front with pad pairs on the right cheek below the mouth, the left cheek above the mouth, the left chin corner, and under the chin"> | <img src="images/austin-right-side.jpg" width="260" alt="Austin's right side with two REF pads behind the right ear and a pad pair on the right cheek below the mouth"> | <img src="images/austin-left-side.jpg" width="260" alt="Austin's left side with two REF pads behind the left ear and pad pairs on the left cheek above the mouth and the left chin corner"> |
+| A2 on the right cheek below the mouth, A3 on the left cheek above it, A1 on the left chin corner, and A0 under the chin | REF for A0 and A2 behind the right ear, and the A2 pair on the cheek | REF for A1 and A3 behind the left ear, and the A3 and A1 pairs on the cheek and chin |
+
 ## Wiring
 
 ![Wiring: the Uno's 5V and GND go to the breadboard's left + and − columns, each BioAmp takes VCC and GND from those columns, and each OUT goes to its own analog pin](images/wiring.png)
