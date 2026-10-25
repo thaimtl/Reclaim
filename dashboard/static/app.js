@@ -1,16 +1,11 @@
 // Reclaim live dashboard: draws each snapshot from dashboard/server.py (dashboard/state.py) as Thai's Figma v5.
-// Text frames are snapshots (JSON); binary frames are the lip reader's camera mirror (cam.preview JPEG) with the
-// face points of that same video frame (dashboard/server.py pack_frame).
+// Text frames are snapshots (JSON); binary frames are cam.preview JPEGs with their face points (server.py pack_frame).
 'use strict';
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const SRC = { camera: 'camera', emg: 'emg', claude: 'claude', lips: 'camera', muscles: 'emg' };
 const TONE_COLOR = { happy: '--warm', sad: '--concerned', neutral: '--calm', surprised: '--surprised', angry: '--firm' };
-// Where each pad sits (HARDWARE.md: A0 under the chin, A1 left chin corner, A2 right cheek below the mouth, A3 left
-// cheek above the mouth; "left" is Austin's left, the image's right): a MediaPipe landmark plus a and b times his
-// face's own axes (down: nose bridge to chin, across: cheek to cheek), so it scales and turns with his head. If the
-// pads went on somewhere else this session, press C on the dashboard and click them (saved in this browser).
-// measured on Austin's session-2 video at his electrode pairs' centres (they land within a few px on other clips)
+// Pad = landmark + a * (nose-to-chin axis) + b * (cheek-to-cheek axis); defaults measured on session 2, C recalibrates.
 const PAD_DEFAULT = {
   A0: { lm: 152, a: 0.1092, b: -0.0342, left: false }, A1: { lm: 379, a: -0.0212, b: -0.0043, left: false },
   A2: { lm: 150, a: -0.0298, b: 0.021, left: true }, A3: { lm: 411, a: 0.0126, b: -0.0134, left: false },
@@ -22,7 +17,7 @@ const W = 760, H = 1080, PREVIEW_STALE_MS = 2000;
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
 let snap = null, lastPreview = -Infinity, speaking = false, toneLabel = 'neutral';
-let frame = null, framePending = false, lastFace = null;    // the newest video frame and the face it was drawn with
+let frame = null, framePending = false, lastFace = null;
 
 // ---- the 1920 x 1080 stage, scaled to the window -------------------------------------------------------
 function fit() {
@@ -150,10 +145,6 @@ function coverMap(size) {           // processed-frame normalized coords -> 760 
 }
 
 // ---- face filter: the picture and the pads on it, drawn in the same animation frame -------------------------
-// A frame is decoded off the main thread (createImageBitmap) and drawn at the next screen refresh together with
-// the pads placed on that frame's own face points, so the pads can't trail the video. No smoothing on top: MediaPipe's
-// video mode already steadies its points (measured on his session-2 videos: 0.44 px of frame-to-frame jitter on this
-// 760 px panel), and a One Euro filter on top only left the pads up to 6 px behind his face when he moved.
 let frameSeq = 0;
 async function onFrame(buf) {
   const seq = ++frameSeq;
@@ -162,12 +153,12 @@ async function onFrame(buf) {
     if (dv.getUint32(0) !== 0x52434631) return;           // 'RCF1'
     const n = dv.getUint32(4), head = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 8, n)));
     const bitmap = await createImageBitmap(new Blob([new Uint8Array(buf, 8 + n)], { type: 'image/jpeg' }));
-    if (frame && frame.seq > seq) { bitmap.close(); return; }   // a newer frame finished decoding first
+    if (frame && frame.seq > seq) { bitmap.close(); return; }
     if (frame) frame.bitmap.close();
     frame = { bitmap, seq, ...head };
     lastPreview = performance.now();
     if (!framePending) { framePending = true; requestAnimationFrame(drawFrame); }
-  } catch (err) { /* a bad frame is skipped; the next one replaces it */ }
+  } catch (err) { /* skip a bad frame */ }
 }
 
 function drawFrame() {
@@ -181,7 +172,6 @@ function drawFrame() {
   placeOverlays(lastFace);
 }
 
-// the face's points on the panel, and its own axes there
 function faceOnPanel(face) {
   const map = coverMap(face.size), P = face.pts.map(([x, y]) => map(x, y));
   const U = [P[AXIS.chin][0] - P[AXIS.top][0], P[AXIS.chin][1] - P[AXIS.top][1]];
@@ -191,7 +181,7 @@ function faceOnPanel(face) {
 
 function placeOverlays(face) {
   const ring = $('mouth-ring'), pads = [...$('pads').children];
-  if (!face || !snap || !snap.face_ok) {          // no face: the pads wait at their usual places
+  if (!face || !snap || !snap.face_ok) {
     ring.classList.add('hidden');
     layoutCallouts(pads, PAD_ORDER.map(pin => PAD_FALLBACK[pin]), 270, 490);
     return;
@@ -211,17 +201,14 @@ function placeOverlays(face) {
 
 const PAD_FALLBACK = { A0: [378, 672], A1: [489, 616], A2: [270, 616], A3: [489, 516] };   // no face yet
 
-// Callouts: each dot sits on its electrode; its label sits in a column beside his face (each pad has its side, set
-// where it was clicked), in the dots' order top to bottom, joined to it by a line. Labels never overlap each other
-// or jump sides; on a close-up with no room beside his face, they keep to the panel's edges.
-const GAP = 28, ROW = 40, LABEL_MAX_Y = 820;          // label rows stay clear of "Heard on the call"
+const GAP = 28, ROW = 40, LABEL_MAX_Y = 820;          // LABEL_MAX_Y keeps clear of "Heard on the call"
 function layoutCallouts(pads, dots, faceLeft, faceRight) {
   for (const left of [true, false]) {
     const idx = dots.map((d, i) => i).filter(i => pads[i] && (padAt[PAD_ORDER[i]].left !== false) === left)
       .sort((a, b) => dots[a][1] - dots[b][1]);
     let prev = -Infinity;
     const ys = idx.map(i => (prev = Math.max(dots[i][1], prev + ROW)));
-    const over = ys.length ? Math.max(0, ys[ys.length - 1] - LABEL_MAX_Y) : 0;   // too low: the column moves up
+    const over = ys.length ? Math.max(0, ys[ys.length - 1] - LABEL_MAX_Y) : 0;
     idx.forEach((i, j) => {
       const el = pads[i], pill = el.querySelector('.pill'), [x, y] = dots[i], ly = ys[j] - over;
       const w = pill.offsetWidth || 300;
@@ -234,14 +221,14 @@ function layoutCallouts(pads, dots, faceLeft, faceRight) {
   }
 }
 
-// ---- pad calibration: press C, then click A0, A1, A2, A3 where they are on his face -------------------------
+// ---- pad calibration: press C, then click A0 to A3 -------------------------------------------------------
 let padAt = loadPads(), calib = null;
 function loadPads() {
   try { return { ...PAD_DEFAULT, ...JSON.parse(localStorage.getItem('reclaim.pads') || '{}') }; }
   catch { return { ...PAD_DEFAULT }; }
 }
 function savePads() {
-  try { localStorage.setItem('reclaim.pads', JSON.stringify(padAt)); } catch { /* this session keeps them */ }
+  try { localStorage.setItem('reclaim.pads', JSON.stringify(padAt)); } catch { /* kept for this session only */ }
 }
 const PAD_PLACE = { A0: 'under his chin', A1: 'his left chin corner', A2: 'his right cheek below the mouth',
                     A3: 'his left cheek above the mouth' };
@@ -265,7 +252,7 @@ $('right').addEventListener('click', e => {
   const { P, U, V } = faceOnPanel(lastFace);
   let lm = 0;
   P.forEach((p, i) => { if (Math.hypot(p[0] - cx, p[1] - cy) < Math.hypot(P[lm][0] - cx, P[lm][1] - cy)) lm = i; });
-  const dx = cx - P[lm][0], dy = cy - P[lm][1], det = U[0] * V[1] - U[1] * V[0];     // dx,dy = a U + b V
+  const dx = cx - P[lm][0], dy = cy - P[lm][1], det = U[0] * V[1] - U[1] * V[0];     // solve dx,dy = a U + b V
   if (Math.abs(det) < 1e-6) return;
   const mid = (P[AXIS.left][0] + P[AXIS.right][0]) / 2;
   calib.next[PAD_ORDER[calib.i]] = { lm, a: (dx * V[1] - dy * V[0]) / det, b: (U[0] * dy - U[1] * dx) / det,
@@ -278,7 +265,7 @@ function renderCamera(s) {
   const previewOn = performance.now() - lastPreview < PREVIEW_STALE_MS;
   const face = s.face;
   const mesh = $('mesh'), g = mesh.getContext('2d');
-  if (!previewOn) {                  // no mirrored video: the face mesh from cam.face, and the pads on it
+  if (!previewOn) {                  // no video: draw the cam.face mesh
     g.clearRect(0, 0, W, H);
     if (face) {
       const map = coverMap(face.size);
@@ -296,7 +283,7 @@ function renderCamera(s) {
   chip.querySelector('i').style.background = !s.face_ok || !s.muscles ? '#8b95a1' : css(TONE_COLOR[s.emotion.label] || '--calm');
   $('lips-off').classList.toggle('hidden', s.face_ok);
 
-  const box = $('pads');             // the pads' content per snapshot; where they sit is set per video frame
+  const box = $('pads');             // content per snapshot, position per video frame
   if (box.children.length !== s.pads.length) {
     box.innerHTML = s.pads.map(() => `<div class="pad"><svg width="${W}" height="${H}"><line/></svg>` +
       '<span class="pdot"></span><span class="pill"><span class="pn"></span>' +

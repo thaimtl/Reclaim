@@ -1,5 +1,4 @@
-"""The pad meters: rig/filters.py's filter in numpy, and levels that read 0 for a still face (hum, drift, noise)
-and fill for a muscle burst."""
+"""Pad meters: the numpy filter matches rig/filters.py, a still face reads 0, a burst fills its pad."""
 import numpy as np
 import pytest
 
@@ -19,8 +18,7 @@ def test_the_filter_is_rig_filters_sample_for_sample():
 
 
 def raw(seconds, hum=30.0, noise=2.0, burst=None):
-    """10-bit samples around 512: mains hum at 60 Hz, slow drift, sensor noise, and an optional muscle burst
-    (broadband) on one channel."""
+    """10-bit samples: 60 Hz hum, drift, noise, and an optional muscle burst on one channel."""
     t = np.arange(int(seconds * FS)) / FS
     x = 512 + hum * np.sin(2 * np.pi * 60 * t)[:, None] + 20 * np.sin(2 * np.pi * 0.3 * t)[:, None] \
         + RNG.normal(0, noise, (len(t), 4))

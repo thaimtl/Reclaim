@@ -283,9 +283,6 @@ def unpack(frame):
 
 
 def test_each_preview_frame_carries_the_face_points_of_that_frame():
-    """The pads are drawn from the face of the very frame shown: the cam.face closest in time (within one camera
-    frame), or the preview's own points if the camera reader sends them; none closer: no points (the page keeps
-    its last placement rather than drawing a stale face)."""
     from dashboard.server import Dashboard
     d = Dashboard(endpoints={'none': 'inproc://dashboard-test-none'})
     a = [[0.1, 0.2]] * 478
