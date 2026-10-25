@@ -154,7 +154,7 @@ def run_session(session, cam_log, svr_path, gate, lock, use_emg=True, use_lm=Tru
         return r['prompt'] if r is not None and r.get('prompt') and r['id'] in ok_ids else None
 
     core = Fusion(search, gate, lock, svr=live, use_emg=use_emg, use_lm=use_lm, use_hints=False, idle_emg=False,
-                  record=record, oracle=oracle)
+                  record=record, oracle=oracle, sentences=False)   # scored per recorded clip
     cam = camera_events(cam_log)
     if limit:
         segs = sorted({int(m['seg_id']) for _, tp, m in cam if tp == 'cam.tick'})[:limit]

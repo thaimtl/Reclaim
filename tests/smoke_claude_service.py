@@ -312,6 +312,28 @@ def requirements():
     check('requirements cover the bus', {'numpy', 'pyzmq', 'msgpack', 'anthropic'} <= names, names)
 
 
+def end_lane():
+    """dec.pause -> one Haiku call on the conversation plus the check -> claude.end; nothing appended."""
+    fake = FakeClient([{'p_complete': 0.83}])
+    b = Brain(fake)
+    b.partner({'text': 'What are you building?', 'is_final': True})
+    n_msgs = len(b.messages)
+    check('end lane: nothing to ask, no call', b.next_end(0.0) is None)
+    b.pause({'utt_id': 4, 'words': ['we', 'built', 'a', 'system', 'that'], 'ask': 2, 'silence_s': 1.6})
+    msgs, target = b.next_end(1.0)
+    r, log = b.ask(msgs, lane='end')
+    out, rejected = b.apply(r, target, 1.0)
+    req = fake.calls[0]
+    check('end lane: Haiku, the end schema, the check last', req['model'] == brain_mod.MODEL and
+          req['output_config']['format']['schema'] == brain_mod.END_SCHEMA and
+          'we built a system that' in req['messages'][-1]['content'] and '1.6 s' in req['messages'][-1]['content']
+          and 'What are you building?' in req['messages'][-1]['content'])
+    check('end lane: claude.end carries the sentence and P(finished)',
+          out == [('claude.end', {'utt_id': 4, 'p_complete': 0.83, 'ask': 2, 't': 1.0})] and not rejected, out)
+    check('end lane: the conversation gets nothing appended', len(b.messages) == n_msgs and b.end is None)
+    check('service: listens for dec.pause', 'dec.pause' in TOPICS)
+
+
 def bus():
     """The loop end to end over inproc sockets: predict, repair, bad messages survived, and the wire format."""
     ctx = zmq.Context.instance()
@@ -397,6 +419,17 @@ def live():
     r3, log3 = b.ask(msgs)     # a repair after a repair: Opus reads its own cached prefix (Haiku's is another model's)
     check('live: a second repair reads the cache', r3 is not None and log3['cache_read'] > 0,
           f"cache_read={log3['cache_read']}, {log3['ms']:.0f} ms, model {log3.get('model')}")
+    # the end lane: an unfinished sentence should read unfinished, a finished answer finished
+    ps = {}
+    for words, silence in (('we built a system that helps patients who', 1.3), ('yes i am a little nervous', 1.3)):
+        b.pause({'utt_id': 2, 'words': words.split(), 'ask': 1, 'silence_s': silence})
+        msgs, target = b.next_end(3.0)
+        r, log = b.ask(msgs, lane='end')
+        ps[words] = (dict(b.apply(r, target, 3.0)[0])['claude.end']['p_complete'] if r else None, log.get('ms'))
+        print(f"  end check: {words!r} -> p_complete {ps[words][0]}, {log.get('ms', 0):.0f} ms")
+    (p_mid, _), (p_end, _) = ps.values()
+    check('live: an end check tells mid-sentence from finished', p_mid is not None and p_end is not None and
+          p_mid < 0.5 < p_end, ps)
 
 
 def failed_call():
@@ -488,6 +521,7 @@ if __name__ == '__main__':
     ap.add_argument('--live', action='store_true')
     args = ap.parse_args()
     unit()
+    end_lane()
     early()
     stale_predict()
     late_lock()

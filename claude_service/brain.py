@@ -15,7 +15,11 @@ Two lanes, one conversation (docs/REALTIME_PIPELINE.md, "Claude"):
   appended: the conversation stays append-only (no thinking block is ever replayed after an edited prefix), and
   every repair call reads the same cached prefix. What it decided reaches the conversation in the next
   conversation-lane message.
-Every reply carries both jobs: predictions always, repairs when words are under review. A prediction is stamped
+- The end lane: when Austin's lips stop, the decoder holds his sentence and asks (dec.pause) whether he has finished;
+  each check is one Haiku call on the conversation so far plus his sentence and how long he has been still, with a
+  one-number reply, P(finished), published as claude.end. Like a repair call it appends nothing. The decoder decides
+  what to do with the number (fusion/core.py, Sentence) and asks again while the silence grows.
+Every other reply carries both jobs: predictions always, repairs when words are under review. A prediction is stamped
 with the time its request left, and a newer prediction is never overwritten by an older one. While Austin mouths
 and nothing changed, the last prediction is sent again with a fresh ttl_s, without a call.
 The system prompt, schema and settings never change during a run.
@@ -56,6 +60,8 @@ EARLY_EVERY_S = 0.7    # ... but at most this often
 BACKOFF_S = (1.0, 2.0, 4.0, 8.0)  # wait after 1, 2, 3, 4+ failed calls in a row, from the moment it failed
 MAX_FAILURES = 3       # failed calls in a row after which the failing request's content is dropped
 MAX_PENDING_LINES = 20  # newest judge lines kept while calls fail
+MAX_END = 2            # end checks in flight at once (a newer one replaces a check not yet sent)
+END_MAX_TOKENS = 300   # the end check's reply is one number
 
 SYSTEM = """You are the conversation model inside Silent Voice, a silent-speech system for people who lost their voice box. \
 Austin is on a phone call with a judge. The judge speaks normally; their words reach you as text from a speech \
@@ -118,6 +124,22 @@ SCHEMA = {
     "required": ["edits", "please_repeat", "predict_words", "predict_phrases", "predictability"],
     "additionalProperties": False,
 }
+
+END_SCHEMA = {
+    "type": "object",
+    "properties": {"p_complete": {"type": "number"}},
+    "required": ["p_complete"],
+    "additionalProperties": False,
+}
+
+END_CHECK = """End-of-sentence check (this message only asks this; no predictions or repairs). Austin stopped \
+mouthing {silence:.1f} s ago. His current sentence so far, as the decoder read it (it may hold look-alike mistakes):
+{words}
+{judge}Has Austin finished what he wanted to say, or has he paused mid-sentence and is about to go on? Use the whole \
+conversation: an answer to the judge's question can be complete in a word or two ("yes", "not really"), while a \
+sentence that stops on "and", "the", "to", "because", "with", or before its thought is complete is not finished. \
+The longer he stays still, the more likely he has finished. Reply with p_complete, from 0 to 1: the probability \
+he has finished."""
 
 
 def _clip(x):
@@ -185,6 +207,7 @@ class Brain:
         self.partial = ""     # the judge's line so far, while they speak (Ink's partial transcript)
         self.early_words = 0  # words in the partial line the last early prediction was asked on
         self.early_at = -1e9
+        self.end = None       # the newest dec.pause not yet asked (end lane)
 
     def partner(self, msg):
         text = msg.get("text", "").strip()
@@ -207,6 +230,26 @@ class Brain:
                    "Nothing is under review. Predict what Austin is likely to answer.")
         return list(self.messages) + [{"role": "user", "content": content}], \
             {"utt_id": None, "words": [], "review": [], "sent": now, "lane": "early"}
+
+    def pause(self, msg):
+        """dec.pause: Austin's lips stopped and the decoder holds his sentence. The newest replaces one not yet sent."""
+        words = [_norm(w) for w in msg.get("words") or [] if isinstance(w, str)]
+        self.end = {"utt_id": msg["utt_id"], "words": [w for w in words if w], "ask": msg.get("ask"),
+                    "silence_s": float(msg.get("silence_s") or 0.0)}
+
+    def next_end(self, now):
+        """An end-lane call for the newest dec.pause: (messages, target), or None. The messages are the conversation so
+        far plus the check, with the judge's lines it hasn't seen; nothing is appended to the conversation."""
+        if self.end is None or now < self.retry_at:
+            return None
+        e, self.end = self.end, None
+        judge = "".join(f"Judge, since: {t}\n" for t in self.events)
+        if self.partial:
+            judge += f"The judge has started speaking (live transcript): {self.partial}\n"
+        content = END_CHECK.format(silence=e["silence_s"], words=" ".join(e["words"]) or "(nothing locked)",
+                                   judge=judge)
+        return _cached(self.messages) + [{"role": "user", "content": content}], \
+            {"utt_id": e["utt_id"], "words": [], "review": [], "sent": now, "lane": "end", "ask": e["ask"]}
 
     def _touch(self, utt):
         if utt not in self.updated:
@@ -307,9 +350,13 @@ class Brain:
         t0 = time.perf_counter()
         log = {"stage": "claude", "lane": lane, "request": msgs[-1]["content"]}
         try:
+            schema = END_SCHEMA if lane == "end" else SCHEMA
             common = dict(system=SYSTEM, messages=msgs, cache_control={"type": "ephemeral"},
-                          output_config={"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}})
-            if lane == "repair":    # Opus: Haiku swapped right words on the session 3 replay (0.8 edits a sentence)
+                          output_config={"effort": "low", "format": {"type": "json_schema", "schema": schema}})
+            if lane == "end":       # Haiku, one number back: the end check is on the clock (the sentence holds)
+                r = self.client.beta.messages.create(model=MODEL, max_tokens=END_MAX_TOKENS,
+                                                     thinking={"type": "disabled"}, **common)
+            elif lane == "repair":  # Opus: Haiku swapped right words on the session 3 replay (0.8 edits a sentence)
                 r = self.client.beta.messages.create(model=REPAIR_MODEL, max_tokens=REPAIR_MAX_TOKENS,
                                                      betas=[FALLBACK_BETA], fallbacks="default", **common)
             else:
@@ -382,6 +429,9 @@ class Brain:
         """Turn a reply into bus messages, keeping only edits that swap a word under review for one of its alts.
         The prediction counts from when its request left (target["sent"]), and is dropped if a newer one went out."""
         out, sent = [], target.get("sent", now)
+        if target.get("lane") == "end":
+            return [("claude.end", {"utt_id": target["utt_id"], "p_complete": _clip(reply["p_complete"]),
+                                    "ask": target.get("ask"), "t": now})], []
         if sent >= self.predict_sent:
             self.predict = {
                 "words": [{"w": _norm(p["w"]), "weight": _clip(p["weight"])} for p in reply["predict_words"] if _norm(p["w"])],

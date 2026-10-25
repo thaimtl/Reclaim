@@ -1,11 +1,13 @@
-"""The Claude service on the bus: reads partner.text, dec.lock and dec.hyp, publishes claude.predict,
-claude.repair and timing.claude (with every request and reply, for the logger).
+"""The Claude service on the bus: reads partner.text, dec.lock, dec.hyp and dec.pause, publishes claude.predict,
+claude.repair, claude.end and timing.claude (with every request and reply, for the logger).
 
 One conversation-lane call at a time, so the conversation stays append-only (whatever arrives meanwhile goes into
 the next one), and a repair-lane call for each dec.lock at once, up to brain.MAX_REPAIRS in flight (brain.py).
 While the judge is still speaking, their partial line (Cartesia Ink) starts early prediction calls, one at a time, so
 a prediction is ready before Austin starts mouthing (up to brain.MAX_EARLY in flight); the final line still goes
 through the conversation lane.
+Each dec.pause (Austin's lips stopped; the decoder holds his sentence) starts an end-lane call, up to
+brain.MAX_END in flight, whose claude.end says how likely he has finished.
 While Austin mouths and nothing changed, the last claude.predict goes out again with a fresh ttl_s, without a call.
 The bus loop never waits on Claude, and nothing that goes wrong (a malformed
 message, a failed call, a reply that breaks apply) stops it: the error goes out on timing.claude and the
@@ -23,9 +25,9 @@ import threading
 
 import bus
 from bus.team import Pub, Sub
-from claude_service.brain import MAX_EARLY, MAX_REPAIRS, Brain
+from claude_service.brain import MAX_EARLY, MAX_END, MAX_REPAIRS, Brain
 
-TOPICS = ("partner.text", "dec.lock", "dec.hyp")
+TOPICS = ("partner.text", "dec.lock", "dec.hyp", "dec.pause")
 MOUTHING_S = 0.5  # dec.hyp showed unlocked words this recently
 
 
@@ -103,7 +105,8 @@ def finish(brain, call, pub, now):
 
 def run(brain, sub, pub, stop=lambda: False):
     """sub: a bus.Sub on TOPICS; pub: a bus.Pub. Runs until stop() is true."""
-    convo, early, repairs, last_mouth = None, [], [], -1e9  # one conversation call, MAX_EARLY early, MAX_REPAIRS repairs
+    convo, early, repairs, ends, last_mouth = None, [], [], [], -1e9  # one conversation call, MAX_EARLY early,
+    # MAX_REPAIRS repairs, MAX_END end checks
     while not stop():
         timeout = 20
         while True:  # wait up to 20 ms for the first message, then drain the rest
@@ -120,6 +123,8 @@ def run(brain, sub, pub, stop=lambda: False):
                     brain.hyp(msg)
                     if msg.get("unlocked"):
                         last_mouth = bus.now()
+                elif topic == "dec.pause":
+                    brain.pause(msg)
             except Exception as e:  # one bad message must not stop the service
                 report(pub, f"bad message: {type(e).__name__}: {e}")
             timeout = 0
@@ -134,6 +139,16 @@ def run(brain, sub, pub, stop=lambda: False):
         for call in [c for c in early if c.done()]:
             finish(brain, call, pub, now)
             early.remove(call)
+        for call in [c for c in ends if c.done()]:
+            finish(brain, call, pub, now)
+            ends.remove(call)
+        if len(ends) < MAX_END:     # Austin's lips stopped: has he finished? (the decoder holds his sentence)
+            try:
+                if (req := brain.next_end(now)) is not None:
+                    ends.append(Call(brain, req[1], req[0]))
+            except Exception as e:
+                report(pub, f"end check failed: {type(e).__name__}: {e}")
+                brain.end = None
         if len(early) < MAX_EARLY:   # the judge is still speaking: predict from their line so far
             try:
                 if (req := brain.next_early(now)) is not None:
