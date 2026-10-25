@@ -363,3 +363,26 @@ def test_load_benchmark_reads_a_scored_session_and_ignores_bad_files(tmp_path):
     assert load_benchmark(tmp_path / 'bad.json') is None
     (tmp_path / 'short.json').write_text(json.dumps({'lips': 20}))
     assert load_benchmark(tmp_path / 'short.json') is None
+
+
+def test_load_benchmark_falls_back_to_the_shipped_session_3_numbers(tmp_path, monkeypatch):
+    # no results/wer_session3.json under the workdir: the scored numbers in the repo, scored with Claude off,
+    # so the third row is labelled as the language model, never as Claude
+    from dashboard.server import load_benchmark
+    monkeypatch.setenv('RECLAIM_WORKDIR', str(tmp_path))
+    b = load_benchmark()
+    assert (b['lips'], b['lips_muscles'], b['claude']) == (21.4, 21.6, 17.8)
+    assert b['labels']['claude'] == '+ language model' and 'Session 3' in b['session']
+    (tmp_path / 'results').mkdir()
+    (tmp_path / 'results' / 'wer_session3.json').write_text(json.dumps({'lips': 1, 'lips_muscles': 2, 'claude': 3}))
+    assert load_benchmark()['claude'] == 3.0 and 'labels' not in load_benchmark()
+
+
+def test_no_repair_window_shows_claudes_reply_time_not_a_zero_window():
+    st = CallState()
+    st.feed('timing.dec', dict(stage='window', ms=0.0), 1.0)
+    st.feed('timing.claude', dict(stage='claude', ms=2300.0), 1.1)
+    assert st.claude_stage() == dict(key='claude', label='Claude reply', ms=2300)
+    st = CallState()
+    st.feed('timing.dec', dict(stage='window', ms=300.0), 1.0)
+    assert st.claude_stage()['label'] == "Claude's window"

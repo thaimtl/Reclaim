@@ -357,13 +357,15 @@ function renderEnd(s) {
     `<b class="num">${esc(value)}${unit && value !== '--' ? `<small>${unit}</small>` : ''}</b></div>`).join('');
 
   const b = m.benchmark, wer = b || PLACEHOLDER_WER;
-  const rows = [['Lips alone', wer.lips, '--camera'], ['+ muscles', wer.lips_muscles, '--emg'], ['+ Claude', wer.claude, '--claude']];
+  const lab = (b && b.labels) || {};
+  const rows = [[lab.lips || 'Lips alone', wer.lips, '--camera'], [lab.lips_muscles || '+ muscles', wer.lips_muscles, '--emg'],
+    [lab.claude || '+ Claude', wer.claude, '--claude']];
   const max = Math.max(...rows.map(x => x[1]), 1) * 1.14;
   $('end-ph').classList.toggle('hidden', !!b);
   $('end-wer-sub').textContent = `${b && b.session ? b.session : 'Session 3'}, scored against the script he mouthed.`;
   $('end-steps').classList.toggle('placeholder', !b);
   $('end-steps').innerHTML = rows.map(([name, v, col], i) => {
-    const drop = i ? Math.round(rows[i - 1][1] - v) : 0, shown = b ? `${Math.round(v)}%` : `[${v}%]`;
+    const drop = i ? Math.round(rows[i - 1][1] - v) : 0, shown = b ? `${+v.toFixed(1)}%` : `[${v}%]`;
     return `<div class="step-row"><span class="sn">${name}</span><div class="st"><i style="--w:${(100 * v / max).toFixed(1)}%;` +
       `background:var(${col})"></i></div><b>${shown}</b><span class="drop">${drop > 0 ? drop + ' fewer' : ''}</span></div>`;
   }).join('');

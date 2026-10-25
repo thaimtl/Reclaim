@@ -1,0 +1,8 @@
+{
+  "session": "Session 3: 100 held-out sentences in demo conditions",
+  "lips": 21.4,
+  "lips_muscles": 21.6,
+  "claude": 17.8,
+  "labels": {"claude": "+ language model"},
+  "source": "docs/SVR1_SPEC.md, session 3 results (fusion.offline, Claude off): camera alone, camera + EMG, camera + EMG + the conversational LM (the live setup)"
+}

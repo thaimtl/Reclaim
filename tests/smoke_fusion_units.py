@@ -409,6 +409,23 @@ def main():
         out = core.feed('cam.tick', reading(pieces, ['i', 'want', 'water'], seg_id=1, t0=500.0), 501.0)
         check('a restarted camera reusing seg_id 1 still starts a new sentence',
               any(tp == 'dec.hyp' and m['utt_id'] == 2 for tp, m in out))
+        # no repair window (the default): every word still said once, in order, with one final
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.0)
+        out = []
+        for n in range(8, T + 1, 3):
+            msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
+            t = float(msg['frame_t'][-1]) + 0.05
+            out += core.feed('cam.tick', msg, t)
+            out += core.step(t)
+        for k in range(1, 40):
+            out += core.step(t + 0.05 * k)
+            if k == 10:
+                out += core.feed('cam.final', {'seg_id': 1, 'nbest': [{'text': 'I WANT WATER', 'score': 0.0}]},
+                                  t + 0.05 * k)
+        said = [x for tp, m in out if tp == 'voice.say' for x in m['words']]
+        check('no repair window: words said once, in order, one final', said == ['i', 'want', 'water'] and
+              sum(1 for tp, m in out if tp == 'voice.say' and m['final']) == 1, ' '.join(said))
+
         # a repair changes the captions only: the voice says what locked, even inside the repair window
         core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
         out = []

@@ -61,7 +61,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--svr', default=DEFAULT_SVR, help='SVR-1 checkpoint')
     ap.add_argument('--params', default=PARAMS, help='fitted gate and lock model (fusion.offline)')
-    ap.add_argument('--repair-s', type=float, default=0.3, help="repair window before a locked word is spoken")
+    ap.add_argument('--repair-s', type=float, default=0.0,
+                    help="wait before a locked word is spoken (default 0: Claude's repairs fix the captions only, so "
+                         "waiting buys nothing; each 0.1 s here is 0.1 s on every word)")
     ap.add_argument('--tau0', type=float, default=None, help="lock threshold at predictability 0 (default: fitted)")
     ap.add_argument('--tau-end', type=float, default=None, help="end-of-sentence lock threshold (before cam.final)")
     ap.add_argument('--repeat-floor', type=float, default=None,

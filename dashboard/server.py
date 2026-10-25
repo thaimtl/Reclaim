@@ -38,16 +38,28 @@ FACE_MATCH_S = 0.06     # max gap between a preview and its cam.face
 LOG_FRESH_S = 5.0   # the logger flushes every 0.2 s: older than this, it isn't running
 
 
+SHIPPED_BENCHMARK = os.path.join(os.path.dirname(__file__), 'benchmark_session3.json')
+
+
 def load_benchmark(path=None):
-    """Word error per reader on a scored session, in %, or None (the end screen then shows its placeholder)."""
+    """Word error per reader on a scored session, in %, or None (the end screen then shows its placeholder).
+    Without a path: $RECLAIM_WORKDIR/results/wer_session3.json if it exists, else the scored session 3 numbers that
+    ship with the dashboard (benchmark_session3.json, from docs/SVR1_SPEC.md). `labels` renames a row, e.g. the third
+    when it was scored without Claude."""
     if path is None:
         work = os.environ.get('RECLAIM_WORKDIR')
         path = os.path.join(work or '.', 'results', 'wer_session3.json')
+        if not os.path.exists(path):
+            path = SHIPPED_BENCHMARK
     try:
         with open(path) as f:
             b = json.load(f)
-        return {k: float(b[k]) for k in ('lips', 'lips_muscles', 'claude')} | {'session': str(b.get('session', ''))}
-    except (OSError, ValueError, KeyError, TypeError):
+        out = {k: float(b[k]) for k in ('lips', 'lips_muscles', 'claude')} | {'session': str(b.get('session', ''))}
+        labels = b.get('labels') or {}
+        if labels:
+            out['labels'] = {k: str(v) for k, v in labels.items() if k in ('lips', 'lips_muscles', 'claude')}
+        return out
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return None
 
 

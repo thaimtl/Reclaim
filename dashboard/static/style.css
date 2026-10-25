@@ -184,8 +184,8 @@ body { font-family: var(--font); font-variant-numeric: tabular-nums; color: var(
 #end .ph-tag { margin-left: 8px; padding: 0 8px; border: 1px dashed var(--text-muted); border-radius: var(--r-sm); font-weight: 600;
   font-size: 18px; color: var(--text-muted); vertical-align: 2px; }
 #end .steps { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
-#end .step-row { display: grid; grid-template-columns: 120px 1fr 64px 80px; column-gap: 12px; align-items: center; height: 36px; }
-#end .sn { font-size: 22px; }
+#end .step-row { display: grid; grid-template-columns: 176px 1fr 76px 80px; column-gap: 12px; align-items: center; height: 36px; }
+#end .sn { font-size: 22px; white-space: nowrap; }
 #end .st { height: 12px; border-radius: var(--r-sm); background: var(--bg-track); }
 #end .st i { display: block; height: 12px; width: 0; border-radius: var(--r-sm); transition: width 1.3s cubic-bezier(.2, .7, .2, 1); }
 #end .st i.go { width: var(--w); }

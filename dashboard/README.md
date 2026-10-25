@@ -76,7 +76,7 @@ These are in docs/TEAM_TASKS_AND_INTERFACES.md; the screen works without them an
 
 When the call ends, the screen shows `CallState.summary()`: the story line, four stats, two charts, the latency strip and the call as a chat.
 
-- **Words wrong** is word error per reader on a scored recording, read at start from `$RECLAIM_WORKDIR/results/wer_session3.json` (or `--benchmark PATH`).
+- **Words wrong** is word error per reader on a scored recording, read at start from `$RECLAIM_WORKDIR/results/wer_session3.json` (or `--benchmark PATH`); without either it shows the scored session 3 numbers that ship in `benchmark_session3.json` (from [docs/SVR1_SPEC.md](../docs/SVR1_SPEC.md)). Those were scored with Claude off, so the third row reads "+ language model" (our conversational LM with the call's cache), not "+ Claude".
   The file is `{"session": "session_03", "lips": 22.0, "lips_muscles": 14.0, "claude": 4.0}`, in percent.
   Without it the chart shows the design's sample values in brackets with a "placeholder" tag: the one exception to "nothing is made up", and it says so on screen.
 - **How he sounded** counts Austin's sentences by the tone they were spoken with (`cam.tick` `emotion`).

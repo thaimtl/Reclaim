@@ -331,9 +331,10 @@ class CallState:
 
     def claude_stage(self):
         """What Claude adds to a word's trip to the voice: the decoder's repair window (a word waits at most that
-        long for Claude), measured from timing.dec. Without it, Claude's own reply time, labelled as such."""
+        long for Claude), measured from timing.dec. With no window (the default: repairs fix the captions only) or
+        none measured, Claude's own reply time, labelled as such: it runs beside the voice, never in its way."""
         window = _median(self.lat['window'])
-        if window is not None:
+        if window:
             return dict(key='claude', label="Claude's window", ms=window)
         return dict(key='claude', label='Claude reply', ms=_median(self.lat['claude']))
 
