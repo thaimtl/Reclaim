@@ -75,7 +75,7 @@ All code lives in this repo; datasets, checkpoints, results and Python environme
 | `camera/` | Camera-only baselines (Auto-AVSR, BRAVEn, LipLearner) |
 | `rig/` | EMG rig: Arduino firmware, serial reader, live hum filter, signal check |
 | `recorder/` | The recording app: camera + EMG + the session sentences ([recorder/README.md](recorder/README.md)) |
-| `figures/` | The SVR-1 architecture figure and the script that draws it |
+| `figures/` | The SVR-1 architecture figure, the SVR-1 vs Gaddy & Klein results (`svr1_vs_gaddy_4ch*`), and the scripts that draw them |
 | `tests/` | Smoke and unit tests |
 | `docs/` | Plans and specs, Markdown with PDF copies |
 

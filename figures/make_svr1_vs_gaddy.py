@@ -1,23 +1,23 @@
 """SVR-1 against Gaddy and Klein's model on our 4 electrode sites (Berkeley test set), from the benchmark summaries.
 
-    venv-svr/bin/python figures/make_results_figure.py   ->  figures/svr1_vs_gaddy_4ch.{pdf,png} (bar chart)
+    venv-svr/bin/python figures/make_svr1_vs_gaddy.py    ->  figures/svr1_vs_gaddy_4ch.{pdf,png} (bar chart)
                                                              figures/svr1_vs_gaddy_4ch_table.{pdf,png} (every result)
 
 Reads $RECLAIM_WORKDIR/benchmark_results/<model>_gpu/summary.json (bench.score). Every model is tested on sites 1, 2,
 3, 6 (input slots 0, 1, 2, 5); the Gaddy-architecture models were trained on all 8 sites, SVR-1 on these 4.
 The bar chart's errors are greedy decoding without a language model (the model's own output); the table adds the
-errors with Gaddy & Klein's language model (their 5-gram and beam-search weights, tuned for their model, not refit). Palette: the first four categorical
-slots of the data-viz reference palette, validated (CVD and normal-vision separation) in the order the bars sit;
-every bar carries its value, since two of the hues are below 3:1 contrast on the surface.
+errors with Gaddy & Klein's language model (their 5-gram and beam-search weights, tuned for their model, not refit).
+The table is also printed as Markdown, for docs/SVR1_SPEC.md section 7.
 """
 import json
 import os
 
 import matplotlib
-from matplotlib import font_manager as fm
-from matplotlib import pyplot as plt
 
 matplotlib.use('Agg')
+from matplotlib import font_manager as fm  # noqa: E402
+from matplotlib import pyplot as plt  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.environ.get('RECLAIM_WORKDIR', os.path.join(HERE, '..'))
 RESULTS = os.path.join(WORK, 'benchmark_results')
@@ -54,8 +54,7 @@ def load():
     for folder, *_ in MODELS:
         with open(os.path.join(RESULTS, folder, 'summary.json')) as f:
             b = json.load(f)['benchmarks']
-        m = {f'{k}.{e}': 100 * b[f'{k}__4ch']['metrics'][d][e] for k, d, e, _ in ERRORS}
-        m.update({k: 100 * b[f'{k}__4ch']['metrics']['top1_accuracy'] for k, _, _ in CHOICES})
+        m = {k: 100 * b[f'{k}__4ch']['metrics']['top1_accuracy'] for k, _, _ in CHOICES}
         m['phrase_id_closedvocab'] = 100 * b['phrase_id_closedvocab__4ch']['metrics']['top1_accuracy']
         for d in ('greedy', 'beam_lm'):
             for e in ('wer', 'cer'):
@@ -66,8 +65,7 @@ def load():
 
 def table(data):
     """Every result in one table: rows = models, columns = TABLE; the best value of each column in bold."""
-    names = ["Gaddy & Klein's released model", 'Gaddy architecture, our retrain', 'SVR-1 (ours)',
-             'SVR-1 + articulator targets (ours)']
+    names = [label.split('\n')[0] for _, label, _ in MODELS]
     sites = ['8', '8', '4', '4']
     best = {k: (min if low else max)(data[f][k] for f, *_ in MODELS) for k, _, _, low in TABLE}
     fig = plt.figure(figsize=(15.5, 4.6))
@@ -148,7 +146,7 @@ def main():
     data = load()
     fig, (a, b) = plt.subplots(1, 2, figsize=(13.5, 5.6), gridspec_kw={'width_ratios': [1, 2.1], 'wspace': 0.12})
     fig.patch.set_facecolor(SURFACE)
-    bars(a, [g for *_, g in ERRORS], data, [f'{k}.{e}' for k, _, e, _ in ERRORS])
+    bars(a, [g for *_, g in ERRORS], data, [f'{k}.{d}.{e}' for k, d, e, _ in ERRORS])
     a.set_title('Transcription errors  (lower is better)', fontsize=12, color=INK, loc='left', pad=10)
     bars(b, [g for _, g, _ in CHOICES], data, [k for k, *_ in CHOICES])
     b.set_title('Picking the true sentence  (higher is better)', fontsize=12, color=INK, loc='left', pad=10)

@@ -217,6 +217,22 @@ At the end of a sentence, the final pass rescores with the camera's attention be
 
 Reference points: Gaddy and Klein report 76.8% of words wrong for their best 4 sites against 68.0% for all 8, on their audio-output metric. Our Gaddy-architecture retrain on 6 sites reached 33.2% WER (beam + LM) and 84.0% homophene-10. The 4-site numbers come from the `G4` and `SVR1_4ch` runs.
 
+**Results so far: SVR-1 against Gaddy & Klein on our 4 sites.**
+Berkeley test set (99 sentences), tested on sites 1, 2, 3, 6.
+The Gaddy-architecture models were trained on all 8 sites, SVR-1 on these 4.
+"With LM" is Gaddy & Klein's 5-gram with their beam-search weights, tuned for their model and not refit for SVR-1.
+Best in bold.
+`figures/make_svr1_vs_gaddy.py` draws the figure from `$RECLAIM_WORKDIR/benchmark_results/` and prints this table.
+
+![SVR-1 vs Gaddy and Klein on our 4 sites: transcription errors and picking the true sentence](../figures/svr1_vs_gaddy_4ch.png)
+
+| Model | Trained on sites | Words wrong no LM | Words wrong with LM | Letters wrong no LM | Letters wrong with LM | True sentence picked among 10 sentences | True sentence picked among 10 (closed set) | True sentence picked among 10 look-alikes | True sentence picked among 50 look-alikes | True sentence picked among 10 near-dups |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Gaddy & Klein's released model | 8 | 95.1% | 94.2% | 84.3% | 87.7% | 17.2% | 17.2% | 27.7% | 5.3% | 29.6% |
+| Gaddy architecture, our retrain | 8 | 88.8% | 89.9% | 63.9% | 73.7% | 35.4% | 44.8% | 36.2% | 11.7% | 45.9% |
+| SVR-1 (ours) | 4 | 78.1% | 80.7% | 41.2% | 61.4% | **96.0%** | **84.0%** | **72.3%** | **40.4%** | 92.9% |
+| SVR-1 + articulator targets (ours) | 4 | **77.0%** | **69.3%** | **40.0%** | **49.0%** | 94.9% | 81.2% | 63.8% | 33.0% | **93.9%** |
+
 ## 8. Code map
 
 | Part | File | Status |
@@ -235,3 +251,4 @@ Reference points: Gaddy and Klein report 76.8% of words wrong for their best 4 s
 | Unit checks: 4 slots, speaking head, causal filter, alignment, cuts, delivery augmentation, live wrapper | `tests/smoke_svr1_units.py` | Done |
 | Joint decoder, gate, lock model | `fusion/decoder.py`, `fusion/lock.py` | Not started |
 | The figure on this page | `figures/make_architecture.py` | Done |
+| Results figure and table (section 7) | `figures/make_svr1_vs_gaddy.py` | Done |
