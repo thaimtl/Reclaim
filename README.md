@@ -20,19 +20,10 @@ Silent Voice has one mode, open mouth, no sound, in real time.
 Three readers work together, because each one sees what the others can't.
 Every 100 ms one joint search combines them and locks in each word as soon as they're confident enough.
 
-```mermaid
-flowchart LR
-    W[Webcam] --> AV[Camera reader<br/>Auto-AVSR]
-    P[4 EMG pads] --> E[EMG reader<br/>SVR-1]
-    AV --> D[Joint search + language model]
-    E --> D
-    M[Phone call<br/>the other person] --> I[Cartesia Ink]
-    I --> C[Claude<br/>whole conversation]
-    C <--> D
-    D --> CAP[Live captions<br/>both speakers]
-    I --> CAP
-    D --> V[Cartesia Sonic<br/>cloned voice + emotion<br/>into the call]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="figures/overview-dark.png">
+  <img alt="Webcam and EMG pads feed Auto-AVSR and SVR-1. A joint search with Claude locks each word, which goes to live captions and to Cartesia Sonic in Austin's cloned voice, into the Twilio call. Cartesia Ink turns the judge's speech into text for Claude." src="figures/overview-light.png">
+</picture>
 
 - The camera reads the lips and does most of the work.
   It also reads the facial expression, which sets the voice's emotion.
