@@ -13,7 +13,10 @@ clipped: the same path as pretraining and the live loop (svr.preprocess, svr.liv
             comes from its first ~60 s of clips only, like the demo-day calibration minute
     dev     a seeded 10% of the last training session's sentences                early stopping (EMA weights)
     train   everything else in --train-sessions: set C sentences, and set B rest clips as speaking negatives
-Clips whose recorder warnings say a channel was flat or pinned, or the EMG was short, are skipped (--keep-warned).
+Clips whose recorder warnings say a channel was flat or pinned, or the EMG was short, are skipped (--keep-warned), and
+so are clips where more than --max-filled of the EMG rows were filled in by the recorder (a dropped serial frame is
+filled with the last reading: a flat step in the signal). Default 5%: shorter gaps look like the time masking the
+training already applies.
 
 SVR-1 losses (svr.train_svr1.train_losses, so pretraining and fine-tuning cannot drift apart): letter CTC (rest clips:
 all blank), phoneme CTC, rate, speaking BCE (forced alignments with the EMA model at the start and every
@@ -58,8 +61,16 @@ BAD_WARNINGS = ('flat', 'pinned', 'EMG short')
 
 
 # ------------------------------------------------------------------------------------------------ data
-def usable_record(r, keep_warned=False):
+def filled_share(r):
+    """Share of EMG rows identical to the previous one: frames the recorder filled after a dropped serial frame."""
+    x = np.load(r['emg'])
+    return float(np.all(np.diff(x, axis=0) == 0, axis=1).mean()) if len(x) > 1 else 0.0
+
+
+def usable_record(r, keep_warned=False, max_filled=1.0):
     if not r.get('emg') or not os.path.exists(r['emg']):
+        return False
+    if max_filled < 1.0 and filled_share(r) > max_filled:
         return False
     return keep_warned or not any(b in w for w in r.get('warnings') or [] for b in BAD_WARNINGS)
 
@@ -350,6 +361,8 @@ def parse_args(argv=None):
     p.add_argument('--recordings', default=None, help='default: $RECLAIM_WORKDIR/recordings')
     p.add_argument('--train-sessions', default='session_01,session_02')
     p.add_argument('--keep-warned', action='store_true', help='also train on clips with recorder warnings')
+    p.add_argument('--max-filled', type=float, default=0.05,
+                   help='skip clips with more than this share of EMG rows filled after dropped frames (1 = keep all)')
     p.add_argument('--camera-nbest', default=CAM_NBEST, help='Auto-AVSR n-best JSON (camera.run_camera_baselines)')
     p.add_argument('--epochs', type=int, default=40)
     p.add_argument('--calib-steps', type=int, default=50)
@@ -368,6 +381,7 @@ def parse_args(argv=None):
         p.add_argument('--' + flag, action='store_true')
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--eval-only', action='store_true', help='benchmark the init model without fine-tuning')
+    p.add_argument('--no-test', action='store_true', help='do not score the test set (set E): pick models on dev first')
     p.add_argument('--out-root', default=os.path.join(WORK, 'checkpoints'))
     return p.parse_args(argv)
 
@@ -389,7 +403,7 @@ def main(argv=None):
     if not records:
         sys.exit('no recordings found (expected recordings/session_0N/manifest.jsonl)')
     n_all = len(records)
-    records = [r for r in records if usable_record(r, args.keep_warned)]
+    records = [r for r in records if usable_record(r, args.keep_warned, args.max_filled)]
     train_sessions = args.train_sessions.split(',')
     train_r, dev_r, test_r = make_splits(records, train_sessions, args.seed)
     print(f'{n_all} clips, {len(records)} usable; train {len(train_r)} (rest {sum(r["set"] == "B" for r in train_r)})  '
@@ -497,7 +511,8 @@ def main(argv=None):
     else:
         torch.save(ema.m.state_dict(), os.path.join(out_dir, 'model.pt'))
     eval_maker = CandidateMaker(extra_texts=[r['prompt'] for r in used if r.get('prompt')])
-    summary, cases = evaluate(ema, args, test, dev, cmask, device, eval_maker)
+    # --no-test keeps the test set (session 3) unseen: model choice uses dev only, the test is run once at the end
+    summary, cases = ({}, {}) if args.no_test else evaluate(ema, args, test, dev, cmask, device, eval_maker)
     summary = {'model': args.name, 'arch': args.arch, 'mode': args.mode, 'init_from': args.init_from,
                'best_dev_wer_greedy': best, 'device': device, 'benchmarks': summary}
     res = os.path.join(RESULTS, f'WEARER_{args.name}')

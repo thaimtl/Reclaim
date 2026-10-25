@@ -77,13 +77,13 @@ Data folders are in `.gitignore`.
 | Folder | What it is |
 | --- | --- |
 | `svr/` | SVR-1, the EMG model: model, training, fine-tuning, preprocessing ([docs/SVR1_SPEC.md](docs/SVR1_SPEC.md)) |
-| `fusion/` | The joint search over camera + EMG + Claude, and its language model: a conversational 4-gram with a cache of the call (`fusion/lm.py`, built by `fusion/build_lm.py`) |
+| `fusion/` | The fusion process: the joint search over camera + EMG + Claude (`search.py`), the lock model (`lock.py`), on the bus (`run.py`), offline fitting and tests on the recordings (`offline.py`), and its language model: a conversational 4-gram with a cache of the call (`lm.py`, built by `build_lm.py`) |
 | `bench/` | Benchmarks and their frozen test splits |
 | `cluster/` | H100/H200 job scripts (PBS), smoke tests, runbook |
 | `camera/` | Camera-only baselines (Auto-AVSR, BRAVEn, LipLearner) |
 | `rig/` | EMG rig: Arduino firmware, serial reader, live hum filter, signal check, `emg.raw` publisher (`publish.py`) |
 | `recorder/` | The recording app: camera + EMG + the session sentences ([recorder/README.md](recorder/README.md)) |
-| `bus/` | The team bus: ZeroMQ wire format, the camera's topics (`__init__.py`) and every other endpoint and port (`team.py`) |
+| `bus/` | The team bus: ZeroMQ wire format, the camera's topics (`__init__.py`) and every other endpoint and port (`team.py`); a fake camera (`stub.py`) and a typed stand-in for the judge (`type_judge.py`) for tests |
 | `buslog/` | Logs every bus message to `$RECLAIM_WORKDIR/logs/` (`record.py`) and replays a session (`replay.py`) |
 | `claude_service/` | The Claude service: predicts Austin's next words and repairs look-alikes (`brain.py`), on the bus (`service.py`) |
 | `dashboard/` | The live dashboard judges watch, from Thai's Figma v5, fed by the bus ([dashboard/README.md](dashboard/README.md)) |

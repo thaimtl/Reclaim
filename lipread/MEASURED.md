@@ -202,4 +202,58 @@ Findings:
 - E3 status: steps 1 (model once, warm-up all lengths; fp16 optional), 2 (cache), 3 (8 s cap, 2 s carry), 4
   (MediaPipe in its own thread) and timing_ms done. Target p95 < 40 ms at 8 s met on the 5090 in every run
   (17.5-39.5 ms). Deliverable still owed: p50/p95 for 2/4/8 s on Austin's laptop:
-  `python -m lipread.bench.tick_bench` (and `--half`, `--no-fe-cache` once each).
+  `python -m lipread.bench.tick_bench` (it times fp32 and fp16; and `--no-fe-cache` once).
+
+### fp16 by default, 2026-10-24
+
+- `lipread.run` now runs the encoder in fp16 (`.half()`) by default, `--fp32` for the old path: the team chose fp16
+  for the 8 GB laptop (peak 966 vs 1310 MiB in `tick_bench` above) and its parity is checked (51/51 greedy
+  identical). Costs on the 5090: paced p95 22.9 vs 17.2 ms and a longer warm-up (19.5 vs 3.8 s).
+
+### Face adapter (Lipflow speaker adaptation) on Austin's session 1, 2026-10-24 (5090 dev box)
+
+- `lipread/adapt.py` = `lipflow/train_vsr.py` (scope frontend + embed + Conformer block 0, 6 epochs, lr 1e-4, its
+  augmentation), crops made as live (1080p -> 720p -> LiveCropper). Held-out test: every 5th of the 250 sentence
+  clips (50: 5 slow, 35 natural, 10 fast), trained on the other 200; nothing tuned on the test clips. Training 92 s.
+- `python -m lipread.adapt --sessions session_01 --test-every 5` (repo script):
+
+  | 50 held-out clips | Base | Face adapter |
+  | --- | --- | --- |
+  | Tick reading (greedy CTC) WER | 0.298 (9 exact) | **0.170** (23 exact) |
+  | Final pass (beam 5 + LM) WER | 0.215 (21 exact) | **0.154** (30 exact) |
+
+  A first run of the same recipe (scratchpad script): tick 0.186 (fast 0.188), final 0.151 (fast 0.174, base fast
+  0.203); 10 test sentences fixed by the final pass, 2 broken ("APPLES AND NUTS" -> "AT NIGHT", "TOMORROW" -> "TO
+  MORROW").
+- Cost: none per read. 162 tensors (25.8 M params, 98 MB); ticks 100 ms apart on real crops, read p50 13.27 ms base
+  vs 13.38 / 13.71 ms adapted (two runs; noise), per-stage front end / Conformer / CTC unchanged; load at start
+  29 ms. The final pass is unchanged (it reuses the tick's encoder output).
+- Caveats: train and test are the same session (same day, light, pads), and test sentences share words with the
+  training ones, so this is optimistic. Check on session 2; never train on session 3.
+
+### Face adapter on a new session: trained on session 1, tested on session 2, 2026-10-25 (5090 dev box)
+
+- `python -m lipread.adapt --sessions session_01 --test-sessions session_02_EMG-dropped-frames`: trained on all 250
+  session 1 sentences (96 s), scored on all 250 session 2 sentences (recorded the same day, a darker room; its video
+  is fine, only its EMG has gaps).
+
+  | 250 session 2 clips | Base | Face adapter (session 1 only) |
+  | --- | --- | --- |
+  | Tick reading (greedy CTC) WER | 0.426 (33 exact) | **0.262** (74 exact) |
+  | Final pass (beam 5 + LM) WER | 0.343 (79 exact) | **0.191** (129 exact) |
+
+- So the gain holds on a session it never saw, and is larger there. Adopted.
+- Demo adapter: `--sessions session_01 session_02_EMG-dropped-frames`, 500 sentences, 161 s ->
+  `data/face_adapter/austin.pth`. Session 3 (the test session) is read with it once, for the final numbers.
+
+### Session 3, the test session: base vs the demo adapter, 2026-10-25 (5090 dev box)
+
+- 100 sentence clips at demo pace, never trained on. Scored once, offline (crops as live, whole clips), same scoring
+  as `lipread/adapt.py`; the demo adapter is the one above (sessions 1 + 2).
+
+  | 100 session 3 clips | Base | Demo face adapter |
+  | --- | --- | --- |
+  | Tick reading (greedy CTC) WER | 0.340 (18 exact) | **0.178** (50 exact) |
+  | Final pass (beam 5 + LM) WER | 0.209 (48 exact) | **0.098** (69 exact) |
+
+- Camera alone, before EMG and Claude. Not used to tune anything.

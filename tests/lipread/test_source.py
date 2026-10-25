@@ -4,6 +4,7 @@ per-frame timestamps (recorder/record.py + svr/recordings.py layout, and RECORDI
     venv-live/bin/python -m pytest tests/lipread/test_source.py -q
 """
 import json
+import os
 import threading
 import time
 
@@ -13,7 +14,8 @@ import pytest
 
 import lipread.source as source
 from bus import now
-from lipread.source import MAX_REPEAT, ReplaySource, Resampler, find_ts, load_ts, resolve_recording
+from lipread.source import (MAX_REPEAT, ReplaySource, Resampler, SessionSource, find_ts, load_ts, resolve_recording,
+                            session_clips)
 from lipread.types import FPS
 
 SIZE = (64, 48)
@@ -69,6 +71,9 @@ class StallCap:
 
     def retrieve(self):
         return self._call(lambda: (True, np.zeros((SIZE[1], SIZE[0], 3), np.uint8)))
+
+    def read(self):
+        return (True, self.retrieve()[1]) if self.grab() else (False, None)
 
     def release(self):
         with type(self).lock:
@@ -268,6 +273,36 @@ def test_resolve_recording_md_layout(tmp_path):
     src = ReplaySource(str(d / 's1_001.mp4'), 0.0, None, realtime=False)
     assert src.ts_path == str(d / 's1_001.video_t.npy')
     src.close()
+
+
+def test_session_source_order_clock_and_gap(tmp_path):
+    """--replay-session: clips in clip_t0 order, the recorder's clock kept across clips, gap_s of wall time between."""
+    d = tmp_path / 'session_01'
+    d.mkdir()
+    rows = []
+    for k, (cid, t0) in enumerate((('s1_b', 1300.0), ('s1_a', 1200.0), ('s1_c', 1400.0))):
+        write_clip(d / f'{cid}.mp4', 15)
+        np.save(d / f'{cid}_video_ts.npy', vfr_ts(15, np.random.default_rng(k), t0=t0))
+        rows.append({'id': cid, 'session': 'session_01', 'video': f'{cid}.mp4', 'video_ts': f'{cid}_video_ts.npy',
+                     'clip_t0': t0})
+    write_clip(d / 's1_nots.mp4', 15)
+    rows.append({'id': 's1_nots', 'video': 's1_nots.mp4', 'clip_t0': 1500.0})
+    (d / 'manifest.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in rows))
+    assert [os.path.basename(p) for p in session_clips('session_01', str(tmp_path))] == \
+        ['s1_a.mp4', 's1_b.mp4', 's1_c.mp4', 's1_nots.mp4']
+
+    src = SessionSource('session_01', realtime=False, root=str(tmp_path))
+    assert src.t_offset == 1200.0 and len(src.skipped) == 1
+    got = list(src.frames())
+    t = np.array([f.t for f in got]) + src.t_offset
+    assert [f.index for f in got] == list(range(len(got))) and np.all(np.diff(t) > 0)
+    assert all(np.any((t >= c) & (t < c + 1)) for c in (1200.0, 1300.0, 1400.0))
+    assert len(list(SessionSource('session_01', realtime=False, limit=1, root=str(tmp_path)).frames())) < len(got) / 2
+
+    src = SessionSource(str(d), realtime=True, gap_s=0.3, limit=2, root=str(tmp_path))
+    w0 = now()
+    list(src.frames())
+    assert now() - w0 >= 0.6        # two clips of ~0.5 s each at real speed, plus 0.3 s after each, not 100 s
 
 
 def test_load_ts_csv(tmp_path):

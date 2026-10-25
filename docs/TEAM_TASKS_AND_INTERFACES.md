@@ -32,10 +32,12 @@ Nothing is trained on the pitch or on a script: the judge can ask anything.
 3. Add the speaking-or-not output, partial-sentence training, and augmentation for the recorded deliveries (slow, effort, held expression). Code done.
 4. Train on the cluster: `SVR1_4ch` plus the Gaddy-architecture baseline `G4` on the same 4 sites ([cluster/RUNBOOK.md](../cluster/RUNBOOK.md)).
 5. The recording tool: done, `recorder/record.py` (camera + EMG + the session prompts, in `svr/recordings.py`'s format).
-6. Live EMG reader: subscribe to `emg.raw`, filter, run SVR-1 every 100 ms, compute pace and effort. The SVR-1 side is `svr/live.py`; the bus side comes with the joint search.
-7. The joint search over camera and EMG probabilities, with look-alike expansion, Claude's predicted words, the gate and the language model: our conversational 4-gram plus a cache of the call (`fusion/lm.py`, built by `fusion/build_lm.py`; done).
-8. Confidence locking: compute the lock ingredients per word, train the lock model on sessions 1 and 2, and set the dynamic threshold from Claude's predictability.
-9. "Please repeat" when the final pass still isn't confident, with the reasons in the debug log.
+6. Live EMG reader: subscribe to `emg.raw`, filter, run SVR-1 every 100 ms, compute pace and effort. Done: `svr/live.py`, run inside the fusion process.
+7. The joint search over camera and EMG probabilities, with look-alike expansion, Claude's predicted words, the gate and the language model: our conversational 4-gram plus a cache of the call. Done: `fusion/search.py` (`fusion/lm.py`, built by `fusion/build_lm.py`).
+8. Confidence locking: compute the lock ingredients per word, train the lock model on sessions 1 and 2, and set the dynamic threshold from Claude's predictability. Done: `fusion/lock.py`, fitted by `fusion/offline.py`.
+9. "Please repeat" when the final pass still isn't confident, with the reasons in the debug log. Done: `dec.repeat`, from `fusion/core.py`.
+
+The fusion process is `python -m fusion.run` (venv-svr): it reads `cam.*`, `emg.raw`, `claude.*` and `partner.text`, and publishes every `dec.*` topic, `voice.say` and `timing.dec`.
 10. The logger, which subscribes to every topic and writes everything to disk, and a replay tool.
 11. Fine-tune SVR-1 on sessions 1 and 2, and tune the joint search, gate and lock model; test everything on session 3.
 
@@ -65,9 +67,9 @@ Follow [EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md). You can pro
 3. Live: the reader stamps samples with `bus.now()` (`time.perf_counter()`) and publishes `emg.raw` every 10 ms.
 4. Safety: the laptop runs on battery whenever the pads are on skin; never charge with the Uno connected.
 5. The Claude service:
-    - **Predict:** on every final `partner.text` and every ~2 s while Austin mouths, publish `claude.predict`: likely words and phrases, plus how predictable the next words are.
+    - **Predict:** while the judge is still speaking, from the partial `partner.text` (once 2 words are in, then every 2 more, at most every 0.7 s, up to two calls in flight), again on the final line, and every ~2 s while Austin mouths, publish `claude.predict`: likely words and phrases, plus how predictable the next words are. The newest prediction always replaces older ones.
     - **Repair:** on each `dec.lock`, publish `claude.repair`.
-    - **How it calls Claude:** `claude-opus-5-5` at low effort, structured outputs, prompt caching (rules and conversation kept as an append-only prefix).
+    - **How it calls Claude:** `claude-haiku-5-5` with thinking off and low effort (about 2 to 3 s a call; `claude-opus-5-5` took about 6 s), structured outputs, prompt caching (rules and conversation kept as an append-only prefix).
     - **Prompt rules:** swap a word only for one of the alternatives given or a lip look-alike, never add ideas, answer "please repeat" when unsure.
 
 ## Interfaces
@@ -103,7 +105,7 @@ flowchart TD
 | `dec.hyp` | Austin → dashboard | every 100 ms | `utt_id`, `locked` [words], `unlocked` [words], `confidence` per word, `source` per word (camera / EMG / Claude); optional for the dashboard: `cands` [{`w`, `cam`, `emg`, `claude`}] (top 3 for the newest word) and `threshold` |
 | `dec.lock` | Austin → Claude, dashboard | on lock | `utt_id`, `words` [{`w`, `conf`, `alts`, `cam`, `emg`, `t`}]; optional for the dashboard: per word `cam_top`, `emg_top` (each reader's own pick, for the end screen's disagreement bars) |
 | `dec.repeat` | Austin → dashboard | at sentence end | `utt_id`, `reason` (which reader disagreed, confidences); the dashboard reads `reason` as {`reader` (camera / EMG / Claude), `words` [{`index`, `w`, `alts`}]} |
-| `claude.predict` | Claude → Austin | on judge line, ~2 s | `words` [{`w`, `weight`}], `phrases`, `predictability` (0 to 1), `ttl_s` |
+| `claude.predict` | Claude → Austin | while the judge speaks, on their final line, ~2 s while Austin mouths | `words` [{`w`, `weight`}], `phrases`, `predictability` (0 to 1), `ttl_s` |
 | `claude.repair` | Claude → Austin, dashboard | on reply | `utt_id`, `edits` [{`index`, `from`, `to`}], `please_repeat` |
 | `voice.say` | Austin → Frank | words leaving the repair window | `utt_id`, `words` (only the new ones), `offset` (index of `words[0]` in the sentence, optional), `final`, `pace`, `effort` (both relative, 1.0 = Austin's normal; below) |
 | `partner.text` | Frank → Claude, dashboard | streaming | `text`, `is_final`, `t` |

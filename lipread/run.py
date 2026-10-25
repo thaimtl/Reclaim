@@ -17,7 +17,9 @@ either mode.
 Each crop gets its model-frame time once, when it reaches the tick loop: its capture time, or the previous frame's
 time + 40 ms if the source repeated a frame (strictly increasing), so a frame carried over at a cap has the same
 frame_t in both segments. Replay times are rebased onto now() at the first frame, so cam.tick times are
-on the laptop clock as the bus requires (and lag is real in --realtime).
+on the laptop clock as the bus requires (and lag is real in --realtime). --recorder-clock instead keeps a recorded
+clip's own capture times (its video_ts, the recorder's bus.now()), so offline replays line up with the clip's EMG
+(same clock) for fitting and testing the joint search.
 
 The crop thread's queue carries (crop, crop ms) items and then one End: End(None) for a clean end of the source,
 End(err) when the thread died.
@@ -26,6 +28,7 @@ Failures: a tick that raises is logged and skipped (MAX_FAILURES in a row: exit 
 run with exit 1 after the last read. Ctrl+C: last read + 'end' of the open segment, then the publisher closes.
 
     venv-live/bin/python -m lipread.run --replay third_party/lipflow/samples/2016-03-12.mov --start 20.4 --end 28.1
+    venv-live/bin/python -m lipread.run --replay-session session_01 --realtime --recorder-clock   # offline, on the EMG's clock
     venv-live/bin/python -m lipread.run --cam 0                          # webcam, Ctrl+C stops
 
 Capture size: the webcam opens at --size (default 1920x1080); the crop thread shrinks any larger frame (camera or a
@@ -202,6 +205,12 @@ def rebased(frames):
         yield Frame(t=f.t + off, image=f.image, index=f.index)
 
 
+def shifted(frames, off):
+    """Replay frames with their video times moved by a fixed offset (--recorder-clock: the source's t_offset)."""
+    for f in frames:
+        yield Frame(t=f.t + off, image=f.image, index=f.index)
+
+
 def size_arg(s):
     """'WxH' -> (w, h)."""
     try:
@@ -224,15 +233,20 @@ def fit(frame, size):
 
 
 def crop_thread(source, cropper, q, stop, emotion=None, rebase=False, process_size=None, face_pub=None, face_every=2,
-                preview=None):
+                clock_offset=None, preview=None):
     """Frames -> (crop, crop ms of the frame's push) on q, until the source ends or stop is set. This thread owns the
     source and the cropper and closes both itself (cap.release() from another thread while this one is inside
     cap.read() segfaults). Each frame is fit() to process_size first. The last item is End.
     face_pub(CamFace): every face_every-th frame's face for the dashboard (cam.face), sent without blocking.
+    clock_offset: shift frame times by it instead of rebasing (--recorder-clock).
     preview (lipread.preview.PreviewWorker): every frame and its face handed over for cam.preview; never waits."""
     err, emotion_errors, face_errors, n = None, 0, 0, 0
     try:
-        frames = rebased(source.frames()) if rebase else source.frames()
+        frames = source.frames()
+        if clock_offset is not None:
+            frames = shifted(frames, clock_offset)
+        elif rebase:
+            frames = rebased(frames)
         for frame in frames:
             if stop.is_set():
                 break
@@ -373,9 +387,14 @@ def positive(s):
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--replay', default=None, help='video file instead of the webcam')
+    ap.add_argument('--replay-session', default=None, metavar='SESSION',
+                    help='every clip of a recording session (e.g. session_01) in order, 1.5 s apart (SessionSource)')
+    ap.add_argument('--clips', type=int, default=None, help='--replay-session: only the first N clips')
     ap.add_argument('--start', type=float, default=0.0)
     ap.add_argument('--end', type=float, default=None)
     ap.add_argument('--realtime', action='store_true', help='replay at real speed (default: as fast as possible)')
+    ap.add_argument('--recorder-clock', action='store_true',
+                    help="replay: keep the recording's capture times (video_ts) instead of moving them onto now()")
     ap.add_argument('--cam', type=int, default=0)
     ap.add_argument('--camera-settings', action='store_true',
                     help="open the webcam driver's settings dialog at start (Windows: lock exposure and focus there)")
@@ -383,7 +402,9 @@ def parse_args(argv=None):
     ap.add_argument('--process-size', type=lambda s: None if s == '0' else size_arg(s), default=(1280, 720),
                     metavar='WxH',
                     help='shrink larger frames to fit this before cropping (0: never)')
-    ap.add_argument('--half', action='store_true', help='encoder in fp16 (.half())')
+    ap.add_argument('--fp32', action='store_true', help='encoder in fp32 (default fp16 via .half(), parity-checked)')
+    ap.add_argument('--face-adapter', default=None, metavar='PTH',
+                    help="Lipflow face adapter over the base weights (lipread/adapt.py; same cost per read)")
     ap.add_argument('--segments', choices=('auto', 'stream'), default='auto',
                     help='auto: E4 activity segments; stream: one segment always open (8 s cap)')
     ap.add_argument('--tick-ms', type=int, choices=(100, 200), default=TICK_MS, help='tick period')
@@ -402,7 +423,9 @@ def parse_args(argv=None):
 
 
 def make_source(args):
-    from lipread.source import CameraSource, ReplaySource
+    from lipread.source import CameraSource, ReplaySource, SessionSource
+    if args.replay_session:
+        return SessionSource(args.replay_session, realtime=args.realtime, limit=args.clips)
     if args.replay:
         return ReplaySource(args.replay, args.start, args.end, realtime=args.realtime)
     w, h = args.size
@@ -417,7 +440,8 @@ def main(argv=None):
     import torch
 
     pub = Publisher(args.pub)
-    live_mode = args.replay is None or args.realtime
+    replay = bool(args.replay or args.replay_session)
+    live_mode = not replay or args.realtime
     final = emotion = th = logf = preview = None
     runner = Runner(None, pub.send, None)
     stop = threading.Event()
@@ -429,8 +453,9 @@ def main(argv=None):
             starter = threading.Thread(target=lambda: box.update(final=FinalPass(None, pub.send)), name='final-start',
                                        daemon=True)
             starter.start()
-        model = LiveModel(half=args.half)
-        log.info('model ready (warm-up %.1f s)', model.warmup_s)
+        model = LiveModel(half=not args.fp32, face_adapter=args.face_adapter)
+        log.info('model ready (warm-up %.1f s%s)', model.warmup_s,
+                 f', face adapter {args.face_adapter}' if args.face_adapter else '')
         if not args.no_final:
             starter.join()
             final = box.get('final')
@@ -448,12 +473,13 @@ def main(argv=None):
                         final=final, fe_cache=not args.no_fe_cache)
         q = queue.Queue()
         face_pub = None if args.no_face else (lambda m: pub.send(m, block=False))
+        offset = getattr(source, 't_offset', 0.0) if replay and args.recorder_clock else None
         if not args.no_preview:
             from lipread.preview import PreviewWorker
             preview = PreviewWorker(lambda m: pub.send(m, block=False), hz=args.preview_hz)
-        th = threading.Thread(target=crop_thread, args=(source, cropper, q, stop, emotion, bool(args.replay),
-                                                        args.process_size),
-                              kwargs=dict(face_pub=face_pub, preview=preview), name='crop', daemon=True)
+        th = threading.Thread(target=crop_thread, args=(source, cropper, q, stop, emotion, replay, args.process_size),
+                              kwargs=dict(face_pub=face_pub, preview=preview, clock_offset=offset), name='crop',
+                              daemon=True)
         logf = open(args.log, 'w') if args.log else None
 
         def report(stats):

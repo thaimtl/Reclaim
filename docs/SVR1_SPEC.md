@@ -184,6 +184,16 @@ Extra hypotheses enter the beam from two places: SVR-1's own best letter strings
 
 It is fitted on sessions 1 and 2 by making the true sentence win among the beam's 16-best: the same objective as the judge loss, with a few dozen parameters.
 
+**As built (v1, `fusion/search.py`, `fusion/core.py`).** Each `cam.tick` is one pass over the whole segment so far:
+- The beam (16) runs over the camera's pieces alone, with the LM, Claude's hints and the length bonus added at each word end. SVR-1 rescores the finished candidates instead of entering every beam step. SVR-1 re-reads the segment every pass anyway, so grading 16 to 64 candidates costs one batched GPU call instead of thousands of tiny ones. Its re-read runs on the GPU while the beam runs on the CPU.
+- Candidates are the beam's hypotheses, `cam.final`'s n-best at segment end, SVR-1's greedy reading, and single look-alike swaps of the beam's best 4. The look-alikes are words with the same viseme sequence among the LM's 50,000 most likely words. Locked words are kept as every candidate's first words.
+- Every candidate gets one score per judge: camera CTC log-likelihood of its pieces; S_emg (`svr/live.py` `verify`, scored on the camera segment's time span); the LM over its finished words; hints; word count; and, at segment end only, `cam.final`'s own score (attention decoder + Auto-AVSR's LM). That last one is a sixth judge, worth 2.6 points of WER on the final pass.
+- The gate is fitted by minimum expected word errors over each final pass's own candidates. Making the true sentence win, with the truth added when the search missed it, made held-out WER worse. Fitted on 912 final passes from sessions 1 and 2, it learned near-constant weights: face visibility and pad quality hardly vary in the recordings. Camera 4.9, EMG 0.16, LM 1.9, length bonus 2.5, camera final score 3.2, and −9.0 per word the camera didn't see.
+- Fitting data is cross-fitted, because session 3 will be read by readers that never saw it. Session 1 is read by a face adapter and an SVR-1 fine-tuned on session 2 only (`austin_s2only.pth`, `X_s2_svr1_4ch`), and session 2 by the session 1 ones. A reader scoring its own training sentences looks far surer than it will be live.
+- What each judge is worth on held-out halves of session 2's final passes: LM 2.0 points of WER, camera final score 2.6, EMG 0.0 (23.00% vs 23.04%). SVR-1 settles look-alikes in the benchmark, but the camera's mistakes on Austin's sessions are mostly dropped short words and contractions ("I'd" / "I"), not look-alikes.
+- Short words the camera drops ("is", "a", "the", "got": 28% of its missing or wrong words on sessions 1 and 2) are put back two ways, at no extra delay. The search tries each short word in each gap of the beam's best two readings and keeps the 12 the LM likes best. Claude's predicted phrases fill in their own short words ("a little nervous" when the camera read "little nervous"). An inserted word has no camera pieces: the camera judge skips it, and the gate's fitted penalty for unseen words decides whether the LM's gain is worth it.
+- EMG alone never writes captions: SVR-1 gets about 96% of words wrong on its own. Speech the muscles detect while the camera has no face ends in "Please repeat" (reader: camera).
+
 ### The language model: conversational n-gram (H) with a call cache (I)
 
 The LM is the joint search's sense of which words follow which. It is one term with one learned weight (g_lm), applied to the combined camera + EMG hypotheses, so word plausibility is counted once. SVR-1 has no language model of its own and needs no change or retraining for it. Auto-AVSR's own neural LM stays where it is, in the camera's end-of-segment beam search.
@@ -191,7 +201,7 @@ The LM is the joint search's sense of which words follow which. It is one term w
 **(H) Conversational n-gram.** A word 4-gram over everyday dialogue instead of audiobook text. Gaddy and Klein's LM was built from book text, which matches Berkeley's novel sentences but not a phone call.
 - Text: about 72M words. OpenSubtitles 2018 (film and TV dialogue, every 3rd line of the first 36M), Cornell Movie-Dialogs, DailyDialog and Topical-Chat.
 - Normalised exactly like SVR-1's targets (`svr.text.clean_text`), so the joint search's words and the LM's words match.
-- Every recording prompt (sessions 1 to 3) removed: session 3 is the test set, and the joint search's weights are fitted on sessions 1 and 2.
+- Every recording prompt (sessions 1 to 3) removed, and every line that contains a session 3 sentence as whole words: session 3 is the test set, and the joint search's weights are fitted on sessions 1 and 2.
 - KenLM, singleton 3- and 4-grams pruned, 8-bit quantised trie (`python -m fusion.build_lm`). A word's score takes about 2 µs, so every hypothesis is scored on every pass.
 
 **(I) Call cache.** A small model of this call's own words, mixed into the n-gram:
@@ -230,6 +240,14 @@ A word locks when p_lock ≥ τ, where τ = clip(τ₀ − κ · predictability,
 
 At the end of a sentence, the final pass rescores with the camera's attention beam (Auto-AVSR, beam 5), look-alike checks, the verifier and a Claude repair. A word still below τ then makes the screen show "Please repeat", with the features logged.
 
+**As built (v1, `fusion/lock.py`, fitted by `python -m fusion.offline fit-lock`).**
+- The camera-only and EMG-only posteriors are softmax(t × that judge's score). The temperatures are fitted so each reader's mass lands on the candidates with the fewest word errors: t_cam 0.53, t_emg 0.048. SVR-1's raw sentence scores, read as probabilities, gave correct words an average EMG support of 0.06, and the agreement rule then blocked 92% of them.
+- Examples: 51,900 words over 13,800 passes of sessions 1 and 2, every word on every pass, nothing locked, read by the cross-fitted readers (above). Each session's lock decisions are simulated with a model fitted on the other session.
+- No threshold reaches 2% wrong locks on these readers. At the final pass 16% of words are wrong, and the confident mistakes (contractions, dropped short words) look like correct words to every feature.
+- So the final pass speaks every word left, wrong guesses included: a wrong word beats "Please repeat" in a demo. "Please repeat" only ends a sentence that is unreadable: the mean p_lock of its words, short words left out and words locked earlier included, below a floor (0.36). That keeps it to at most 5% of sentences.
+- With every word spoken at the end anyway, an early lock only buys time. τ₀ is the lowest threshold whose WER stays within 3 points of waiting for the sentence end, and τ_end the same: τ₀ = 0.66, τ_end = 0.58. Cross-fitted on sessions 1 and 2: 23.6% WER, "Please repeat" on 1.5% of sentences, median 0.76 s from a word's end on the lips to its lock. Waiting for every sentence end would be 20.7% WER, 2.6 s behind.
+- κ (Claude's predictability) stays at 0.1: Claude has no offline replay, so it is checked live. `python -m fusion.run --tau0 X --tau-end Y --repeat-floor Z` overrides the thresholds live.
+
 ## 7. Evaluation
 
 | Benchmark | Data | Metric |
@@ -239,6 +257,25 @@ At the end of a sentence, the final pass rescores with the camera's attention be
 | Fast-speech judge | Berkeley test set compressed 1.25× and 1.5× | Top-1 |
 | Austin, session 3 | 100 held-out sentences, demo conditions | WER for camera alone, camera + EMG, camera + EMG + Claude; lock delay; wrong-lock rate; "Please repeat" rate |
 | Speed | RTX 5060, on battery | Per-pass time for SVR-1, camera and the joint search |
+
+**Austin, session 3: the whole pipeline, tested once.**
+100 held-out sentences in demo conditions, never used to fit anything.
+Read by the demo face adapter and `W_s12_svr1_4ch`, both trained on sessions 1 and 2, through `fusion/core.py` exactly as live, with locking (`python -m fusion.offline test`).
+Claude is off: the recordings have no conversation, so its predictions and repairs are tested live.
+Lag is from a word's end on the lips (the camera's alignment of the true sentence) to its lock.
+Pass times are on the RTX 5090 dev box.
+Best in bold.
+
+| Readers | WER | Wrong locks | "Please repeat" | Median lag | Lag, 90th percentile | Pass time, median |
+| --- | --- | --- | --- | --- | --- | --- |
+| Camera alone | 21.4% | 19.5% | **1%** | **0.47 s** | **1.39 s** | **10 ms** |
+| Camera + EMG | 21.6% | 18.6% | 3% | 0.51 s | 1.51 s | 31 ms |
+| Camera + EMG + LM (the live setup) | **17.8%** | **13.9%** | 4% | 0.71 s | 1.79 s | 33 ms |
+| Camera's own final pass, for reference | 9.9% | | | waits for the sentence end | | |
+
+- Adding the conversational LM to camera + EMG takes 3.8 points off the WER and a quarter off the wrong locks. EMG is neutral (+0.2 points), as on sessions 1 and 2.
+- "Please repeat" ends 4% of sentences.
+- The camera's own final pass is more accurate because it reads the finished sentence. The pipeline locks most words while Austin is still mouthing, from the camera's per-tick reading, so the voice runs 0.7 s behind his lips instead of a few seconds. `--tau0` trades one for the other live.
 
 Reference points: Gaddy and Klein report 76.8% of words wrong for their best 4 sites against 68.0% for all 8, on their audio-output metric. Our Gaddy-architecture retrain on 6 sites reached 33.2% WER (beam + LM) and 84.0% homophene-10. The 4-site numbers come from the `G4` and `SVR1_4ch` runs.
 
@@ -275,6 +312,9 @@ Best in bold.
 | Cluster runs `SVR1_4ch` and `G4`, smoke tests, runbook | `cluster/` | Done |
 | Unit checks: 4 slots, speaking head, causal filter, alignment, cuts, delivery augmentation, live wrapper | `tests/smoke_svr1_units.py` | Done |
 | Language model: conversational n-gram (H) + call cache (I) | `fusion/lm.py`, `fusion/build_lm.py` | Done; the model file is `data/lm/conversational.binary` |
-| Joint search, gate, lock model | `fusion/search.py`, `fusion/lock.py` | Not started |
+| Joint search, gate, lock model | `fusion/search.py`, `fusion/lock.py` | Done; fitted on sessions 1 and 2 (`data/fusion/params.json`) |
+| The fusion process on the bus | `fusion/core.py` (logic), `fusion/run.py` (bus) | Done |
+| Offline runs on the recordings: passes, fitting, the session 3 test | `fusion/offline.py` | Done |
+| Unit checks: camera CTC, beam, look-alikes, EMG overturning a look-alike, locking, voice, repairs, Please repeat | `tests/smoke_fusion_units.py` | Done |
 | The figure on this page | `figures/make_architecture.py` | Done |
 | Results figure and table (section 7) | `figures/make_svr1_vs_gaddy.py` | Done |

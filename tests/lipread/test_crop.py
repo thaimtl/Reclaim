@@ -215,6 +215,9 @@ class FakeCap:
     def retrieve(self):
         return True, np.zeros((480, 640, 3), np.uint8)
 
+    def read(self):
+        return self.grab() and self.retrieve()
+
     def release(self):
         pass
 

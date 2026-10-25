@@ -44,6 +44,9 @@ GRID = 1.0 / FPS
 MAX_REPEAT = 3
 MEASURE_GRABS = 31
 SLOW_FPS = 28
+# Windows DirectShow (OpenCV 5): grab() returns at once and retrieve() waits for the frame, so a grab-only loop spins
+# and stamps frames before they arrive. There every frame is read, and stamped once it is in.
+READ_EVERY_FRAME = sys.platform == 'win32'
 
 
 class Resampler:
@@ -146,9 +149,9 @@ def resolve_recording(spec, root=None):
         if r.get('id') != spec or not r.get('video'):
             continue
         for d in (base, os.path.join(root, str(r.get('session', ''))), root):
-            video = os.path.join(d, r['video'])
+            video = os.path.normpath(os.path.join(d, r['video']))  # labels.csv paths use /
             if os.path.isfile(video):
-                ts = os.path.join(d, r['video_ts']) if r.get('video_ts') else None
+                ts = os.path.normpath(os.path.join(d, r['video_ts'])) if r.get('video_ts') else None
                 return video, ts if ts and os.path.isfile(ts) else find_ts(video)
     for d in sorted(os.listdir(root)):
         for ext in VIDEO_EXTS:
@@ -240,6 +243,61 @@ class ReplaySource:
             if self.cap is not None:
                 self.cap.release()
                 self.cap = None
+
+
+def session_clips(session, root=None):
+    """Video paths of a session folder (or its name under root, default recordings/) in recording order (clip_t0)."""
+    root = root or RECORDINGS
+    d = session if os.path.isdir(session) else os.path.join(root, session)
+    if not os.path.isdir(d):
+        raise FileNotFoundError(f'{session}: no session folder {d}')
+    rows = [r for base, r in _manifest_rows(d) if base == d and r.get('video')]
+    if not rows:
+        raise FileNotFoundError(f'{session}: no manifest with videos in {d}')
+    return [os.path.join(d, r['video']) for r in sorted(rows, key=lambda r: r.get('clip_t0') or 0.0)]
+
+
+class SessionSource:
+    """Every clip of a recording session, in recording order, as one replay (lipread.run --replay-session).
+
+    Each clip is a ReplaySource on its own capture times; t is the recorder's clock minus the first clip's first
+    frame (t_offset gives the recorder's clock back, as in ReplaySource), so the real gaps between clips stay in t.
+    Wall time between clips is gap_s instead: with realtime, the camera reader's stall rule (no crop for 0.5 s) ends
+    the open segment there, so a segment never spans two clips. Clips without per-frame times are skipped, since
+    nothing places them on the shared clock."""
+
+    def __init__(self, session, realtime=True, gap_s=1.5, limit=None, root=None):
+        self.paths = []
+        self.skipped = []
+        for path in session_clips(session, root)[:limit]:
+            (self.paths if find_ts(path) else self.skipped).append(path)
+        for path in self.skipped:
+            log.warning('%s: no frame times, skipped', path)
+        if not self.paths:
+            raise FileNotFoundError(f'{session}: no clip with frame times')
+        self.t_offset = float(load_ts(find_ts(self.paths[0]))[0])
+        self.realtime, self.gap_s = realtime, gap_s
+        self._closed = threading.Event()
+        self._cur = None
+
+    def frames(self):
+        index = 0
+        for path in self.paths:
+            if self._closed.is_set():
+                return
+            src = self._cur = ReplaySource(path, realtime=self.realtime)
+            shift = src.t_offset - self.t_offset
+            for f in src.frames():
+                yield Frame(t=f.t + shift, image=f.image, index=index)
+                index += 1
+            src.close()
+            if self.realtime and self._closed.wait(self.gap_s):
+                return
+
+    def close(self):
+        self._closed.set()
+        if self._cur is not None:
+            self._cur.close()
 
 
 def _v4l2_dev(device):
@@ -384,10 +442,14 @@ class CameraSource:
 
     def _pick_fps(self, fps):
         """Requested rate, or 50 / 60 when V4L2 lists them and the driver accepts them, else 30. Without a listing
-        (Windows, macOS) only 30: some drivers echo back any rate they are asked for."""
+        (Windows, macOS) only 30: some drivers echo back any rate they are asked for. Unless asked for, a rate is not set
+        again when the camera already runs at it or doesn't say (DirectShow reports -1 after an open with 30 fps asked
+        for): setting it on DirectShow drops the C920 back to 640x480 YUY2."""
         tries = [fps] if fps else [r for r in (50, 60) if r in self.offered] + [30]
         for r in tries:
-            self.cap.set(cv2.CAP_PROP_FPS, r)
+            cur = self.cap.get(cv2.CAP_PROP_FPS)
+            if fps or (cur > 0 and abs(cur - r) >= 1):
+                self.cap.set(cv2.CAP_PROP_FPS, r)
             got = self.cap.get(cv2.CAP_PROP_FPS)
             if fps or abs(got - r) < 1 or r == 30:
                 return got if got > 0 else r
@@ -432,7 +494,10 @@ class CameraSource:
         n = index = fails = 0
         last_ok = now()
         while not self._stop.is_set():
-            ok = self.cap.grab()
+            if READ_EVERY_FRAME:
+                ok, image = self.cap.read()
+            else:
+                ok, image = self.cap.grab(), None
             t = now()
             if ok:
                 self.grab_ts.append(t)
@@ -446,7 +511,8 @@ class CameraSource:
                 if not reps:
                     last_ok, fails = t, 0
                     continue
-                ok, image = self.cap.retrieve()
+                if image is None:
+                    ok, image = self.cap.retrieve()
             if not ok:
                 fails += 1
                 self.grab_failures += 1

@@ -19,6 +19,7 @@ rate z-score, `pace` and `effort` in voice.say's units (1.0 = Austin's normal; d
 Segments start when the speaking probability (or the camera's mouth activity) rises, 300 ms earlier, and end after
 0.5 s with neither; the read where one starts says so (segment_started) and the read where one ends too (segment_ended).
 """
+import difflib
 import time
 
 import numpy as np
@@ -26,7 +27,9 @@ import torch
 
 from svr.preprocess import (EMG_RATE, KEEP, RAW_RATE, SAMPLES_PER_FRAME, apply_gain, resample_linear, rig_filters,
                             rig_gain, rig_to_slots, rig_unscaled, robust_spread)
-from svr.svr1 import build, config_of, score_texts
+from svr.phonemes import TOKEN_PAD, sentence_phonemes, verifier_tokens
+from svr.svr1 import build, config_of
+from svr.text import text_to_ids
 from svr.text import clean_text
 
 FRAME_RATE = RAW_RATE / SAMPLES_PER_FRAME
@@ -44,7 +47,8 @@ def frame_rms(x):
 
 class LiveSVR1:
     def __init__(self, checkpoint, device=None, session=None, max_seconds=8.0, context_seconds=2.0,
-                 idle_seconds=2.0, buffer_seconds=60.0, speak_threshold=0.5, pre_roll=0.3, end_silence=0.5):
+                 idle_seconds=2.0, buffer_seconds=60.0, speak_threshold=0.5, pre_roll=0.3, end_silence=0.5,
+                 gap_seconds=0.25):
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
         state = torch.load(checkpoint, map_location='cpu', weights_only=False)
         if state.get('preprocess', 'gaddy') != 'causal':
@@ -70,7 +74,15 @@ class LiveSVR1:
         self.clock = None                                  # (absolute index, monotonic time) of the latest message
         self.max_s, self.ctx_s, self.idle_s = (int(s * EMG_RATE) for s in (max_seconds, context_seconds, idle_seconds))
         self.thr, self.pre_roll, self.end_silence = speak_threshold, pre_roll, end_silence
+        self.gap_s = gap_seconds
         self.seg_id, self.seg_start, self.win_start, self.last_active = 0, None, None, None
+        self.last_out = None
+
+    def reset(self):
+        """Forget the signal (a gap in the stream): the filter restarts and nothing before now is read again."""
+        self.filter = rig_filters.EmgFilter()
+        self.n, self.clock = 0, None
+        self.seg_start = self.win_start = self.last_active = None
         self.last_out = None
 
     # ------------------------------------------------------------------ input
@@ -79,6 +91,8 @@ class LiveSVR1:
         x = np.asarray(samples, np.float64).reshape(-1, 4)
         if not len(x):
             return
+        if t0 is not None and self.clock is not None and float(t0) - self.time_of(self.n) > self.gap_s:
+            self.reset()   # samples went missing (or a new recording starts): times after the gap would be wrong
         y = self.filter(x)
         idx = (self.n + np.arange(len(y))) % self.size
         self.ring[idx] = y
@@ -126,8 +140,10 @@ class LiveSVR1:
         with torch.autocast('cuda', dtype=torch.float16, enabled=str(self.device).startswith('cuda')):
             return self.model(xt, torch.tensor([n], device=self.device), self.cmask)
 
-    def read(self, camera_active=False):
-        """Re-read the current segment (or the idle window) and update the segmentation. None until enough data."""
+    def read(self, camera_active=False, start_t=None):
+        """Re-read the current segment (or the idle window) and update the segmentation. None until enough data.
+        start_t: read from this time instead (the fusion process passes the camera's segment start, so both readers
+        grade the same span; up to max_seconds back)."""
         if self.gain is None:
             raise RuntimeError('no session gain: load a fine-tuned checkpoint or call calibrate() first')
         if self.clock is None:
@@ -136,7 +152,12 @@ class LiveSVR1:
         in_seg = self.seg_start is not None
         if in_seg and self.n - self.win_start > self.max_s:
             self.win_start = self.n - self.ctx_s
-        start, f1k = self._window(self.win_start if in_seg else self.n - self.idle_s)
+        if start_t is not None:
+            i0, t0 = self.clock
+            first = max(i0 + int(round((float(start_t) - t0) * EMG_RATE)), self.n - self.max_s)
+        else:
+            first = self.win_start if in_seg else self.n - self.idle_s
+        start, f1k = self._window(first)
         if len(f1k) < 2 * SAMPLES_PER_FRAME * EMG_RATE / RAW_RATE:
             return None
         x = resample_linear(rig_to_slots(f1k), RAW_RATE)
@@ -185,4 +206,77 @@ class LiveSVR1:
         if self.last_out is None:
             raise RuntimeError('read() first')
         cands = [' '.join(clean_text(c).split()) for c in candidates]
-        return score_texts(self.model, self.last_out, 0, cands, self.device).float().cpu().numpy()
+        s, _ = self.model.score_candidates(self.last_out, 0, *self._targets(cands))
+        return s.float().cpu().numpy()
+
+    def _targets(self, cands):
+        """svr.svr1.candidate_tensors, fast enough for every pass: per-sentence targets cached across passes, and
+        the disputed words found without comparing every pair of candidates (disputed_fast)."""
+        cache = self.__dict__.setdefault('_tcache', {})
+        if len(cache) > 20000:
+            cache.clear()
+        letters, phones = [], []
+        for c in cands:
+            if c not in cache:
+                cache[c] = (text_to_ids(c), sentence_phonemes(c))
+            lt, ph = cache[c]
+            letters.append(lt)
+            phones.append(ph)
+        dev = self.device
+        phone_ok = torch.tensor([p is not None and len(p) > 0 for p in phones], device=dev)
+        toks = [verifier_tokens(c, d) for c, d in zip(cands, disputed_fast(cands))]
+        width = max(len(t) for t, _ in toks)
+        tok = np.full((len(cands), width), TOKEN_PAD, np.int64)
+        dis = np.zeros((len(cands), width), np.int64)
+        for i, (t, f) in enumerate(toks):
+            tok[i, :len(t)] = t
+            dis[i, :len(f)] = f
+        cat = lambda xs: torch.tensor([v for x in xs for v in x], dtype=torch.long, device=dev)  # noqa: E731
+        ph = [p if p else [0] for p in phones]
+        return (cat(letters), torch.tensor([len(x) for x in letters], device=dev), cat(ph),
+                torch.tensor([len(x) for x in ph], device=dev), phone_ok, torch.from_numpy(tok).to(dev),
+                torch.from_numpy(dis).to(dev))
+
+
+_PAIRS = {}
+
+
+def disputed_fast(candidates):
+    """svr.phonemes.disputed_words: per candidate, True for each word where another candidate disagrees. Candidates
+    of the same length are compared position by position (a column with two different words is disputed in every
+    row); pairs of different lengths go through difflib as there, cached across passes."""
+    split = [c.split() for c in candidates]
+    flags = [np.zeros(len(w), bool) for w in split]
+    by_len = {}
+    for i, w in enumerate(split):
+        by_len.setdefault(len(w), []).append(i)
+    for n, idx in by_len.items():
+        if len(idx) > 1 and n:
+            cols = np.array([split[i] for i in idx], dtype=object)
+            differ = np.array([len(set(cols[:, k])) > 1 for k in range(n)])
+            for i in idx:
+                flags[i] |= differ
+    if len(_PAIRS) > 50000:
+        _PAIRS.clear()
+    lens = sorted(by_len)
+    for a in lens:
+        for b in lens:
+            if a == b:
+                continue
+            for i in by_len[a]:
+                if flags[i].all():
+                    continue
+                for j in by_len[b]:
+                    key = (candidates[i], candidates[j])
+                    d = _PAIRS.get(key)
+                    if d is None:
+                        d = []
+                        for tag, a0, a1, _, _ in difflib.SequenceMatcher(a=split[i], b=split[j],
+                                                                         autojunk=False).get_opcodes():
+                            if tag != 'equal':
+                                d.extend(range(a0, a1))
+                        _PAIRS[key] = d
+                    flags[i][d] = True
+                    if flags[i].all():
+                        break
+    return [f.tolist() for f in flags]
