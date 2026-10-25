@@ -23,11 +23,7 @@ Claude is the one part of Silent Voice that knows what the conversation is about
 - Under the hood it's the Claude API with JSON schema outputs, prompt caching, and a backoff that carries the judge's lines into the next request, so a short outage or a 429 loses nothing.
 
 We started on Opus 5.5 and it was too slow for a phone call, so we timed every option on live calls and moved to Haiku 5.5 with thinking off.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../figures/sponsors/claude_latency-dark.png">
-  <img alt="Claude reply time on live calls. Opus 5.5 at low effort 5.7 to 6.9 s. Haiku 5.5 prediction while the judge talks 1.9 to 3.9 s, after the judge's line 1.9 to 2.3 s, look-alike repair 2.0 to 2.3 s." src="../figures/sponsors/claude_latency-light.png">
-</picture>
+Opus took 5.7 to 6.9 s a call, and Haiku answers in about 2 to 3 s, so a prediction is ready before Austin starts mouthing.
 
 The code is in `claude_service/`, and [docs/REALTIME_PIPELINE.md](../docs/REALTIME_PIPELINE.md) shows where Claude sits in the whole loop.
 
@@ -50,11 +46,6 @@ It laid out the breadboard, wrote the 1 kHz Arduino firmware and the serial read
 
 The hum filter is causal, so it runs live one sample at a time, and training runs the exact same filter, which means the model never sees cleaner data than it gets on stage.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../figures/sponsors/hum_filter-dark.png">
-  <img alt="Frequency response of the EMG hum filter, a 20 Hz high-pass plus notches at 60, 120, and 180 Hz." src="../figures/sponsors/hum_filter-light.png">
-</picture>
-
 ## How they judge
 
 | They want | Our answer | Gap to close |
@@ -75,5 +66,3 @@ The hum filter is causal, so it runs live one sample at a time, and training run
 ## Pitch line
 
 "Silent Voice lets someone who lost their voice box talk again, in their own voice, without holding a buzzer to their throat."
-
-Charts come from `python figures/make_sponsor_charts.py`, using the times measured in the `claude_service` commits and the filter in `rig/filters.py`.

@@ -24,11 +24,6 @@ A phone call dies in the silences, so we measured them.
 With Sonic's default buffer, 14 of 15 words waited for the sentence to end and the judge sat through 4.9 s of nothing.
 We switched to phrases with no server buffer, so the first sound now lands 0.6 s after Austin starts and he's done 1.0 s after he stops.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../figures/sponsors/cartesia_wait-dark.png">
-  <img alt="Silence before the judge hears Austin. Silent Voice phrases 0.6 s, Sonic with its default buffer 4.9 s, speaking after the sentence ends 6.5 to 7.5 s (estimate)." src="../figures/sponsors/cartesia_wait-light.png">
-</picture>
-
 Word by word with no buffer was worse in its own way, because each word came back as its own tiny sentence.
 Phrases sound like a person talking, which is the whole point.
 
@@ -36,12 +31,8 @@ Phrases sound like a person talking, which is the whole point.
 
 Ink is great at hearing everyone, which is a problem when everyone is the crowd behind the judge.
 So we gate the call audio around the caller's own level, and people nearby stay muted even while they talk.
+On test calls at the expo, the judge came in at -20 to -12 dBFS and the crowd at -60 to -40, so there's plenty of room between them.
 Ink also gets our keyterms (Silent Voice, Austin, Cal Hacks) so names don't come out mangled.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../figures/sponsors/cartesia_gate-dark.png">
-  <img alt="Audio levels on expo test calls. The judge at the ear is at minus 20 to minus 12 dBFS and passes the gate. People nearby are at minus 60 to minus 40 dBFS and are muted." src="../figures/sponsors/cartesia_gate-light.png">
-</picture>
 
 ## Shout-out to Frank
 
@@ -86,5 +77,3 @@ Ask him about Sonic continuations and clear your afternoon.
   The root README still has no setup section, so point judges to [call/README.md](../call/README.md).
 - Judges can read the source code.
 - No API keys committed.
-
-Charts come from `python figures/make_sponsor_charts.py`, using numbers measured in `call/README.md` and the call commits.
