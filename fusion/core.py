@@ -239,7 +239,7 @@ class Fusion:
                                  else mc.get(word, 0.0), hints.get(word, 0.0), final or i < n_best - 1, pause, quiet,
                                  stable, u.cam.face_ok if u.cam is not None else False, self.emg_quality)
             p = float(self.lock.prob(f))
-            alts = [x for x, _ in sorted(d.items(), key=lambda kv: -kv[1]) if x != word][:4]
+            alts = self._alts(word, i, best, cands, d)
             words.append(dict(i=i, w=word, p=p, f=f, alts=alts, cam=mc.get(word, 0.0), tokens=best.tokens[i],
                               emg=me.get(word, 0.0) if emg_read is not None else None,
                               cam_top=max(mc, key=mc.get) if mc else word,
@@ -302,6 +302,19 @@ class Fusion:
         out.append(('timing.dec', {'stage': 'lock', 'ms': ms, 'utt_id': u.utt_id, 'final': final,
                                    'candidates': len(cands)}))
         return out
+
+    def _alts(self, word, i, best, cands, d):
+        """What word i could be instead (Claude may only swap it for one of these): words that candidates identical
+        to the best one everywhere else put there, then its lip look-alikes; real words only. Position i of a
+        candidate with a word dropped or added is a neighbour shifted in (43% of locked words had one on session 3)."""
+        pron = getattr(getattr(self.search, 'lexicon', None), 'pron', None)
+        n = len(best.words)
+        swaps = {c.words[i] for c in cands if len(c.words) == n and c.words[:i] == best.words[:i]
+                 and c.words[i + 1:] == best.words[i + 1:]}
+        out = [x for x, _ in sorted(d.items(), key=lambda kv: -kv[1]) if x in swaps]
+        out += [x for x in self.search.lookalikes(word) if x not in out]
+        near = set(best.words[max(0, i - 2):i] + best.words[i + 1:i + 3])
+        return [x for x in out if x != word and x not in near and (pron is None or x in pron)][:4]
 
     # ------------------------------------------------------------------ voice, repairs, repeats
     @staticmethod
