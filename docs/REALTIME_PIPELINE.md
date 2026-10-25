@@ -1,6 +1,6 @@
-# Reclaim's real-time pipeline
+# Silent Voice's real-time pipeline
 
-Reclaim turns silently mouthed speech into live captions and a live voice. In the demo, Austin calls a judge on the phone (through Twilio). The judge talks normally; Austin only mouths, mouth open, no sound. His words appear on screen as he mouths them and play into the call in his own cloned voice, with the emotion on his face, while he is still mouthing. The judge's words, transcribed from the call, appear in the same captions. Everything runs on one laptop (RTX 5060, 115 W), and the goal at every step is the lowest possible delay.
+Silent Voice turns silently mouthed speech into live captions and a live voice. In the demo, Austin calls a judge on the phone (through Twilio). The judge talks normally; Austin only mouths, mouth open, no sound. His words appear on screen as he mouths them and play into the call in his own cloned voice, with the emotion on his face, while he is still mouthing. The judge's words, transcribed from the call, appear in the same captions. Everything runs on one laptop (RTX 5060, 115 W), and the goal at every step is the lowest possible delay.
 
 Three readers work together, because each one sees something the others cannot. The camera reads the lips. The EMG model reads the muscles under the skin. Claude reads the conversation. Every 100 ms, one joint search in the middle combines them, and each word is locked in as soon as the three together are confident enough.
 
@@ -160,16 +160,16 @@ sequenceDiagram
 
 Claude does two jobs:
 
-- **Predict, before Austin mouths.** Whenever the judge finishes speaking, and again every couple of seconds while Austin talks, Claude returns the words and short phrases Austin is likely to use next, and how predictable the next words are. The predicted words get a boost in the joint search, and the predictability sets the locking threshold. This costs no waiting: the prediction is ready before Austin starts.
+- **Predict, before Austin mouths.** While the judge is still speaking, from Cartesia Ink's live transcript of their unfinished line, once more when the line is final (its last words can change the answer: "...nervous or excited?"), and again every couple of seconds while Austin talks, Claude returns the words and short phrases Austin is likely to use next, and how predictable the next words are. The predicted words get a boost in the joint search, and the predictability sets the locking threshold. This costs no waiting: the prediction is ready before Austin starts.
 - **Repair.** As words lock, the joint search sends Claude the last few words with the alternatives it considered and how sure it was. Claude may swap a word only for one of those alternatives or a lip look-alike, never add or reword ideas, and answers "please repeat" when it cannot tell. The reply is a short structured list of edits.
 
 A locked word waits a short repair window before it is spoken, 0.3 s by default, so that a quick repair can still change it. A repair that arrives later fixes the captions only, with the change highlighted. The window is a single setting: 0 gives the fastest voice, a longer window lets Claude catch more before words are spoken.
 
-Claude runs through the Claude API, as `claude-opus-5-5` at low effort. The rules and the conversation so far form a prefix that stays the same from call to call, so prompt caching keeps each call fast and cheap; only the newest words are new input.
+Claude runs through the Claude API, as `claude-haiku-5-5` with thinking off and low effort, chosen for speed: a call takes about 2 to 3 s (measured: predictions 2.1 to 3.5 s, repairs 2.0 to 2.3 s), where `claude-opus-5-5`, which always thinks first, took about 6 s. A repair that slow can't land inside the 0.3 s repair window, so repairs mostly correct the captions. The rules and the conversation so far form a prefix that stays the same from call to call, so prompt caching keeps each call fast and cheap; only the newest words are new input.
 
 ## The voice and the call
 
-The voice is Frank's part. It is Cartesia Sonic 3.6 with an Instant Voice Clone of Austin, made from his own recordings with his consent. For each sentence the system opens one streaming context on Cartesia's WebSocket and sends words as they lock and clear the repair window, marking each input as "more to come" so that the prosody flows across the pieces. Speed, volume and emotion are set per sentence through `generation_config` and changed within a sentence through inline `<speed>`, `<volume>` and `<emotion>` tags: speed and volume from SVR-1's pace and effort, which arrive with every word as numbers relative to Austin's normal (1.0), and emotion from the camera's facial expression.
+The voice is Frank's part. It is Cartesia Sonic 3.6 with an Instant Voice Clone of Austin, made from his own recordings with his consent. For each sentence the system opens one streaming context on Cartesia's WebSocket and sends the words that lock and clear the repair window as natural phrases, marking each as "more to come" so that the prosody flows across the pieces: a phrase goes when Austin pauses (his decoder shows no word being mouthed) or after about four words. A word sent alone would be said like a one-word sentence; phrases sound like a person talking, at his pauses, about a second behind his lips, which on a phone call sounds like ordinary speech. Speed, volume and emotion are set per sentence through `generation_config` and changed within a sentence through inline `<speed>`, `<volume>` and `<emotion>` tags: speed and volume from SVR-1's pace and effort, which arrive with every word as numbers relative to Austin's normal (1.0), and emotion from the camera's facial expression.
 
 The audio goes straight into the Twilio call, so the judge hears Austin's voice on the phone. The call's incoming audio, the judge's voice, goes to Cartesia Ink, whose transcript feeds the captions and Claude. The phone network adds its usual delay in both directions, like any phone call; the dashboard shows the captions with the delay the system actually achieves.
 
@@ -202,8 +202,9 @@ These are design estimates for the RTX 5060; every one gets measured on the lapt
 | Word locked (black) | as soon as the next word starts and confidence is reached, often within one or two passes |
 | Repair window before speaking | 0.3 s (adjustable, 0 for fastest) |
 | First audio from Cartesia | a few tenths of a second |
+| Claude, per call (beside the loop, never in it) | about 2 to 3 s: predictions arrive after the judge's line, repairs after the word was spoken |
 
-A sentence-at-a-time lip reader only starts speaking after the whole sentence is done, plus one or two seconds of decoding. Reclaim speaks while the sentence is still being mouthed, like a simultaneous interpreter.
+A sentence-at-a-time lip reader only starts speaking after the whole sentence is done, plus one or two seconds of decoding. Silent Voice speaks while the sentence is still being mouthed, like a simultaneous interpreter.
 
 ## What we train, and what we don't
 

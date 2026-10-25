@@ -2,7 +2,7 @@
 
 Pure json + numpy so both the main venv and the camera venv can import it.
 
-Layout (written by recorder/record.py, the Reclaim recorder; session folders are named session_01, session_02, ...):
+Layout (written by recorder/record.py, the Silent Voice recorder; session folders are named session_01, session_02, ...):
 
     recordings/<session>/manifest.jsonl          one JSON object per utterance
     recordings/<session>/<id>_emg.npy            (samples, 4), 1000 Hz, raw unfiltered Uno readings (uint16, 0-1023),

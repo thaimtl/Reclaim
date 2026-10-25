@@ -111,7 +111,7 @@ def test_voice_offset_skips_resent_words_and_keeps_real_repeats():
     st = fed(('voice.say', {'utt_id': 1, 'words': ['no'], 'offset': 0}),
              ('voice.say', {'utt_id': 1, 'words': ['no', 'no', 'way'], 'offset': 0}),
              ('voice.say', {'utt_id': 1, 'words': [], 'offset': 3, 'final': True}))
-    assert st.utts[1]['spoken'] == ['no', 'no', 'way'] and st.transcript[-1]['text'] == 'no no way'
+    assert st.utts[1]['spoken'] == ['no', 'no', 'way'] and st.transcript[-1]['text'] == 'No no way'   # cased
 
 
 def test_repair_already_applied_by_the_decoder_is_shown_once():
@@ -168,7 +168,7 @@ def test_server_decodes_skips_bad_frames_and_keeps_the_newest_preview():
     d.handle(encode('partner.text', {'text': 'hello', 'is_final': True, 't': 1.0}))
     d.handle([b'partner.text', b'\xc1 not msgpack'])
     d.handle(encode('cam.preview', {'t': 1.0, 'w': 640, 'h': 360, 'jpeg': b'\xff\xd8jpeg'}))
-    assert d.state.transcript[-1]['text'] == 'hello' and d.preview == b'\xff\xd8jpeg' and d.preview_seq == 1
+    assert d.state.transcript[-1]['text'] == 'hello' and d.frame.endswith(b'\xff\xd8jpeg')
 
 
 async def test_websocket_sends_snapshots_and_the_camera_mirror(aiohttp_client):
@@ -185,7 +185,8 @@ async def test_websocket_sends_snapshots_and_the_camera_mirror(aiohttp_client):
         got.append(m.data)
         if isinstance(m.data, bytes):
             break
-    assert b'\xff\xd8frame' in got
+    frame = next(g for g in got if isinstance(g, bytes))
+    assert frame.startswith(b'RCF1') and frame.endswith(b'\xff\xd8frame')
     page = await client.get('/')
     assert page.status == 200 and 'app.js' in await page.text()
     css = await client.get('/static/style.css')
@@ -256,8 +257,20 @@ def test_a_decoder_restart_starts_a_new_sentence():
     st.feed('voice.say', {'utt_id': 1, 'words': ['hi'], 'offset': 0, 'final': True}, 10.5)
     st.feed('dec.hyp', {'utt_id': 1, 'locked': ['hello'], 'unlocked': []}, 30.0)   # after a restart: utt 1 again
     st.feed('voice.say', {'utt_id': 1, 'words': ['hello'], 'offset': 0, 'final': True}, 30.5)
-    assert st.snapshot(30.5)['austin']['words'][0]['w'] == 'hello'
-    assert [t['text'] for t in st.transcript if t['who'] == 'austin'] == ['hi', 'hello']
+    assert st.snapshot(30.5)['austin']['words'][0]['w'] == 'Hello'
+    assert [t['text'] for t in st.transcript if t['who'] == 'austin'] == ['Hi', 'Hello']
+
+
+def test_a_restarted_sentence_never_rewrites_the_old_caption():
+    st = fed(('dec.hyp', {'utt_id': 1, 'locked': ['hi'], 'unlocked': []}))
+    st.feed('voice.say', {'utt_id': 1, 'words': ['hi'], 'offset': 0, 'final': True}, 10.5)
+    st.feed('timing.voice', {'stage': 'voice_phrase', 'utt_id': 1, 'text': 'Hi.'}, 11.0)
+    st.feed('dec.hyp', {'utt_id': 1, 'locked': ['second'], 'unlocked': []}, 30.0)  # after a restart: utt 1 again
+    st.feed('voice.say', {'utt_id': 1, 'words': ['second'], 'offset': 0}, 30.5)
+    st.feed('timing.voice', {'stage': 'voice_phrase', 'utt_id': 1, 'text': 'Second,'}, 31.0)
+    assert [t['text'] for t in st.transcript if t['who'] == 'austin'] == ['Hi.']
+    st.feed('voice.say', {'utt_id': 1, 'words': [], 'offset': 1, 'final': True}, 31.5)
+    assert [t['text'] for t in st.transcript if t['who'] == 'austin'] == ['Hi.', 'Second,']
 
 
 def test_voice_indicator_times_out_and_lips_to_voice_counts_first_audio_once():
@@ -273,3 +286,80 @@ def test_end_summary_is_built_once():
     st = fed(('call.state', {'state': 'connected'}), ('call.state', {'state': 'ended'}))
     first = st.snapshot(10.0)['summary']
     assert st.snapshot(20.0)['summary'] is first
+
+
+def test_the_call_heard_text_is_the_voices_own_with_its_punctuation():
+    """The voice reports each phrase as it spoke it (cased, with the punctuation his face and pauses gave it); the
+    dashboard shows that, not the lip reader's UPPERCASE words."""
+    st = CallState()
+    st.feed('dec.hyp', dict(utt_id=1, locked=['I', 'GOT', 'THE', 'JOB'], unlocked=['I'], source=['camera'] * 4), 1.0)
+    assert [w['w'] for w in st.snapshot(1.1)['austin']['words']] == ['I', 'got', 'the', 'job', 'I']
+    st.feed('voice.say', dict(utt_id=1, words=['I', 'GOT', 'THE', 'JOB'], final=False), 1.2)
+    assert st.snapshot(1.3)['austin']['spoken'] == 'I got the job'
+    st.feed('timing.voice', dict(stage='voice_phrase', utt_id=1, words='I GOT THE JOB', text='I got the job!'), 1.5)
+    st.feed('voice.say', dict(utt_id=1, words=['I', 'START', 'MONDAY'], final=True), 1.6)
+    st.feed('timing.voice', dict(stage='voice_phrase', utt_id=1, words='I START MONDAY', text='I start monday!'), 1.8)
+    assert st.transcript[-1]['text'] == 'I got the job! I start monday!'
+
+
+def unpack(frame):
+    import struct
+    n = struct.unpack('>I', frame[4:8])[0]
+    return json.loads(frame[8:8 + n]), frame[8 + n:]
+
+
+def test_each_preview_frame_carries_the_face_points_of_that_frame():
+    from dashboard.server import Dashboard
+    d = Dashboard(endpoints={'none': 'inproc://dashboard-test-none'})
+    a = [[0.1, 0.2]] * 478
+    b = [[0.3, 0.4]] * 478
+    d.handle(encode('cam.face', {'t': 10.00, 'w': 640, 'h': 360, 'face_ok': True, 'pts': a}))
+    d.handle(encode('cam.face', {'t': 10.08, 'w': 640, 'h': 360, 'face_ok': True, 'pts': b}))
+    d.handle(encode('cam.preview', {'t': 10.07, 'w': 640, 'h': 360, 'jpeg': b'\xff\xd8x'}))
+    head, jpeg = unpack(d.frame)
+    assert head['pts'][0] == [0.3, 0.4] and head['t'] == 10.07 and jpeg == b'\xff\xd8x'
+    d.handle(encode('cam.preview', {'t': 10.50, 'w': 640, 'h': 360, 'jpeg': b'\xff\xd8y'}))
+    assert unpack(d.frame)[0]['pts'] is None                     # no face from that moment
+    own = [[0.5, 0.6]] * 478
+    d.handle(encode('cam.preview', {'t': 10.51, 'w': 640, 'h': 360, 'jpeg': b'\xff\xd8z', 'pts': own}))
+    assert unpack(d.frame)[0]['pts'][0] == [0.5, 0.6]            # the frame's own points win
+
+
+def test_bad_face_points_never_stop_the_dashboard():
+    from dashboard.server import Dashboard
+    d = Dashboard(endpoints={'none': 'inproc://dashboard-test-none'})
+    d.handle(encode('cam.face', {'t': 5.0, 'w': 640, 'h': 360, 'face_ok': True, 'pts': [[0.1, 0.2], [0.3]]}))
+    d.handle(encode('cam.preview', {'t': 5.0, 'w': 640, 'h': 360, 'jpeg': b'\xff\xd8a', 'pts': [1, 2, 3]}))
+    head, jpeg = unpack(d.frame)
+    assert head['pts'] is None and jpeg == b'\xff\xd8a'        # the picture still goes out
+
+
+def test_a_preview_with_x_y_z_points_keeps_them():
+    from dashboard.server import Dashboard
+    d = Dashboard(endpoints={'none': 'inproc://dashboard-test-none'})
+    own = [[0.5, 0.6, -0.02]] * 478
+    d.handle(encode('cam.preview', {'t': 1.0, 'w': 640, 'h': 360, 'jpeg': b'\xff\xd8z', 'pts': own}))
+    assert unpack(d.frame)[0]['pts'][0] == [0.5, 0.6, -0.02]
+
+
+def test_end_summary_counts_austins_tones_in_order(shots):
+    assert shots['end']['summary']['tones'] == {'warm': 3, 'concerned': 1, 'calm': 1}
+    assert list(shots['end']['summary']['tones']) == ['warm', 'concerned', 'calm']
+
+
+def test_end_summary_benchmark_is_none_until_a_session_is_scored(shots):
+    assert shots['end']['summary']['benchmark'] is None
+    st = CallState(benchmark={'lips': 22.0, 'lips_muscles': 14.0, 'claude': 4.0, 'session': 'session_03'})
+    assert st.summary(40, 0.0)['benchmark']['claude'] == 4.0
+
+
+def test_load_benchmark_reads_a_scored_session_and_ignores_bad_files(tmp_path):
+    from dashboard.server import load_benchmark
+    good = tmp_path / 'wer.json'
+    good.write_text(json.dumps({'session': 'session_03', 'lips': 21.5, 'lips_muscles': 13, 'claude': 3.9}))
+    assert load_benchmark(good) == {'lips': 21.5, 'lips_muscles': 13.0, 'claude': 3.9, 'session': 'session_03'}
+    assert load_benchmark(tmp_path / 'missing.json') is None
+    (tmp_path / 'bad.json').write_text('{not json')
+    assert load_benchmark(tmp_path / 'bad.json') is None
+    (tmp_path / 'short.json').write_text(json.dumps({'lips': 20}))
+    assert load_benchmark(tmp_path / 'short.json') is None

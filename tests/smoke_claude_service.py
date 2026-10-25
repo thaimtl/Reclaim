@@ -116,8 +116,43 @@ def unit():
                                                            for c in fake.calls if c not in convo))
     check('frozen system, schema, settings', all(c['system'] == SYSTEM and c['output_config']['format']['schema'] == SCHEMA
                                                  and c['output_config']['effort'] == 'low' for c in fake.calls))
-    check('model', all(c['model'] == 'claude-opus-5-5' for c in fake.calls))
+    check('model', all(c['model'] == 'claude-haiku-5-5' for c in fake.calls))
     check('roles alternate', [m['role'] for m in b.messages] == ['user', 'assistant'] * 2)
+
+
+def early():
+    """While the judge speaks, their partial line starts early predictions (from EARLY_MIN_WORDS words, then every
+    EARLY_STEP_WORDS more, at most every EARLY_EVERY_S); nothing is appended to the conversation; the final line still
+    goes through the conversation lane, and its newer prediction replaces the early one."""
+    b = Brain(FakeClient([reply(words=(('early', 0.9),)), reply(words=(('final', 0.9),))]))
+    b.partner({'text': 'are', 'is_final': False})
+    check('early: not before enough words', b.next_early(0.0) is None)
+    b.partner({'text': 'are you', 'is_final': False})
+    req = b.next_early(0.1)
+    check('early: starts at the minimum words', req is not None and req[1]['lane'] == 'early'
+          and 'are you' in req[0][-1]['content'], req and req[0][-1]['content'])
+    b.partner({'text': 'are you feeling', 'is_final': False})
+    check('early: waits for more words', b.next_early(1.0) is None)
+    b.partner({'text': 'are you feeling nervous', 'is_final': False})
+    check('early: not more often than the interval', b.next_early(0.5) is None)
+    req2 = b.next_early(1.0)
+    check('early: again after more words and time', req2 is not None and 'feeling nervous' in req2[0][-1]['content'])
+    r, log = b.ask(req2[0], lane='early')
+    check('early: the call appends nothing', b.messages == [] and log['lane'] == 'early')
+    out, _ = b.apply(r, req2[1], 3.0)
+    check('early: publishes a prediction', [t for t, _ in out] == ['claude.predict'] and
+          b.predict['words'][0]['w'] == 'early')
+    b.partner({'text': 'are you feeling nervous about the demo', 'is_final': True})
+    check('early: the final line clears the partial and goes to the conversation lane',
+          b.partial == '' and b.next_early(9.0) is None and b.due(9.0, mouthing=False))
+    target = b.next_request(9.0)
+    r2, _ = b.ask()
+    out2, _ = b.apply(r2, target, 11.0)
+    check('early: the final line\'s prediction replaces it', b.predict['words'][0]['w'] == 'final' and
+          'Judge: are you feeling nervous about the demo' in b.messages[0]['content'])
+    late, _ = b.apply(reply(words=(('stale', 0.9),)), {'utt_id': None, 'words': [], 'review': [], 'sent': 1.0,
+                                                       'lane': 'early'}, 12.0)
+    check('early: a late early reply never replaces the final one', late == [] and b.predict['words'][0]['w'] == 'final')
 
 
 def stale_predict():
@@ -164,9 +199,9 @@ def late_lock():
 
 def empty_reply():
     """A refusal or an empty reply never leaves an empty assistant turn behind."""
-    empty = SimpleNamespace(content=[], stop_reason='refusal', model='claude-opus-5-5', usage=None)
+    empty = SimpleNamespace(content=[], stop_reason='refusal', model='claude-haiku-5-5', usage=None)
     blank = SimpleNamespace(content=[SimpleNamespace(type='text', text='')], stop_reason='end_turn',
-                            model='claude-opus-5-5', usage=None)
+                            model='claude-haiku-5-5', usage=None)
     fake = FakeClient([empty, blank, reply()])
     b = Brain(fake)
     for k in range(3):
@@ -356,9 +391,9 @@ def failed_call():
     def boom(kw):
         raise TimeoutError('read timed out')
     cut = SimpleNamespace(content=[SimpleNamespace(type='thinking', thinking='hm', signature='x')],
-                          stop_reason='max_tokens', model='claude-opus-5-5', usage=None)
+                          stop_reason='max_tokens', model='claude-haiku-5-5', usage=None)
     bad = SimpleNamespace(content=[SimpleNamespace(type='text', text='{not json')], stop_reason='end_turn',
-                          model='claude-opus-5-5', usage=None)
+                          model='claude-haiku-5-5', usage=None)
     for name, fail in (('error', boom), ('max_tokens', lambda kw: cut), ('bad JSON', lambda kw: bad)):
         # conversation lane
         answers = [fail, fail, fail, lambda kw: reply()]
@@ -401,7 +436,7 @@ def failed_call():
             r, log = b.ask(messages)
             last = b.failed(target, 10.0 * k)
         check(f'{name}: third repair failure drops that review only', not last and 3 not in b.review, b.review)
-    refuse = SimpleNamespace(content=[], stop_reason='refusal', model='claude-opus-5-5', usage=None)
+    refuse = SimpleNamespace(content=[], stop_reason='refusal', model='claude-haiku-5-5', usage=None)
     b = Brain(FakeClient([refuse, refuse]))
     b.partner({'text': 'how are you', 'is_final': True})
     b.locked(lock(6, ('fine', ('vine',))))
@@ -435,6 +470,7 @@ if __name__ == '__main__':
     ap.add_argument('--live', action='store_true')
     args = ap.parse_args()
     unit()
+    early()
     stale_predict()
     late_lock()
     empty_reply()

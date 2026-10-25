@@ -75,7 +75,7 @@ def render_tests(client, cfg, voice_id, out_dir):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('clip', nargs='?', help='Austin speaking, 10 to 60 s (wav, mp3, ogg, flac or webm; convert m4a first)')
-    ap.add_argument('--name', default='Austin (Reclaim)')
+    ap.add_argument('--name', default='Austin (Silent Voice)')
     ap.add_argument('--write', action='store_true', help='save the new voice id as CARTESIA_VOICE_ID in call/keys.env')
     ap.add_argument('--test', action='store_true', help='render the test lines with the voice (after cloning, or the saved one)')
     ap.add_argument('--out', default=HERE, help='where the test wavs go')
@@ -90,7 +90,7 @@ def main():
             print('note:', w)
         with open(args.clip, 'rb') as f:
             voice = client.voices.clone(clip=f, name=args.name, language='en',
-                                        description='Reclaim demo: Austin\'s own voice, cloned with his consent')
+                                        description='Silent Voice demo: Austin\'s own voice, cloned with his consent')
         voice_id = voice.id
         print('cloned:', voice.name, voice_id)
         if args.write:

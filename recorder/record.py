@@ -1,4 +1,4 @@
-"""Reclaim recorder: webcam + 4-channel EMG + the session's sentences, saved for SVR-1 fine-tuning.
+"""Silent Voice recorder: webcam + 4-channel EMG + the session's sentences, saved for SVR-1 fine-tuning.
 
     python recorder/record.py --session 1                       # webcam 0, Uno found automatically
     python recorder/record.py --session 1 --camera 1 --port COM4
@@ -72,7 +72,7 @@ CUE_SCALE = 0.75
 REST_CUES = ['Still face, relaxed', 'Swallow once', 'Nod your head', 'Look left, then back', 'Look right, then back',
              'Smile', 'Raise your eyebrows', 'Take a slow breath', 'Lick your lips', 'Small cough']
 ARDUINO_VIDS = {0x2341, 0x2A03, 0x1A86}
-WIN = 'Reclaim recorder'
+WIN = 'Silent Voice recorder'
 
 
 # ------------------------------------------------------------------------------------------------ prompts
@@ -670,7 +670,7 @@ def list_cameras():
 
 
 def parse(argv=None):
-    p = argparse.ArgumentParser(description='Record camera + EMG for the Reclaim sessions (RECORDING.md).')
+    p = argparse.ArgumentParser(description='Record camera + EMG for the Silent Voice sessions (RECORDING.md).')
     p.add_argument('--session', type=int, choices=[1, 2, 3])
     p.add_argument('--root', default=os.path.join(os.environ.get('RECLAIM_WORKDIR', REPO), 'recordings'))
     p.add_argument('--speaker', default='austin')

@@ -48,7 +48,7 @@ Follow [EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md). You can pro
 ### Frank
 
 1. Instant Voice Clone of Austin, from about 60 s of his real voice read aloud, recorded separately with his consent ([RECORDING.md](../RECORDING.md#voice-sample-for-the-clone)); the silent sessions have no audio.
-2. Sonic 3.6 over the WebSocket: one context per sentence, words streamed in with "more to come" as they arrive on `voice.say`, `max_buffer_delay_ms` kept low. Speed, volume and emotion are set per sentence with `generation_config` and changed within a sentence with inline `<speed>`, `<volume>` and `<emotion>` tags, since Sonic ignores `generation_config` changes inside a context. `pace` maps to speed 0.6 to 1.5, `effort` to volume 0.5 to 2.0.
+2. Sonic 3.6 over the WebSocket: one context per sentence, locked words from `voice.say` streamed in with "more to come" as natural phrases: a phrase goes when Austin pauses (`dec.hyp` shows nothing being mouthed) or after about 4 words, each its own flush with no server buffer, Sonic's padding trimmed. A word sent alone sounds like a one-word sentence; phrases sound like talking, about 1 s behind his lips. Speed, volume and emotion are set per sentence with `generation_config` and changed within a sentence with inline `<speed>`, `<volume>` and `<emotion>` tags, since Sonic ignores `generation_config` changes inside a context. `pace` maps to speed 0.6 to 1.5, `effort` to volume 0.5 to 2.0.
 3. Twilio:
     - Austin's call to the judge, with a two-way audio stream to the laptop.
     - Cartesia's audio goes into the call; ask Cartesia for phone-format audio, or convert it.
@@ -67,9 +67,9 @@ Follow [EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md). You can pro
 3. Live: the reader stamps samples with `bus.now()` (`time.perf_counter()`) and publishes `emg.raw` every 10 ms.
 4. Safety: the laptop runs on battery whenever the pads are on skin; never charge with the Uno connected.
 5. The Claude service:
-    - **Predict:** on every final `partner.text` and every ~2 s while Austin mouths, publish `claude.predict`: likely words and phrases, plus how predictable the next words are.
+    - **Predict:** while the judge is still speaking, from the partial `partner.text` (once 2 words are in, then every 2 more, at most every 0.7 s, up to two calls in flight), again on the final line, and every ~2 s while Austin mouths, publish `claude.predict`: likely words and phrases, plus how predictable the next words are. The newest prediction always replaces older ones.
     - **Repair:** on each `dec.lock`, publish `claude.repair`.
-    - **How it calls Claude:** `claude-opus-5-5` at low effort, structured outputs, prompt caching (rules and conversation kept as an append-only prefix).
+    - **How it calls Claude:** `claude-haiku-5-5` with thinking off and low effort (about 2 to 3 s a call; `claude-opus-5-5` took about 6 s), structured outputs, prompt caching (rules and conversation kept as an append-only prefix).
     - **Prompt rules:** swap a word only for one of the alternatives given or a lip look-alike, never add ideas, answer "please repeat" when unsure.
 
 ## Interfaces
@@ -101,11 +101,11 @@ flowchart TD
 | `cam.tick` | Evan → Austin, Frank | every 100 ms | `seg_id`, `seg_start`, `frame_t` (T), `topk_ids` (T × 32), `topk_logp` (T × 32), `blank_logp` (T), `greedy`, `activity` (T), `face_ok`, `emotion` {`label`, `confidence`, `scores`}, `timing_ms` |
 | `cam.final` | Evan → Austin | at segment end | `seg_id`, `nbest` [{`text`, `score`}] |
 | `cam.face` | Evan → dashboard | ~12.5 Hz | `t`, `w`, `h`, `face_ok`, `pts` (478 × 2, normalised), `blend` (52), `pose` (yaw, pitch, roll) |
-| `cam.preview` | Evan → dashboard | ~10 Hz (optional) | `t`, `w`, `h`, `jpeg` (the processed frame, 640 px wide): the dashboard's mirror of the webcam, which only the lip reader can open |
+| `cam.preview` | Evan → dashboard | every processed frame, at most 30 Hz | `t`, `w`, `h`, `jpeg` (the processed frame, 640 px wide): the dashboard's mirror of the webcam, which only the lip reader can open; `pts` (that frame's 478 × 3 face points: x / w, y / h and MediaPipe's z; nil without a face), so the pads drawn on it sit on his face. Sent from its own thread without blocking (`lipread/preview.py`), so it never slows the lip reader |
 | `dec.hyp` | Austin → dashboard | every 100 ms | `utt_id`, `locked` [words], `unlocked` [words], `confidence` per word, `source` per word (camera / EMG / Claude); optional for the dashboard: `cands` [{`w`, `cam`, `emg`, `claude`}] (top 3 for the newest word) and `threshold` |
 | `dec.lock` | Austin → Claude, dashboard | on lock | `utt_id`, `words` [{`w`, `conf`, `alts`, `cam`, `emg`, `t`}]; optional for the dashboard: per word `cam_top`, `emg_top` (each reader's own pick, for the end screen's disagreement bars) |
 | `dec.repeat` | Austin → dashboard | at sentence end | `utt_id`, `reason` (which reader disagreed, confidences); the dashboard reads `reason` as {`reader` (camera / EMG / Claude), `words` [{`index`, `w`, `alts`}]} |
-| `claude.predict` | Claude → Austin | on judge line, ~2 s | `words` [{`w`, `weight`}], `phrases`, `predictability` (0 to 1), `ttl_s` |
+| `claude.predict` | Claude → Austin | while the judge speaks, on their final line, ~2 s while Austin mouths | `words` [{`w`, `weight`}], `phrases`, `predictability` (0 to 1), `ttl_s` |
 | `claude.repair` | Claude → Austin, dashboard | on reply | `utt_id`, `edits` [{`index`, `from`, `to`}], `please_repeat` |
 | `voice.say` | Austin → Frank | words leaving the repair window | `utt_id`, `words` (only the new ones), `offset` (index of `words[0]` in the sentence, optional), `final`, `pace`, `effort` (both relative, 1.0 = Austin's normal; below) |
 | `partner.text` | Frank → Claude, dashboard | streaming | `text`, `is_final`, `t` |

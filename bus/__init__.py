@@ -1,6 +1,6 @@
 """Team bus: ZeroMQ PUB/SUB on the laptop's loopback, msgpack payloads, numpy arrays as raw bytes.
 
-Wire format (bus/schema.md): multipart [topic, payload], topic b'cam.tick', b'cam.final' or b'cam.face',
+Wire format (bus/schema.md): multipart [topic, payload], topic b'cam.tick', b'cam.final', b'cam.face' or b'cam.preview',
 payload a msgpack map with the fields of docs/TEAM_TASKS_AND_INTERFACES.md plus v (schema version), seq (per-topic
 counter) and t_pub (now() at send).
 Every numpy array is the map {'nd': 1, 'dtype': '<f4', 'shape': [T, 32], 'data': <bin, C order>}.
@@ -8,6 +8,7 @@ Every numpy array is the map {'nd': 1, 'dtype': '<f4', 'shape': [T, 32], 'data':
     pub = Publisher()                       # binds CAM_PUB (env RECLAIM_CAM_PUB overrides)
     pub.send(cam_tick)                      # CamTick / CamFinal / CamFace, from any thread; a no-op after close()
     pub.send(cam_face, block=False)         # the crop thread: drops the message (returns 0) instead of waiting
+    pub.send(cam_preview, block=False)      # the preview thread (lipread/preview.py), the same way
     sub = Subscriber()                      # connects; cam.tick + cam.final (add FACE for the dashboard's cam.face)
     topic, msg = sub.recv(timeout_ms=1000)  # msg: validated dict with numpy arrays; None on timeout
     finals, ticks = sub.drain()             # everything waiting: every cam.final, the newest cam.tick per segment
@@ -30,7 +31,7 @@ log = logging.getLogger(__name__)
 now = time.perf_counter
 DEFAULT_CAM_PUB = 'tcp://127.0.0.1:5556'
 CAM_PUB = os.environ.get('RECLAIM_CAM_PUB', DEFAULT_CAM_PUB)
-TICK, FINAL, FACE = 'cam.tick', 'cam.final', 'cam.face'
+TICK, FINAL, FACE, PREVIEW = 'cam.tick', 'cam.final', 'cam.face', 'cam.preview'
 VERSION = 2
 TICK_S = 0.1
 SNDHWM = 20
@@ -47,6 +48,7 @@ DTYPES = {'frame_t': '<f8', 'topk_ids': '<i4', 'topk_logp': '<f4', 'blank_logp':
           'pts': '<f2', 'blend': '<f2', 'pose': '<f4'}
 FACE_POINTS = (468, 478)
 FACE_RANGE = (-1.0, 2.0)
+PREVIEW_MAX_BYTES = 1 << 20     # a 640 px JPEG is ~30-60 KB
 
 
 @dataclass(frozen=True)
@@ -90,6 +92,24 @@ class CamFace:
     pts: np.ndarray = None
     blend: np.ndarray = None
     pose: np.ndarray = None
+
+
+@dataclass(frozen=True)
+class CamPreview:
+    """cam.preview: one processed frame as a JPEG and its face points (478 x 3: x / w, y / h, z), or None."""
+    t: float
+    w: int
+    h: int
+    jpeg: bytes
+    pts: np.ndarray = None
+
+
+def preview_msg(t, jpeg, w, h, last_face, last_z):
+    """A JPEG of a w x h frame and LiveCropper.last_face / last_z of that frame -> CamPreview."""
+    if last_face is None or last_z is None:
+        return CamPreview(float(t), int(w), int(h), bytes(jpeg))
+    xy = np.asarray(last_face[1], np.float32) / np.array([w, h], np.float32)
+    return CamPreview(float(t), int(w), int(h), bytes(jpeg), np.column_stack([xy, np.asarray(last_z, np.float32)]))
 
 
 def face_msg(t, last_face, last_pose, w, h):
@@ -156,6 +176,8 @@ def to_msg(obj):
     if isinstance(obj, CamFace):
         return FACE, {'t': float(obj.t), 'w': int(obj.w), 'h': int(obj.h), 'face_ok': bool(obj.face_ok),
                       'pts': obj.pts, 'blend': obj.blend, 'pose': obj.pose}
+    if isinstance(obj, CamPreview):
+        return PREVIEW, {'t': float(obj.t), 'w': int(obj.w), 'h': int(obj.h), 'jpeg': obj.jpeg, 'pts': obj.pts}
     raise TypeError(f'not a bus message: {type(obj).__name__}')
 
 
@@ -186,6 +208,8 @@ def from_msg(topic, msg):
         return CamFinal(msg['seg_id'], tuple((n['text'], n['score']) for n in msg['nbest']))
     if topic == FACE:
         return CamFace(msg['t'], msg['w'], msg['h'], msg['face_ok'], msg.get('pts'), msg.get('blend'), msg.get('pose'))
+    if topic == PREVIEW:
+        return CamPreview(msg['t'], msg['w'], msg['h'], msg['jpeg'], msg.get('pts'))
     raise ValueError(f'unknown topic {topic!r}')
 
 
@@ -255,6 +279,8 @@ def validate(topic, msg):
     _num(msg['t_pub'], f'{topic}.t_pub')
     if topic == FACE:
         return _validate_face(msg)
+    if topic == PREVIEW:
+        return _validate_preview(msg)
     _need(msg, ('seg_id',), topic)
     _int(msg, 'seg_id', topic, 1)
     if topic == TICK:
@@ -350,6 +376,24 @@ def _validate_face(msg):
     return msg
 
 
+def _validate_preview(msg):
+    where = PREVIEW
+    _need(msg, ('t', 'w', 'h', 'jpeg', 'pts'), where)
+    _num(msg['t'], f'{where}.t')
+    _int(msg, 'w', where, 1)
+    _int(msg, 'h', where, 1)
+    j = msg['jpeg']
+    if not isinstance(j, bytes) or not j.startswith(b'\xff\xd8') or len(j) > PREVIEW_MAX_BYTES:
+        raise ValueError(f'{where}.jpeg: a JPEG of at most {PREVIEW_MAX_BYTES} bytes expected')
+    if msg['pts'] is not None:
+        pts = _arr(msg, 'pts', 2, where)
+        if pts.shape[0] not in FACE_POINTS or pts.shape[1] != 3:
+            raise ValueError(f'{where}.pts: shape (468 or 478, 3) expected, got {pts.shape}')
+        if not np.all(np.isfinite(pts)) or pts.min() < FACE_RANGE[0] or pts.max() > FACE_RANGE[1]:
+            raise ValueError(f'{where}.pts: finite normalised coordinates in {FACE_RANGE} expected')
+    return msg
+
+
 class Publisher:
     """One PUB socket for the camera reader. send() is thread-safe (tick thread and final-pass thread), and close()
     takes the same lock: a send racing close() either goes out before it or is dropped (send returns 0), never
@@ -366,7 +410,7 @@ class Publisher:
             self.sock.close()
             raise
         self.addr = self.sock.getsockopt_string(zmq.LAST_ENDPOINT) if bind else addr
-        self.seq = {TICK: 0, FINAL: 0, FACE: 0}
+        self.seq = {TICK: 0, FINAL: 0, FACE: 0, PREVIEW: 0}
         self.dropped_busy = 0
         self.lock = threading.Lock()
         self.closed = False
@@ -374,8 +418,9 @@ class Publisher:
 
     def send(self, obj, block=True):
         """Returns the number of payload bytes sent; 0 after close() (the message is dropped and counted).
-        block=False (the crop thread's cam.face): if another thread is sending, drop this message and return 0."""
-        topic = TICK if isinstance(obj, CamTick) else FACE if isinstance(obj, CamFace) else FINAL
+        block=False (cam.face, cam.preview): if another thread is sending, drop this message and return 0."""
+        topic = TICK if isinstance(obj, CamTick) else FACE if isinstance(obj, CamFace) else \
+            PREVIEW if isinstance(obj, CamPreview) else FINAL
         frames = None
         if not self.lock.acquire(blocking=block):
             self.dropped_busy += 1
