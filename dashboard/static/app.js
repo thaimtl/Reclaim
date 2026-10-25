@@ -24,7 +24,7 @@ addEventListener('resize', fit); fit();
 
 // ---- connection ------------------------------------------------------------------------------------------
 function connect() {
-  const ws = new WebSocket(`ws://${location.host}/ws`);
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   ws.binaryType = 'blob';
   ws.onmessage = e => {
     if (typeof e.data === 'string') { snap = JSON.parse(e.data); render(snap); return; }
