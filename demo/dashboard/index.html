@@ -1,0 +1,652 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"></head><body><title>Reclaim Call Console</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@200..800&family=Geist:wght@200..600&family=Atkinson+Hyperlegible+Mono:wght@300..600&display=swap">
+<style>
+/* Layout: a film frame built for three distances. 5 m: idle hook. 1 m: the caller's own words, then Austin's subtitles.
+   Q&A: "Under the hood" slides the film left and opens the live pipeline. Grade warms cool → clay → gold as voice returns. */
+@property --grade { syntax: "<color>"; inherits: true; initial-value: rgba(143,184,255,0) }
+:root {
+  --bg: #0b090d;
+  --sheet: #131017;
+  --text: #f6f0e8;
+  --muted: rgba(246,240,232,.58);
+  --dim: rgba(246,240,232,.3);
+  --hair: rgba(246,240,232,.14);
+  --lips: #8fb8ff;
+  --claude: #e3876a;
+  --voice: #ffd27a;
+  --f-ui: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, sans-serif;
+  --f-num: "Atkinson Hyperlegible Mono", ui-monospace, Menlo, monospace;
+  --f-fig: "Geist", "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box }
+html, body { height: 100% }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--f-ui); font-size: clamp(12px, 1.5vh, 15px); line-height: 1.4; overflow: hidden }
+.lab { font-size: .72em; letter-spacing: .18em; text-transform: uppercase; color: var(--muted) }
+.mono { font-family: var(--f-num) }
+
+.shell { position: fixed; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr) 0fr; transition: grid-template-columns .8s cubic-bezier(.2,.8,.2,1) }
+.shell.hood { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) }
+
+/* film */
+.frame { position: relative; overflow: hidden; min-width: 0; transition: --grade 1.4s ease }
+.frame[data-phase="listen"] { --grade: rgba(200,205,220,.1) }
+.frame[data-phase="lips"] { --grade: rgba(143,184,255,.42) }
+.frame[data-phase="claude"] { --grade: rgba(227,135,106,.42) }
+.frame[data-phase="voice"] { --grade: rgba(255,210,122,.48) }
+#mesh, #footage { position: absolute; inset: 0; width: 100%; height: 100% }
+#footage { object-fit: cover; filter: grayscale(1) contrast(1.15) brightness(.62); display: none }
+.frame.video #footage { display: block }
+.frame.video #mesh { opacity: 0 }
+.grade { display: none }
+.vignette { position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(120% 90% at 50% 40%, transparent 35%, rgba(11,9,13,.55) 70%, rgba(11,9,13,.96) 100%),
+              linear-gradient(to bottom, rgba(11,9,13,.6), transparent 22%, transparent 50%, rgba(11,9,13,.94) 88%); }
+
+.hud { position: absolute; inset: 0; padding: max(3.2vh, env(safe-area-inset-top, 0px)) 3.2vw max(3.4vh, env(safe-area-inset-bottom, 0px)) max(3.2vw, env(safe-area-inset-left, 0px));
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; transition: opacity .8s; padding-bottom: max(6.4vh, 44px) }
+.shell:not(.hood) .hud { padding-right: max(3.2vw, env(safe-area-inset-right, 0px)) }
+.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 2vw }
+.mark { display: flex; align-items: center; gap: .55em; font-weight: 800; font-size: 1.3em }
+.mark svg { width: 1.2em; height: 1.2em }
+.rec { display: flex; align-items: center; gap: .6em; margin-top: .7em; font-family: var(--f-num); font-size: .9em; color: var(--muted) }
+.rec i { width: .55em; height: .55em; border-radius: 50%; background: #ff5d5d; animation: blink 1.6s steps(2) infinite }
+@keyframes blink { 50% { opacity: .2 } }
+.sound { text-align: right; display: grid; justify-items: end; gap: .45em }
+.sound .meter { display: flex; gap: 3px; align-items: flex-end; height: 2.4vh }
+.sound .meter i { width: 4px; height: 3px; background: var(--dim); border-radius: 1px }
+.sound b { font-family: var(--f-fig); font-variant-numeric: tabular-nums; font-weight: 250; font-size: 3.4em; line-height: .9 }
+
+/* caller: huge and verbatim while they speak (proof it is live), then steps back */
+.caller { align-self: start; margin-top: 4vh; display: grid; gap: .6em; max-width: min(22ch, 19vw); transition: max-width .8s, margin .8s; position: relative; z-index: 3 }
+.caller.hero { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); margin: 0; text-align: center; justify-items: center }
+.caller .q { font-weight: 300; line-height: 1.18; font-size: clamp(17px, 2.9vh, 30px); min-height: 2.4em; transition: font-size .8s cubic-bezier(.2,.8,.2,1), color .6s; text-wrap: balance }
+.caller.hero { max-width: none; width: min(72vw, 1100px); background: radial-gradient(closest-side, rgba(11,9,13,.92), rgba(11,9,13,.6) 70%, rgba(11,9,13,0)); padding: 6vh 4vw }
+.caller.hero .q { font-size: clamp(34px, min(5vw, 8.6vh), 92px); letter-spacing: -.02em }
+.caller .live { color: #8fd4a8 }
+.caller .ctx { border-radius: 2px; transition: color .4s, box-shadow .4s }
+.caller .ctx.lit { color: var(--claude); box-shadow: 0 .12em 0 var(--claude); font-weight: 600 }
+
+.caller { grid-row: 2 }
+.base { grid-row: 4 }
+.subs { grid-row: 3; transition: opacity .5s; position: relative; display: grid; gap: 1.2vh; padding-bottom: 2.6vh; min-height: 0 }
+.subs .lab { color: var(--lips); transition: color .6s }
+.frame[data-phase="voice"] .subs .lab { color: var(--voice) }
+.cap { font-size: clamp(32px, min(5.6vw, 10vh), 112px); line-height: 1.04; letter-spacing: -.025em; display: flex; flex-wrap: wrap; gap: .04em .26em; max-width: 17ch; min-height: 1.1em; text-shadow: 0 .04em .5em rgba(0,0,0,.6) }
+.shell.hood .cap { font-size: clamp(28px, min(3.6vw, 8vh), 80px) }
+.w { position: relative; color: var(--text); font-weight: 250; transition: opacity .5s, color .4s, font-weight .7s cubic-bezier(.2,.8,.2,1), text-shadow .4s }
+.cap.spot .w:not(.target) { opacity: .14 !important }
+.w.fix { color: var(--claude) }
+.w.said { color: var(--voice); text-shadow: 0 0 .5em rgba(255,210,122,.35), 0 .04em .5em rgba(0,0,0,.6) }
+.reel { position: absolute; left: -.4em; bottom: 100%; margin-bottom: .2em; padding: .35em .5em; border-radius: 6px; background: rgba(11,9,13,.88); z-index: 4; display: grid; gap: .12em; font-family: var(--f-num); font-weight: 400; font-size: max(13px, .2em); letter-spacing: 0; color: var(--muted); white-space: nowrap; text-shadow: none; transition: opacity .5s }
+.reel span { display: flex; justify-content: space-between; gap: 1.2em; transition: opacity .4s, color .4s }
+.reel span.pick { color: var(--claude) }
+.reel span.out { opacity: .25; text-decoration: line-through }
+.why { font-size: clamp(14px, 2vh, 19px); color: var(--claude); min-height: 1.4em; opacity: 0; transition: opacity .5s }
+.why.on { opacity: 1 }
+#arc { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 2 }
+
+.base { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3vw; align-items: end; border-top: 1px solid var(--hair); padding-top: 1.6vh }
+.ribbon { height: 5.4vh; min-height: 34px; position: relative }
+.ribbon canvas { position: absolute; inset: 0; width: 100%; height: 100% }
+.stats { display: flex; gap: 3vw }
+.shell.hood .stats { display: none }
+.stat { display: grid; gap: .35em; min-width: 8.5em }
+.stat b { font-family: var(--f-fig); font-variant-numeric: tabular-nums; font-weight: 300; font-size: clamp(22px, 3.8vh, 38px); line-height: 1; font-variant-numeric: tabular-nums }
+.stat b small { font-size: .4em; color: var(--muted); margin-left: .3em }
+.stat .vs { font-size: .78em; color: var(--muted) }
+.stat .vs em { font-style: normal; color: var(--text) }
+.seg { display: flex; gap: 2px; height: 3px }
+.seg i { height: 100%; width: 0; transition: width .5s cubic-bezier(.2,.8,.2,1) }
+.origin { position: absolute; right: 3.2vw; top: 60%; max-width: 22ch; text-align: right; font-size: clamp(13px, 1.9vh, 18px); color: var(--muted); opacity: 0; transition: opacity .8s; pointer-events: none }
+.origin b { display: block; color: var(--voice); font-weight: 600 }
+.origin.on { opacity: 1 }
+.shell.hood .origin { display: none }
+
+/* idle hook */
+.attract { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 3.2vh; padding: 0 16px; transition: opacity 1s; z-index: 5 }
+.attract.off { opacity: 0; pointer-events: none }
+.attract h1 { margin: 0; font-weight: 250; font-size: clamp(40px, min(7vw, 11vh), 132px); line-height: 1.02; letter-spacing: -.03em; text-wrap: balance; text-shadow: 0 .05em .6em rgba(0,0,0,.7) }
+.attract h1 b { font-weight: 700; color: var(--voice) }
+.attract .tel { font-family: var(--f-fig); font-variant-numeric: tabular-nums; font-weight: 300; font-size: clamp(26px, 6vh, 64px); letter-spacing: .04em }
+.attract p { margin: 0; color: var(--muted); font-size: clamp(14px, 2.1vh, 20px) }
+.today { position: absolute; left: 50%; bottom: 5vh; transform: translateX(-50%); display: flex; gap: 4vw; white-space: nowrap }
+.today div { display: grid; justify-items: center }
+.today b { font-family: var(--f-fig); font-variant-numeric: tabular-nums; font-weight: 300; font-size: clamp(24px, 4.4vh, 44px) }
+.today .z b { color: var(--lips) }
+.frame.attracting .hud, .frame.ending .hud { opacity: 0 }
+
+/* end-of-call card */
+.end { position: absolute; inset: 0; z-index: 6; display: grid; align-content: center; justify-items: start; gap: 3.6vh; padding: 0 8vw; background: rgba(11,9,13,.88); backdrop-filter: blur(6px); transition: opacity .9s }
+.end.off { opacity: 0; pointer-events: none }
+.end h2 { margin: 0; font-weight: 250; font-size: clamp(30px, min(4.6vw, 8vh), 84px); letter-spacing: -.025em; line-height: 1.05; max-width: 18ch; text-wrap: balance }
+.end h2 b { font-weight: 700; color: var(--voice) }
+.totals { display: grid; grid-template-columns: repeat(4, auto); gap: 1vh 5vw }
+.totals div { display: grid; gap: .3em }
+.totals b { font-family: var(--f-fig); font-variant-numeric: tabular-nums; font-weight: 300; font-size: clamp(26px, 5vh, 52px); line-height: 1 }
+.totals .z b { color: var(--lips) }
+.totals .c b { color: var(--claude) }
+.script { display: grid; gap: .8vh; font-size: clamp(14px, 2vh, 20px); max-width: 70ch }
+.script p { margin: 0; color: var(--muted) }
+.script p b { color: var(--voice); font-weight: 400 }
+.script p em { font-style: normal; color: var(--claude) }
+
+/* under the hood */
+.sheet { min-width: 0; overflow: hidden; background: var(--sheet); border-left: 1px solid var(--hair) }
+.sheet .in { height: 100%; overflow: auto; padding: max(3.2vh, env(safe-area-inset-top, 0px)) max(2.6vw, env(safe-area-inset-right, 0px)) 3vh 2.6vw; display: grid; gap: 2.6vh; align-content: start; min-width: 460px }
+.sheet h3 { margin: 0; font-size: 1.25em; font-weight: 700; display: flex; justify-content: space-between; align-items: baseline; gap: 1em }
+.sheet h3 span { font-weight: 400; font-size: .7em; color: var(--muted) }
+.pipe { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; position: relative }
+.node { display: grid; gap: .3em; padding: 1.2vh .8vw; border-top: 2px solid var(--hair); transition: border-color .3s }
+.node.on { border-color: var(--c) }
+.node b { font-size: .95em; font-weight: 600 }
+.node span { font-size: .75em; color: var(--muted) }
+.node .ms { font-family: var(--f-num); font-size: 1.35em; color: var(--text) }
+.block { display: grid; gap: 1vh }
+.block .lab { color: var(--dim) }
+.nb { display: grid; gap: .5vh; font-family: var(--f-num); font-size: .92em }
+.nb div { display: grid; grid-template-columns: 1fr auto; gap: 1em; padding: .45em .7em; border-radius: 6px; background: rgba(246,240,232,.03) }
+.nb div:first-child { background: rgba(143,184,255,.09) }
+.nb em { font-style: normal; color: var(--muted) }
+.io { display: grid; grid-template-columns: 1fr 1fr; gap: 1vw }
+pre { margin: 0; font-family: var(--f-num); font-size: .8em; line-height: 1.5; color: var(--muted); background: rgba(246,240,232,.03); border-radius: 8px; padding: .9em 1em; white-space: pre-wrap; word-break: break-word }
+pre:empty::before { content: "Waiting for this step"; color: var(--dim) }
+pre .k { color: var(--text) }
+pre .c { color: var(--claude) }
+pre .v { color: var(--voice) }
+pre .l { color: var(--lips) }
+.emg { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1vh 1vw }
+.emg div { display: grid }
+.emg label { font-size: .72em; color: var(--muted) }
+.emg canvas { width: 100%; height: 3vh; min-height: 22px }
+
+.ctrl { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(1.2vh, env(safe-area-inset-bottom, 0px)); z-index: 10; display: flex; gap: .6em; align-items: center }
+.ctrl button, .ctrl label { font: inherit; font-size: .78em; color: var(--muted); background: rgba(11,9,13,.6); border: 1px solid var(--hair); border-radius: 999px; padding: .45em 1em; cursor: pointer }
+.ctrl button:hover, .ctrl label:hover { color: var(--text) }
+.ctrl button:focus-visible, .ctrl input:focus-visible + label { outline: 2px solid var(--lips); outline-offset: 2px }
+.ctrl kbd { font-family: var(--f-num); border: 1px solid var(--hair); border-radius: 4px; padding: 0 .35em; margin-left: .4em }
+.ctrl input { position: absolute; opacity: 0; width: 1px; height: 1px }
+.campv { position: fixed; left: max(3.2vw, env(safe-area-inset-left, 0px)); top: 36vh; width: min(13vw, 200px); aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; border: 1px solid var(--hair); transform: scaleX(-1); z-index: 10; background: #000; box-shadow: 0 0 0 1px rgba(143,212,168,.35) }
+.ctrl .on { color: #8fd4a8; border-color: rgba(143,212,168,.5) }
+.fine { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); bottom: max(1.2vh, env(safe-area-inset-bottom, 0px)); z-index: 10; font-size: .68em; color: var(--dim) }
+
+@media (max-width: 860px) {
+  body { overflow: auto } .shell { position: relative; min-height: 100%; grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: 100vh auto }
+  .shell:not(.hood) .sheet { display: none }
+  .sheet .in { min-width: 0 } .pipe { grid-template-columns: repeat(2, minmax(0, 1fr)) } .io { grid-template-columns: minmax(0, 1fr) }
+  .base { grid-template-columns: minmax(0, 1fr) } .stats { gap: 18px; flex-wrap: wrap } .origin { display: none }
+  .totals { grid-template-columns: repeat(2, auto) } .today { gap: 24px }
+  .ctrl { position: absolute } .fine { display: none }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important } }
+</style>
+
+<div class="shell" id="shell">
+  <div class="frame attracting" id="frame" data-phase="voice">
+    <canvas id="mesh"></canvas>
+    <video id="footage" muted loop playsinline></video>
+    <div class="grade"></div>
+    <div class="vignette"></div>
+
+    <div class="hud">
+      <div class="top">
+        <div>
+          <div class="mark"><svg viewBox="0 0 26 26" aria-hidden="true"><path d="M3 13c3-5 6-5 10 0s7 5 10 0" fill="none" stroke="#8fb8ff" stroke-width="2.4" stroke-linecap="round"/><path d="M3 13c3 5 6 5 10 0" fill="none" stroke="#ffd27a" stroke-width="2.4" stroke-linecap="round"/></svg>Reclaim</div>
+          <div class="rec"><i></i><span>LIVE CALL</span><span id="clock">00:00</span></div>
+        </div>
+        <div class="sound"><span class="lab">Sound from Austin</span><div class="meter" id="meter"></div><b>0</b></div>
+      </div>
+
+      <div class="caller" id="caller"><span class="lab" id="callerLab">You, on the phone</span><div class="q" id="q"></div></div>
+
+      <div class="subs" id="subs">
+        <span class="lab" id="subLab">Austin, read from his lips</span>
+        <div class="cap" id="cap"></div>
+        <div class="why" id="why"></div>
+        <svg id="arc"><path id="arcPath" fill="none" stroke="#e3876a" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+
+      <div class="base">
+        <div class="ribbon"><canvas id="ribbon"></canvas></div>
+        <div class="stats">
+          <div class="stat"><span class="lab">Latency</span><b id="lat">–<small>ms</small></b><div class="seg" id="seg"><i style="background:var(--lips)"></i><i style="background:var(--claude)"></i><i style="background:var(--voice)"></i><i style="background:var(--muted)"></i></div></div>
+          <div class="stat"><span class="lab">Reply gap</span><b id="gap">–<small>s</small></b><span class="vs">typing device <em>~30 s</em></span></div>
+          <div class="stat"><span class="lab">Words / min</span><b id="wpm">–</b><span class="vs">eye-gaze <em>~12</em></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="origin" id="origin"><b>This is his own voice.</b>Rebuilt by Cartesia from 14 seconds of a 2019 birthday video.</div>
+
+    <div class="attract" id="attract">
+      <h1>Austin can't speak.<br><b>Call him anyway.</b></h1>
+      <div class="tel">(415) 555‑0142</div>
+      <p>Ask him anything. He answers with his lips, in his own voice.</p>
+    </div>
+    <div class="today" id="today"><div><b id="todayWords">412</b><span class="lab">words spoken today</span></div><div class="z"><b>0</b><span class="lab">sounds made</span></div><div><b id="todayCalls">17</b><span class="lab">calls taken</span></div></div>
+
+    <div class="end off" id="end">
+      <span class="lab">Call ended · <span id="endTime">01:12</span></span>
+      <h2>You just talked with Austin for a minute. <b>He never made a sound.</b></h2>
+      <div class="totals">
+        <div><b id="eWords">0</b><span class="lab">words spoken</span></div>
+        <div class="z"><b>0</b><span class="lab">sounds made</span></div>
+        <div class="c"><b id="eFix">0</b><span class="lab">words chosen by Claude</span></div>
+        <div><b id="eGap">–</b><span class="lab">avg reply, seconds</span></div>
+      </div>
+      <div class="script" id="eScript"></div>
+    </div>
+  </div>
+
+  <aside class="sheet" id="sheet" aria-label="Under the hood">
+    <div class="in">
+      <h3>Under the hood <span>same call, live</span></h3>
+      <div class="pipe" id="pipe">
+        <div class="node" style="--c:var(--text)"><b>Phone</b><span>Twilio · Cartesia Ink</span><span class="ms">–</span></div>
+        <div class="node" style="--c:var(--lips)"><b>Lips</b><span>Auto-AVSR · webcam 30 fps</span><span class="ms">–</span></div>
+        <div class="node" style="--c:var(--claude)"><b>Claude</b><span>question + guesses</span><span class="ms">–</span></div>
+        <div class="node" style="--c:var(--voice)"><b>Voice</b><span>Cartesia Sonic · clone</span><span class="ms">–</span></div>
+        <div class="node" style="--c:var(--muted)"><b>Line</b><span>back to the caller</span><span class="ms">–</span></div>
+      </div>
+      <div class="block"><span class="lab">Lip reader, top guesses</span><div class="nb" id="nbest"></div></div>
+      <div class="io">
+        <div class="block"><span class="lab">Claude gets</span><pre id="cin"></pre></div>
+        <div class="block"><span class="lab">Claude returns</span><pre id="cout"></pre></div>
+      </div>
+      <div class="block"><span class="lab">Cartesia request</span><pre id="tts"></pre></div>
+      <div class="block"><span class="lab">Face muscles · 4 EMG channels · 1 kHz</span><div class="emg" id="emg"></div></div>
+    </div>
+  </aside>
+</div>
+
+<video id="camPrev" class="campv" muted playsinline hidden></video>
+<div class="ctrl"><button id="camBtn" type="button">Use webcam</button><input type="file" id="file" accept="video/*"><label for="file">Use real footage</label><button id="hoodBtn" type="button">Under the hood<kbd>H</kbd></button></div>
+<div class="fine">Mockup · sample call and timings · comparison figures to verify</div>
+
+<script src="face_data.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const sleep = ms => new Promise(r => setTimeout(r, reduce ? Math.min(ms, 80) : ms));
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const C = { lips: css('--lips'), voice: css('--voice'), claude: css('--claude'), dim: css('--dim') };
+  const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const fit = cv => { const r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1), W = Math.max(1, Math.round(r.width * d)), H = Math.max(1, Math.round(r.height * d)); if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; } const x = cv.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, r.width, r.height); return { x, w: r.width, h: r.height }; };
+
+  const SCRIPT = [
+    { q: 'Hey Austin, did you pick up your {meds} today?', raw: ['I', 'got', 'the', 'bills', 'this', 'morning.'], conf: [.95, .9, .86, .34, .82, .88],
+      at: 3, alts: [['pills', .31], ['bills', .34], ['mills', .12]], pick: 'pills', why: 'You said “meds”, so Claude chose “pills”.',
+      nbest: [['i got the bills this morning', -4.1], ['i got the pills this morning', -4.3], ['i got the mills this morning', -6.0]], emo: 'content', tts: 'I got the pills this morning.',
+      ink: 410, lat: [312, 381, 118, 152], gap: 1.6, wpm: 58 },
+    { q: 'Nice. What did you {eat} for lunch?', raw: ['A', 'bureau,', 'it', 'was', 'amazing.'], conf: [.9, .29, .88, .91, .84],
+      at: 1, alts: [['burrito', .27], ['bureau', .29], ['pirate', .08]], pick: 'burrito,', why: 'You asked what he ate, so Claude chose “burrito”. He laughs.',
+      nbest: [['a bureau it was amazing', -5.2], ['a burrito it was amazing', -5.4], ['a pirate it was amazing', -7.9]], emo: 'happy', tts: 'A burrito, it was amazing!',   // Claude swaps look-alikes only: never adds words or sounds
+      ink: 380, lat: [296, 402, 109, 148], gap: 1.5, wpm: 64 },
+    { q: 'Anything you want to tell your {mom}?', raw: ['Tell', 'her', 'I', 'glove', 'her.'], conf: [.87, .9, .93, .33, .89],
+      at: 3, alts: [['love', .32], ['glove', .33], ['of', .1]], pick: 'love', why: 'A message for his mom, so Claude chose “love”.',
+      nbest: [['tell her i glove her', -3.9], ['tell her i love her', -4.0], ['tell her i of her', -6.6]], emo: 'content', tts: 'Tell her I love her.',
+      ink: 395, lat: [288, 356, 121, 150], gap: 1.4, wpm: 61 }
+  ];
+
+  const shell = $('shell'), frame = $('frame'), cap = $('cap'), q = $('q'), caller = $('caller');
+  let mouth = 0, speaking = false, voicing = false, voiceAmp = 0, callStart = 0, firstVoice = true;
+  const N = 360, amp = new Float32Array(N), kind = new Uint8Array(N);
+  $('meter').innerHTML = '<i></i>'.repeat(14);
+  const EMG = ['A0 under chin', 'A1 left chin', 'A2 right cheek', 'A3 left cheek'];
+  $('emg').innerHTML = EMG.map(n => `<div><label>${n}</label><canvas></canvas></div>`).join('');
+  const emgH = EMG.map(() => new Array(140).fill(0));
+
+  const toggleHood = () => { shell.classList.toggle('hood'); $('hoodBtn').setAttribute('aria-pressed', shell.classList.contains('hood')); };
+  $('hoodBtn').addEventListener('click', toggleHood);
+  addEventListener('keydown', e => { if ((e.key === 'h' || e.key === 'H') && !e.metaKey && !e.ctrlKey) toggleHood(); });
+
+  const NV = MV.length / 3, base = new Float32Array(MV), cur = new Float32Array(MV.length);
+  const vx = i => base[i * 3], vy = i => base[i * 3 + 1];
+  const LOOPS = {
+    oval: [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109,10],
+    lipsOut: [61,146,91,181,84,17,314,405,321,375,291,409,270,269,267,0,37,39,40,185,61],
+    lipsIn: [78,95,88,178,87,14,317,402,318,324,308,415,310,311,312,13,82,81,80,191,78],
+    eyeL: [263,249,390,373,374,380,381,382,362,398,384,385,386,387,388,466,263],
+    eyeR: [33,7,163,144,145,153,154,155,133,173,157,158,159,160,161,246,33],
+    browL: [276,283,282,295,285,336,296,334,293,300,276],
+    browR: [46,53,52,65,55,107,66,105,63,70,46],
+    nose: [168,6,197,195,5,4],
+    nostrils: [129,98,97,2,326,327,358]
+  };
+  // pad sites from HARDWARE.md, snapped to the nearest landmark; off = extra offset in cm (A0 sits under the chin)
+  const near = (x, y) => { let b = 0, d = 1e9; for (let i = 0; i < NV; i++) { if (base[i * 3 + 2] < -1) continue; const e = (vx(i) - x) ** 2 + (vy(i) - y) ** 2; if (e < d) { d = e; b = i; } } return b; };
+  const PADS = [
+    { ch: 'A0', name: 'Under chin', reads: 'tongue', at: [[-.9, -9.2], [.9, -9.2]], off: [0, -.9, -1.2], side: -1, ly: -9.4, w: 1.0 },
+    { ch: 'A1', name: 'Left chin corner', reads: 'lower lip, jaw', at: [[2.9, -7.3], [3.6, -6.5]], off: [0, 0, 0], side: 1, ly: -6.4, w: .8 },
+    { ch: 'A2', name: 'Right cheek, below mouth', reads: 'lower lip', at: [[-2.7, -5.7], [-1.8, -6.0]], off: [0, 0, 0], side: -1, ly: -5.2, w: .85 },
+    { ch: 'A3', name: 'Left cheek, above mouth', reads: 'upper lip, smile', at: [[2.5, -2.7], [3.5, -2.5]], off: [0, 0, 0], side: 1, ly: -2.2, w: .9 }
+  ].map(p => ({ ...p, idx: p.at.map(([x, y]) => near(x, y)) }));
+
+  const rms = new Float32Array(4), uv = new Float32Array(4);
+  const pose = { yaw: 0, pitch: 0, roll: 0 };
+  const ex = { smile: 0, brow: 0, blink: 0, pucker: 0 };
+  function emgLevels(t, dt) {
+    for (let i = 0; i < PADS.length; i++) {
+      const burst = speaking ? PADS[i].w * (.35 + .65 * Math.abs(Math.sin(t / (85 + i * 23) + i * 1.7) * Math.sin(t / (310 + i * 41)))) : .05 + .02 * Math.random();
+      rms[i] += (burst - rms[i]) * Math.min(1, dt / 90);
+      uv[i] = Math.round(4 + rms[i] * 86);
+    }
+    trackStep(dt);
+    const B = live.b;
+    ex.jaw = B[0]; ex.smile = (B[1] + B[2]) / 2; ex.brow = Math.max(B[3], (B[4] + B[5]) / 2); ex.pucker = B[6]; ex.blink = (B[7] + B[8]) / 2;
+    pose.yaw = live.pose[0]; pose.pitch = live.pose[1]; pose.roll = live.pose[2];
+  }
+  // Recorded MediaPipe Face Landmarker output (landmarks, 52-blendshape subset, head pose) played back at 15 fps.
+  // Segments: quiet (listening), talk (mouthing), smile (his voice playing). Live build: same fields, straight from the webcam.
+  const dec = (b64, n) => { const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Int16Array(u.buffer); };
+  const TP = dec(TRACK.p), TB = dec(TRACK.b), TPO = dec(TRACK.pose);
+  const seg = { quiet: { t: 0, dir: 1 }, talk: { t: 0, dir: 1 }, smile: { t: 0, dir: 1 } };
+  const live = { b: new Float32Array(9), pose: [0, 0, 0] };
+  const raw = new Float32Array(MV.length); let smoothInit = false;
+  function smoothInto() { const a = smoothInit ? .45 : 1; for (let i = 0; i < raw.length; i++) cur[i] += (raw[i] - cur[i]) * a; smoothInit = true; }
+  function trackStep(dt) {
+    const L = window.reclaimLive;
+    if (L && L.fresh) { raw.set(L.p); live.b.set(L.b); live.pose = L.pose.slice(); smoothInto(); return; }
+    const ph = frame.dataset.phase, name = speaking ? 'talk' : ph === 'voice' ? 'smile' : 'quiet';
+    const [a, b] = TRACK.segs[name], st = seg[name], len = b - a - 1;
+    st.t += st.dir * dt / 1000 * TRACK.fps;
+    if (st.t >= len) { st.t = len; st.dir = -1; } else if (st.t <= 0) { st.t = 0; st.dir = 1; }
+    const f0 = a + Math.floor(st.t), f1 = Math.min(b - 1, f0 + 1), k = st.t - Math.floor(st.t);
+    const o0 = f0 * NV * 3, o1 = f1 * NV * 3;
+    for (let i = 0; i < NV * 3; i++) raw[i] = (TP[o0 + i] * (1 - k) + TP[o1 + i] * k) / 100;
+    smoothInto();
+    for (let i = 0; i < 9; i++) live.b[i] = (TB[f0 * 9 + i] * (1 - k) + TB[f1 * 9 + i] * k) / 1000;
+    for (let i = 0; i < 3; i++) live.pose[i] = (TPO[f0 * 3 + i] * (1 - k) + TPO[f1 * 3 + i] * k) / 1000;
+  }
+  const deg = r => (r * 180 / Math.PI).toFixed(0);
+  const PH = { listen: [246, 240, 232], lips: [143, 184, 255], claude: [227, 135, 106], voice: [255, 210, 122] };
+  const PX = new Float32Array(NV * 3);
+
+  function drawMesh(t) {
+    const { x, w, h } = fit($('mesh'));
+    const idle = frame.classList.contains('attracting'), ph = frame.dataset.phase, spot = ph === 'claude';
+    const u = Math.min(h * .47 / 17.7, w * .36 / 17.7), cx = w * .5, cy = h * .33;
+    const cyw = 1, syw = 0, cp = 1, sp = 0, cr = 1, sr = 0;
+    const proj = (X, Y, Z) => {
+      Y += .3;
+      let x1 = X * cyw + Z * syw, z1 = Z * cyw - X * syw;
+      let y1 = Y * cp + z1 * sp; z1 = -Y * sp + z1 * cp;
+      const x2 = x1 * cr - y1 * sr, y2 = x1 * sr + y1 * cr;
+      const f = 1 + z1 * .012;
+      return [cx + x2 * u * f, cy - y2 * u * f, z1];
+    };
+    for (let i = 0; i < NV; i++) { const q = proj(cur[i * 3], cur[i * 3 + 1], cur[i * 3 + 2]); PX[i * 3] = q[0]; PX[i * 3 + 1] = q[1]; PX[i * 3 + 2] = q[2]; }
+    const [r, g, b] = PH[ph] || PH.listen, tone = a => `rgba(${r},${g},${b},${a.toFixed(3)})`;
+    const dimAll = idle ? .4 : 1;
+
+    const halo = x.createRadialGradient(cx, cy, 0, cx, cy, u * 16);
+    halo.addColorStop(0, tone(.13 * dimAll)); halo.addColorStop(1, tone(0)); x.fillStyle = halo; x.fillRect(0, 0, w, h);
+
+    // tessellation, faded by depth so the far side recedes
+    x.lineWidth = .6;
+    for (const [lo, hi, a] of [[-99, 0, .025], [0, 3, .05], [3, 99, .075]]) {
+      x.beginPath();
+      for (let e = 0; e < ME.length; e += 2) {
+        const i = ME[e], j = ME[e + 1], zz = (PX[i * 3 + 2] + PX[j * 3 + 2]) / 2;
+        if (zz < lo || zz >= hi) continue;
+        x.moveTo(PX[i * 3], PX[i * 3 + 1]); x.lineTo(PX[j * 3], PX[j * 3 + 1]);
+      }
+      x.strokeStyle = `rgba(246,240,232,${(a * dimAll).toFixed(3)})`; x.stroke();
+    }
+    x.fillStyle = `rgba(246,240,232,${(.4 * dimAll).toFixed(3)})`;
+    for (let i = 0; i < NV; i++) { const zz = PX[i * 3 + 2]; if (zz < 0) continue; const rr = .5 + Math.min(1.2, zz * .18); x.fillRect(PX[i * 3] - rr / 2, PX[i * 3 + 1] - rr / 2, rr, rr); }
+    const loop = (ids, color, lw) => { x.beginPath(); ids.forEach((i, k) => k ? x.lineTo(PX[i * 3], PX[i * 3 + 1]) : x.moveTo(PX[i * 3], PX[i * 3 + 1])); x.strokeStyle = color; x.lineWidth = lw; x.stroke(); };
+    const feat = `rgba(246,240,232,${(.6 * dimAll).toFixed(3)})`;
+    loop(LOOPS.oval, `rgba(246,240,232,${(.22 * dimAll).toFixed(3)})`, 1);
+    loop(LOOPS.eyeL, feat, 1.1); loop(LOOPS.eyeR, feat, 1.1); loop(LOOPS.browL, feat, 1.1); loop(LOOPS.browR, feat, 1.1); loop(LOOPS.nose, `rgba(246,240,232,${(.28 * dimAll).toFixed(3)})`, 1); loop(LOOPS.nostrils, `rgba(246,240,232,${(.4 * dimAll).toFixed(3)})`, 1);
+    const lipC = idle ? feat : tone(.95);
+    loop(LOOPS.lipsOut, lipC, 1.7); loop(LOOPS.lipsIn, idle ? feat : tone(.6), 1.1);
+
+    // REF pads behind each ear
+    for (const sd of [-1, 1]) for (let k = 0; k < 3; k++) { const [X, Y, Z] = proj(sd * 8.2, .2 + k * .9, -3.4); x.strokeStyle = `rgba(246,240,232,${(.25 * dimAll * (Z > -6 ? 1 : .35)).toFixed(3)})`; x.lineWidth = 1; x.beginPath(); x.arc(X, Y, 3.5, 0, 7); x.stroke(); }
+    if (idle) return;
+
+    const lab = ph === 'listen' ? 0 : spot ? .16 : 1;
+    const big = Math.max(11, u * .52), small = Math.max(10, u * .44);
+    for (let i = 0; i < PADS.length; i++) {
+      const pad = PADS[i], v = rms[i];
+      const pts = pad.idx.map(j => proj(cur[j * 3] + pad.off[0], cur[j * 3 + 1] + pad.off[1], cur[j * 3 + 2] + pad.off[2] + .25));
+      x.globalCompositeOperation = 'lighter';
+      for (const [X, Y] of pts) {
+        const R = 5 + v * u * 3.4, gr = x.createRadialGradient(X, Y, 0, X, Y, R);
+        gr.addColorStop(0, `rgba(143,184,255,${(.2 + .8 * v).toFixed(2)})`); gr.addColorStop(.35, `rgba(143,184,255,${(.08 + .3 * v).toFixed(2)})`); gr.addColorStop(1, 'rgba(143,184,255,0)');
+        x.fillStyle = gr; x.beginPath(); x.arc(X, Y, R, 0, 7); x.fill();
+      }
+      x.globalCompositeOperation = 'source-over';
+      for (const [X, Y] of pts) { x.fillStyle = v > .35 ? '#ffffff' : '#b9d1ff'; x.beginPath(); x.arc(X, Y, 2.6, 0, 7); x.fill(); }
+      if (!lab) continue;
+      const mx = (pts[0][0] + pts[1][0]) / 2, my = (pts[0][1] + pts[1][1]) / 2;
+      const lx = cx + pad.side * u * 10.5, ly = cy - (pad.ly + .6) * u;
+      x.globalAlpha = lab;
+      x.strokeStyle = `rgba(143,184,255,${(.22 + .5 * v).toFixed(2)})`; x.lineWidth = 1;
+      x.beginPath(); x.moveTo(mx, my); x.lineTo(lx - pad.side * 10, ly); x.lineTo(lx, ly); x.stroke();
+      x.textAlign = pad.side > 0 ? 'left' : 'right';
+      const tx = lx + pad.side * 6, bw = Math.max(110, u * 6.2), bx = pad.side > 0 ? tx : tx - bw, by = ly + 5;
+      x.font = `600 ${big}px ${css('--f-ui')}`; x.fillStyle = 'rgba(246,240,232,.92)'; x.fillText(pad.name, tx, ly - 4);
+      x.fillStyle = 'rgba(246,240,232,.1)'; x.fillRect(bx, by, bw, 2);
+      const fw = bw * Math.min(1, v); x.fillStyle = v > .35 ? '#ffffff' : C.lips; x.fillRect(pad.side > 0 ? bx : bx + bw - fw, by, fw, 2);
+      x.font = `400 ${small}px ${css('--f-ui')}`; x.fillStyle = 'rgba(246,240,232,.5)'; x.fillText(`${pad.ch} · ${pad.reads}`, tx, by + small + 6);
+      x.textAlign = pad.side > 0 ? 'right' : 'left'; x.fillStyle = 'rgba(246,240,232,.8)'; x.font = `400 ${small}px ${css('--f-fig')}`;
+      x.fillText(`${uv[i]} µV`, pad.side > 0 ? bx + bw : bx, by + small + 6);
+      if (i === 0 && v > .55) { x.textAlign = pad.side > 0 ? 'left' : 'right'; x.fillStyle = C.voice; x.font = `400 ${small}px ${css('--f-ui')}`; x.fillText('Tongue moving. The camera can\'t see this.', tx, by + small * 2 + 12); }
+      x.globalAlpha = 1;
+    }
+    x.textAlign = 'left';
+
+    // head pose + expression panel, right column
+    if (ph === 'listen') return;
+    x.globalAlpha = spot ? .3 : 1;
+    const hx = Math.max(cx + u * 10.5 + 190, w - 230), wide = hx + 200 < w;
+    let ey = h * .16;
+    if (!wide) return void (x.globalAlpha = 1);
+    x.font = `600 ${big}px ${css('--f-ui')}`; x.fillStyle = 'rgba(246,240,232,.92)'; x.fillText('Head pose', hx, ey);
+    x.font = `400 ${small}px ${css('--f-fig')}`; x.fillStyle = 'rgba(246,240,232,.6)';
+    ey += small + 8; x.fillText(`yaw ${deg(pose.yaw)}°   pitch ${deg(pose.pitch)}°   roll ${deg(pose.roll)}°`, hx, ey);
+    ey += 34; x.font = `600 ${big}px ${css('--f-ui')}`; x.fillStyle = 'rgba(246,240,232,.92)'; x.fillText('Expression', hx, ey);
+    const rows = [['Jaw open', ex.jaw], ['Smile', ex.smile], ['Brows up', ex.brow], ['Pucker', ex.pucker], ['Blink', ex.blink]];
+    for (const [n, v] of rows) {
+      ey += small + 10;
+      x.font = `400 ${small}px ${css('--f-ui')}`; x.fillStyle = 'rgba(246,240,232,.55)'; x.fillText(n, hx, ey);
+      x.fillStyle = 'rgba(246,240,232,.1)'; x.fillRect(hx + 78, ey - small * .35, 80, 2);
+      x.fillStyle = tone(.95); x.fillRect(hx + 78, ey - small * .35, 80 * Math.min(1, v), 2);
+      x.textAlign = 'right'; x.fillStyle = 'rgba(246,240,232,.8)'; x.font = `400 ${small}px ${css('--f-fig')}`; x.fillText(v.toFixed(2), hx + 196, ey); x.textAlign = 'left';
+    }
+    const toneName = ex.smile > .7 ? 'happy' : ex.smile > .45 ? 'warm' : ex.brow > .45 ? 'curious' : 'calm';
+    ey += small + 18; x.font = `400 ${small}px ${css('--f-ui')}`; x.fillStyle = 'rgba(246,240,232,.55)'; x.fillText('Voice tone', hx, ey);
+    x.fillStyle = C.voice; x.font = `600 ${big}px ${css('--f-ui')}`; x.fillText(toneName, hx + 78, ey);
+    ey += 22; x.font = `400 ${small}px ${css('--f-ui')}`; x.fillStyle = 'rgba(246,240,232,.4)'; x.fillText('MediaPipe · 478 landmarks', hx, ey); ey += small + 6; x.fillText('52 blendshapes · head pose', hx, ey);
+    x.globalAlpha = 1;
+  }
+
+  const phase = p => frame.dataset.phase = p;
+  const node = (i, on, ms) => { const n = $('pipe').children[i]; n.classList.toggle('on', on); if (ms != null) n.querySelector('.ms').textContent = ms + ' ms'; };
+
+  async function type(text) {
+    q.textContent = '';
+    for (const part of text.split(/(\{[^}]+\})/)) {
+      let el = q;
+      if (part.startsWith('{')) { el = document.createElement('span'); el.className = 'ctx'; q.append(el); }
+      for (const ch of part.replace(/[{}]/g, '')) { el.append(ch); await sleep(34); }
+    }
+  }
+  function drawArc(from, to) {
+    const box = $('subs').getBoundingClientRect(), a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+    const r = to.querySelector('.reel'), top = r ? r.getBoundingClientRect().top : b.top;
+    const x1 = a.left + a.width / 2 - box.left, y1 = a.bottom - box.top + 8, x2 = b.left + Math.min(b.width / 2, 40) - box.left, y2 = top - box.top - 6;
+    const p = $('arcPath'); p.setAttribute('d', `M${x1},${y1} C${x1},${y1 + (y2 - y1) * .7} ${x2},${y1 + (y2 - y1) * .3} ${x2},${y2}`);
+    const L = p.getTotalLength(); p.style.opacity = 1;
+    p.animate([{ strokeDasharray: `0 ${L}` }, { strokeDasharray: `${L} 0` }], { duration: reduce ? 1 : 700, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
+  }
+
+  const log = [];
+  async function play(t) {
+    cap.innerHTML = ''; cap.classList.remove('spot'); $('why').classList.remove('on'); $('arcPath').style.opacity = 0;
+    [0, 1, 2, 3, 4].forEach(i => node(i, false));
+    $('nbest').innerHTML = ''; $('cin').innerHTML = ''; $('cout').innerHTML = ''; $('tts').innerHTML = '';
+    $('subLab').textContent = 'Austin, read from his lips';
+
+    phase('listen'); caller.classList.add('hero'); $('subs').style.opacity = 0; $('callerLab').innerHTML = '<span class="live">● Hearing you, live</span>';
+    node(0, true); await type(t.q); node(0, true, t.ink); await sleep(900);
+    caller.classList.remove('hero'); $('subs').style.opacity = 1; $('callerLab').textContent = 'You asked'; await sleep(500);
+
+    phase('lips'); speaking = true; node(1, true);
+    const spans = t.raw.map(w => { const s = document.createElement('span'); s.className = 'w'; s.textContent = w; s.style.opacity = 0; cap.append(s); return s; });
+    for (let i = 0; i < spans.length; i++) { await sleep(300); spans[i].style.opacity = (.3 + .7 * t.conf[i]).toFixed(2); spans[i].style.fontWeight = Math.round(200 + 500 * t.conf[i]); }
+    await sleep(300); speaking = false; node(1, true, t.lat[0]);
+    $('nbest').innerHTML = t.nbest.map(([s, sc]) => `<div><span>${s}</span><em>${sc.toFixed(1)}</em></div>`).join('');
+
+    const target = spans[t.at]; target.classList.add('target');
+    const reel = document.createElement('div'); reel.className = 'reel';
+    reel.innerHTML = t.alts.map(([w, p]) => `<span data-w="${w}"><span>${w}</span><span>${p.toFixed(2)}</span></span>`).join('');
+    target.append(reel); await sleep(800);
+
+    phase('claude'); node(2, true); cap.classList.add('spot'); $('subLab').textContent = 'Claude, choosing the word';
+    const plainQ = t.q.replace(/[{}]/g, '');
+    $('cin').innerHTML = `<span class="k">question</span>  "${esc(plainQ)}"\n<span class="k">lip guesses</span>\n${t.nbest.map(([s]) => '  <span class="l">' + s + '</span>').join('\n')}\n<span class="k">face</span>  ${t.emo}`;
+    const ctx = q.querySelector('.ctx'); ctx.classList.add('lit'); drawArc(ctx, target); await sleep(850);
+    reel.querySelectorAll(':scope > span').forEach(s => s.classList.add(s.dataset.w === t.pick.replace(/[,.]/g, '') ? 'pick' : 'out'));
+    await sleep(500);
+    target.firstChild.textContent = t.pick; target.classList.add('fix');
+    $('why').textContent = t.why; $('why').classList.add('on'); node(2, true, t.lat[1]);
+    $('cout').innerHTML = `<span class="k">say</span>  <span class="c">"${esc(t.tts)}"</span>\n<span class="k">emotion</span>  ${t.emo}\n<span class="k">because</span>  "${esc(ctx.textContent)}" in the question`;
+    await sleep(800);
+    reel.style.opacity = 0; cap.classList.remove('spot'); $('arcPath').style.opacity = 0;
+    spans.forEach(s => { s.style.opacity = 1; s.style.fontWeight = 650; });
+    await sleep(400);
+
+    const total = t.lat.reduce((a, b) => a + b, 0), segs = $('seg').children;
+    [...segs].forEach(s => s.style.width = 0);
+    for (let i = 0; i < 4; i++) { segs[i].style.width = t.lat[i] / total * 100 + '%'; await sleep(120); }
+    $('lat').innerHTML = total + '<small>ms</small>';
+
+    phase('voice'); voicing = true; node(3, true, t.lat[2]); $('subLab').textContent = 'Austin, in his own voice';
+    $('tts').innerHTML = `<span class="k">model</span> sonic-3.6   <span class="k">voice</span> austin (instant clone)\n<span class="k">transcript</span> <span class="v">"${esc(t.tts)}"</span>\n<span class="k">emotion</span> ${t.emo}   <span class="k">output</span> phone audio, streamed`;
+    if (firstVoice) { $('origin').classList.add('on'); firstVoice = false; }
+    for (const s of spans) { s.classList.add('said'); await sleep(260); }
+    node(4, true, t.lat[3]);
+    await sleep(400); voicing = false;
+    $('gap').innerHTML = t.gap.toFixed(1) + '<small>s</small>'; $('wpm').textContent = t.wpm;
+    log.push({ q: plainQ, a: t.tts, pick: t.pick.replace(/[,.]/g, ''), n: t.raw.length, gap: t.gap });
+    await sleep(2800); $('origin').classList.remove('on');
+  }
+
+  async function endCard() {
+    const words = log.reduce((a, b) => a + b.n, 0), s = Math.floor((performance.now() - callStart) / 1000);
+    $('endTime').textContent = String(s / 60 | 0).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+    $('eWords').textContent = words; $('eFix').textContent = log.length;
+    $('eGap').textContent = (log.reduce((a, b) => a + b.gap, 0) / log.length).toFixed(1);
+    $('eScript').innerHTML = log.map(l => `<p>You: ${esc(l.q)}<br><b>Austin: ${esc(l.a).replace(l.pick, '<em>' + l.pick + '</em>')}</b></p>`).join('');
+    $('todayWords').textContent = +$('todayWords').textContent + words; $('todayCalls').textContent = +$('todayCalls').textContent + 1;
+    frame.classList.add('ending'); $('end').classList.remove('off'); await sleep(8000);
+    $('end').classList.add('off'); frame.classList.remove('ending');
+  }
+
+  function ribbon() {
+    const { x, w, h } = fit($('ribbon')), mid = h / 2;
+    for (let i = 0; i < N - 1; i++) {
+      const a = amp[i] * (mid - 2); if (a < .5) continue;
+      x.fillStyle = kind[i] === 2 ? C.voice : C.lips; x.globalAlpha = .2 + .8 * (i / N);
+      x.fillRect(i / (N - 1) * w, mid - a, w / (N - 1) + .6, a * 2);
+    }
+    x.globalAlpha = 1; x.fillStyle = 'rgba(246,240,232,.28)'; x.fillRect(0, mid - .5, w, 1);
+  }
+
+  let last = performance.now();
+  function tick(t) {
+    const dt = Math.min(50, t - last); last = t;
+    const idle = frame.classList.contains('attracting');
+    const target = Math.min(1, (ex.jaw || 0) * 2.4);
+    mouth += (target - mouth) * Math.min(1, dt / 70);
+    voiceAmp += ((voicing ? .3 + .7 * Math.abs(Math.sin(t / 70) * Math.sin(t / 190 + 2)) : 0) - voiceAmp) * Math.min(1, dt / 50);
+    amp.copyWithin(0, 1); kind.copyWithin(0, 1);
+    if (voiceAmp > .04) { amp[N - 1] = voiceAmp; kind[N - 1] = 2; } else { const m = speaking || mouth > .08 ? mouth : 0; amp[N - 1] = m; kind[N - 1] = m ? 1 : 0; }
+    emgLevels(t, dt);
+    if (!frame.classList.contains('video')) drawMesh(t);
+    ribbon();
+    if (shell.classList.contains('hood')) document.querySelectorAll('#emg canvas').forEach((cv, ch) => {
+      const H = emgH[ch], a = rms[ch];
+      H.push((Math.random() - .5) * 2 * a); H.shift();
+      const { x, w, h } = fit(cv); x.beginPath();
+      H.forEach((v, i) => { const X = i / (H.length - 1) * w, Y = h / 2 + v * (h / 2 - 1); i ? x.lineTo(X, Y) : x.moveTo(X, Y); });
+      x.strokeStyle = speaking ? C.lips : C.dim; x.lineWidth = 1; x.stroke();
+    });
+    if (callStart) { const s = Math.floor((t - callStart) / 1000); $('clock').textContent = String(s / 60 | 0).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  $('file').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const v = $('footage'); v.src = URL.createObjectURL(f); frame.classList.add('video'); v.play().catch(() => {});
+  });
+
+  (async () => {
+    for (;;) {
+      frame.classList.add('attracting'); $('attract').classList.remove('off'); $('today').style.opacity = 1; phase('voice'); await sleep(5000);
+      $('attract').classList.add('off'); $('today').style.opacity = 0; frame.classList.remove('attracting');
+      callStart = performance.now(); firstVoice = true; log.length = 0;
+      for (const t of SCRIPT) await play(t);
+      await endCard(); callStart = 0;
+    }
+  })();
+})();
+</script>
+
+<script type="module">
+// Live webcam: the same MediaPipe Face Landmarker the lip reader uses (Lipflow's face_landmarker.task), run in the browser.
+// Publishes window.reclaimLive = {p: 468*3 model-space coords, b: 9 blendshapes, pose: [yaw, pitch, roll], fresh}.
+const KEYS = ['jawOpen', 'mouthSmileLeft', 'mouthSmileRight', 'browInnerUp', 'browOuterUpLeft', 'browOuterUpRight', 'mouthPucker', 'eyeBlinkLeft', 'eyeBlinkRight'];
+const btn = document.getElementById('camBtn'), prev = document.getElementById('camPrev');
+let landmarker = null, running = false, lastSeen = 0;
+async function start() {
+  btn.textContent = 'Starting camera…';
+  try {
+    const { FaceLandmarker, FilesetResolver } = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+    const files = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+    landmarker = await FaceLandmarker.createFromOptions(files, {
+      baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task', delegate: 'GPU' },
+      runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true
+    });
+    prev.srcObject = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+    prev.hidden = false; await prev.play();
+    running = true; btn.textContent = 'Webcam on'; btn.classList.add('on'); loop();
+  } catch (e) {
+    btn.textContent = 'Webcam unavailable here'; console.warn(e);
+  }
+}
+const out = { p: new Float32Array(468 * 3), b: new Float32Array(9), pose: [0, 0, 0], fresh: false };
+function loop() {
+  if (!running) return;
+  if (prev.readyState >= 2) {
+    const r = landmarker.detectForVideo(prev, performance.now());
+    const w = prev.videoWidth, h = prev.videoHeight;
+    if (r.faceLandmarks && r.faceLandmarks.length) {
+      const L = r.faceLandmarks[0];
+      let cx = 0, cy = 0, cz = 0;
+      for (let i = 0; i < 468; i++) { cx += L[i].x * w; cy += L[i].y * h; cz += L[i].z * w; }
+      cx /= 468; cy /= 468; cz /= 468;
+      const H = Math.hypot((L[10].x - L[152].x) * w, (L[10].y - L[152].y) * h), k = 17.7 / H;
+      for (let i = 0; i < 468; i++) { out.p[i * 3] = (L[i].x * w - cx) * k; out.p[i * 3 + 1] = -(L[i].y * h - cy) * k; out.p[i * 3 + 2] = -(L[i].z * w - cz) * k; }
+      const bs = {}; for (const c of r.faceBlendshapes[0].categories) bs[c.categoryName] = c.score;
+      KEYS.forEach((n, i) => out.b[i] = bs[n] || 0);
+      const m = r.facialTransformationMatrixes[0].data; // column-major 4x4
+      out.pose = [Math.atan2(-m[2], Math.hypot(m[6], m[10])), Math.atan2(m[6], m[10]), Math.atan2(m[1], m[0])];
+      out.fresh = true; lastSeen = performance.now();
+    } else if (performance.now() - lastSeen > 800) out.fresh = false;
+    window.reclaimLive = out;
+  }
+  requestAnimationFrame(loop);
+}
+btn.addEventListener('click', () => { if (!running) start(); });
+if (new URLSearchParams(location.search).has('cam')) start();
+</script>
+</body></html>

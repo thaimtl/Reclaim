@@ -74,7 +74,7 @@ Follow [EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md). You can pro
 
 The parts run as separate small programs on the laptop and talk through ZeroMQ publish/subscribe over TCP on the loopback (`tcp://127.0.0.1:<port>`, one port per publisher; the camera reader is 5556), with messages encoded as msgpack (numpy arrays as raw bytes).
 `ipc://` sockets don't work on Windows, which is why it is TCP.
-Ports, each bound by its publisher: camera reader 5556 (`RECLAIM_CAM_PUB`), Austin's joint search 5557 (`RECLAIM_DEC_PUB`), Claude service 5558, call service 5559 (`RECLAIM_CALL_PUB`).
+Ports, each bound by its publisher (the map is `bus/team.py`): EMG rig 5555 (`RECLAIM_EMG_PUB`), camera reader 5556 (`RECLAIM_CAM_PUB`), Austin's joint search 5557 (`RECLAIM_DEC_PUB`), Claude service 5558 (`RECLAIM_CLAUDE_PUB`), call service 5559 (`RECLAIM_CALL_PUB`), live EMG reader 5560 (`RECLAIM_SVR_PUB`).
 A message takes well under a millisecond.
 All timestamps are `bus.now()` seconds on the same laptop, which is `time.perf_counter()`: on Windows before Python 3.13, `time.monotonic()` only ticks every 15.6 ms.
 Every message also carries `v` (schema version), `seq` (counts up per topic, so a gap is a drop) and `t_pub` (send time).

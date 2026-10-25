@@ -74,8 +74,12 @@ All code lives in this repo; datasets, checkpoints, results and Python environme
 | `bench/` | Benchmarks and their frozen test splits |
 | `cluster/` | H100/H200 job scripts (PBS), smoke tests, runbook |
 | `camera/` | Camera-only baselines (Auto-AVSR, BRAVEn, LipLearner) |
-| `rig/` | EMG rig: Arduino firmware, serial reader, live hum filter, signal check |
+| `rig/` | EMG rig: Arduino firmware, serial reader, live hum filter, signal check, `emg.raw` publisher (`publish.py`) |
 | `recorder/` | The recording app: camera + EMG + the session sentences ([recorder/README.md](recorder/README.md)) |
+| `bus/` | The team bus: ZeroMQ wire format, the camera's topics (`__init__.py`) and every other endpoint and port (`team.py`) |
+| `buslog/` | Logs every bus message to `$RECLAIM_WORKDIR/logs/` (`record.py`) and replays a session (`replay.py`) |
+| `claude_service/` | The Claude service: predicts Austin's next words and repairs look-alikes (`brain.py`), on the bus (`service.py`) |
+| `demo/dashboard/` | Captions dashboard prototype, sample data ([demo/dashboard/README.md](demo/dashboard/README.md)) |
 | `call/` | The phone call: Twilio, Austin's cloned voice (Cartesia Sonic) and the judge's captions (Cartesia Ink) ([call/README.md](call/README.md)) |
 | `figures/` | The SVR-1 architecture figure and the script that draws it |
 | `tests/` | Smoke and unit tests |
