@@ -64,9 +64,6 @@ def main():
     ap.add_argument('--repair-s', type=float, default=0.0,
                     help="wait before a locked word is spoken (default 0: Claude's repairs fix the captions only, so "
                          "waiting buys nothing; each 0.1 s here is 0.1 s on every word)")
-    ap.add_argument('--beta', type=float, default=None,
-                    help="weight of Claude's word hints in the camera beam (default: params.json); Claude's own "
-                         "sentences and words carry through fusion.search.claude_override, not this")
     ap.add_argument('--tau0', type=float, default=None, help="lock threshold at predictability 0 (default: fitted)")
     ap.add_argument('--tau-end', type=float, default=None, help="end-of-sentence lock threshold (before cam.final)")
     ap.add_argument('--repeat-floor', type=float, default=None,
@@ -80,8 +77,6 @@ def main():
 
     from fusion.core import Fusion
     gate, lock, meta = load_params(args.params)
-    if args.beta is not None:
-        gate.beta = args.beta
     if args.tau0 is not None:   # keep the fitted range's shape around the new threshold
         lock.tau_min, lock.tau_max = lock.tau_min + args.tau0 - lock.tau0, min(0.99, lock.tau_max + args.tau0 - lock.tau0)
         lock.tau0 = args.tau0
@@ -134,12 +129,6 @@ def main():
                     print(f"sentence {m['utt_id']} {m['event']}" + (f" ({m['reason']})" if m['reason'] else '')
                           + f": held {m['held_s']:.1f} s, Claude p {p} ({m['asks']} asks), {m['segments']} segments,"
                           f" {m['words']} words", file=sys.stderr)
-                elif t == 'timing.dec' and m.get('stage') == 'prediction':
-                    aj = 'no judge line' if m['after_judge_s'] is None else f"started {m['after_judge_s']:.1f} s after the judge"
-                    age = 'no prediction yet' if m['prediction_age_s'] is None else \
-                        f"Claude's prediction {m['prediction_age_s']:.1f} s old ({'ready' if m['ready'] else 'not for this line'})"
-                    print(f"sentence {m['utt_id']} prediction: {aj}; {age}; {m['predicted']} of {m['content_words']} "
-                          f"content words predicted, {m['carried']} carried by Claude: {m['text']}", file=sys.stderr)
                 elif t == 'dec.pause':
                     print(f"sentence {m['utt_id']} asks Claude #{m['ask']} after {m['silence_s']:.1f} s still:",
                           ' '.join(m['words']), file=sys.stderr)

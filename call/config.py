@@ -32,10 +32,8 @@ class Config:
     # CARTESIA_PHRASE_WORDS > 1 is an opt-in experiment: group words client-side (then use CARTESIA_MAX_BUFFER_MS=0).
     max_buffer_delay_ms: int = field(default_factory=lambda: int(_env('CARTESIA_MAX_BUFFER_MS', '120')))
     phrase_words: int = field(default_factory=lambda: int(_env('CARTESIA_PHRASE_WORDS', '1')))
-    # paced (call/voice.py): words go to Sonic as phrases cut at his pauses; ignores the two settings above. Off by
-    # default: every word streams to Sonic as it locks, for the lowest voice latency (phrases waited for 3 words,
-    # about 1 s on the 5060 live test). CARTESIA_PACED=1 brings phrases back.
-    paced: bool = field(default_factory=lambda: _env('CARTESIA_PACED', '0') != '0')
+    # paced (call/voice.py): words go to Sonic as phrases cut at his pauses; ignores the two settings above
+    paced: bool = field(default_factory=lambda: _env('CARTESIA_PACED', '1') != '0')
     twilio_sid: str = field(default_factory=lambda: _env('TWILIO_ACCOUNT_SID'))
     twilio_token: str = field(default_factory=lambda: _env('TWILIO_AUTH_TOKEN'), repr=False)
     twilio_number: str = field(default_factory=lambda: _env('TWILIO_NUMBER'))         # the number we call from

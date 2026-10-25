@@ -4,13 +4,12 @@ One Sonic context per utterance (utt_id), continue=True ("more to come"), the fi
 while Austin is still mouthing. Every chunk carries a leading space after the first and the last one closing
 punctuation, so Sonic joins them as one sentence, in one continuous recording.
 
-Unpaced (the default, CARTESIA_PACED=0): every word goes to Sonic the moment it locks, and audio is played as it
-arrives, with the server buffer CARTESIA_MAX_BUFFER_MS: the lowest latency. Words can be grouped client-side
-(CARTESIA_PHRASE_WORDS=3 with CARTESIA_MAX_BUFFER_MS=0).
+Phrases (the default, CARTESIA_PACED=1): Sonic sounds natural only with a few words at once, so locked words go as
+phrases, each its own flush, cut at his pauses (dec.hyp) or every PHRASE_WORDS words. Sonic's padding is trimmed
+(call/audio.py) and each phrase plays as soon as it arrives.
 
-Phrases (CARTESIA_PACED=1): Sonic sounds most natural with a few words at once, so locked words go as phrases, each its
-own flush, cut at his pauses (dec.hyp) or every PHRASE_WORDS words. Sonic's padding is trimmed (call/audio.py) and
-each phrase plays as soon as it arrives. The first phrase waits for PHRASE_FIRST words: about 1 s more latency.
+Unpaced (CARTESIA_PACED=0): audio is played as it arrives, with the server buffer CARTESIA_MAX_BUFFER_MS, and
+optionally words grouped client-side (CARTESIA_PHRASE_WORDS=3 with CARTESIA_MAX_BUFFER_MS=0).
 
 Audio order: each utterance's audio goes into its own queue and one player task plays utterances in the order they
 started, so two sentences never interleave on the phone, and on_done fires only after an utterance's last audio is

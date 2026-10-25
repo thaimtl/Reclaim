@@ -12,13 +12,12 @@ import numpy as np
 from fusion.core import Fusion
 from fusion.lm import ConversationLM
 from fusion.lock import FEATURES, LockModel
-from fusion.lock import features as _lock_features
 from fusion.offline import align
 from fusion.search import BLANK, CamReading, Gate, JointSearch, Pieces, ctc_loglik, viterbi_word_ends
 
 ARPA = r"""
 \data\
-ngram 1=13
+ngram 1=8
 ngram 2=5
 
 \1-grams:
@@ -30,11 +29,6 @@ ngram 2=5
 -0.9	water	-0.3
 -1.5	waiter	-0.3
 -1.2	what	-0.3
--1.3	bill	-0.3
--1.3	mill	-0.3
--1.3	hi	-0.3
--1.6	afraid	-0.3
--1.6	frank	-0.3
 
 \2-grams:
 -0.2	<s> i
@@ -45,11 +39,6 @@ ngram 2=5
 
 \end\
 """
-
-
-def lockmod_features(joint, cam, emg, claude):
-    """Lock features of a finished, stable word on a clear face and clean pads."""
-    return _lock_features(joint, cam, emg, claude, True, 1.0, 1.0, 10, True, 1.0)
 
 
 def check(name, ok, detail=''):
@@ -185,43 +174,6 @@ def main():
         check('EMG can overturn the camera on a look-alike', b0[-1] == 'water' and b1[-1] == 'waiter', f'{b0} -> {b1}')
         hint = search.combine(search.judge_scores(cands, cam2, None, {'waiter': 30.0}, True), w)
         check("Claude's hints add to a word's score", cands[int(np.argmax(hint))].words[-1] == 'waiter')
-
-        # Claude carries: its predicted words and sentences enter the race when they look like the lips (fusion.search
-        # LIP_MIN) and then beat the camera's reading (claude_override), with the fitted gate's weights
-        from fusion.search import claude_override, lip_similarity, LIP_MIN
-        live_w = {'cam': 4.9, 'emg': 0.0, 'lm': 1.9, 'beta': 1.0, 'gamma': 2.5, 'final': 0.0, 'unseen': -9.0}
-        lk_search = JointSearch(lm, pieces, StubLexicon({}))
-
-        def best_with(words, claude_words=None, claude_phrases=(), locked=()):
-            c = CamReading(reading(pieces, words))
-            cs = lk_search.candidates(c, live_w, {}, locked, final=True, claude_words=claude_words,
-                                      claude_phrases=claude_phrases)
-            S = claude_override(cs, lk_search.combine(lk_search.judge_scores(cs, c, None, {}, True), live_w))
-            return cs[int(np.argmax(S))].words, cs
-
-        b0, _ = best_with(['i', 'want', 'bill'])
-        b1, _ = best_with(['i', 'want', 'bill'], {'mill': 0.9})
-        check('Claude carries a predicted look-alike over the camera\'s clear reading', b0[-1] == 'bill' and b1[-1] == 'mill',
-              f'{b0} -> {b1}')
-        b2, _ = best_with(['i', 'want', 'water'], {'waiter': 0.9})
-        check('Claude carries a predicted word that is only roughly a lip match (water -> waiter, lip %.2f)'
-              % lip_similarity(('water',), ('waiter',)), b2[-1] == 'waiter', b2)
-        b3, cs3 = best_with(['i', 'want', 'water'], {'coffee': 1.0})
-        check('a predicted word that looks nothing like the lips never appears (water vs coffee, lip %.2f < %.2f)'
-              % (lip_similarity(('water',), ('coffee',)), LIP_MIN),
-              b3 == ('i', 'want', 'water') and not any('coffee' in c.words for c in cs3), b3)
-        b4, _ = best_with(['i', 'want', 'water'], claude_phrases=[['i', 'want', 'waiter', 'please']])
-        check("Claude's predicted sentence carries, cut to the words read so far", b4 == ('i', 'want', 'waiter'), b4)
-        b5, _ = best_with(['i', 'want', 'water'], {'waiter': 0.1})
-        check('a weakly predicted word does not carry', b5[-1] == 'water', b5)
-        b7, _ = best_with(['hi', 'afraid'], {'frank': 0.4})
-        check('a weak prediction (an always-on name, 0.4) does not carry on a rough lip match (0.40 < 0.6)',
-              b7 == ('hi', 'afraid'), b7)
-        b8, _ = best_with(['i', 'want', 'water'], {'waiter': 0.4})
-        check('a weak prediction carries on a close lip match (water -> waiter, 0.75)', b8 == ('i', 'want', 'waiter'), b8)
-        b6, _ = best_with(['hi', 'afraid'], {'frank': 0.9})
-        check('the live test\'s case: Claude predicted "frank", the camera read "afraid" (lip %.2f): frank wins'
-              % lip_similarity(('afraid',), ('frank',)), b6 == ('hi', 'frank'), b6)
 
         locked = search.candidates(cam, w, {}, locked=['i', 'went'])
         check('every candidate keeps the locked words', all(c.words[:2] == ('i', 'went') for c in locked))
@@ -468,9 +420,8 @@ def main():
         out = core.feed('cam.tick', reading(pieces, ['i', 'want', 'water'], seg_id=1, t0=500.0), 501.0)
         check('a restarted camera reusing seg_id 1 still starts a new sentence',
               any(tp == 'dec.hyp' and m['utt_id'] == 2 for tp, m in out))
-        # no repair window (the default): every word still said once, in order, with one final (no Claude here to say
-        # Austin has finished, so the sentence closes after the no-Claude hold)
-        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.0, claude_end=False)
+        # no repair window (the default): every word still said once, in order, with one final
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.0)
         out = []
         for n in range(8, T + 1, 3):
             msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
@@ -504,46 +455,6 @@ def main():
         caps = [m for tp, m in out if tp == 'dec.hyp'][-1]['locked']
         check('a repair, even inside the repair window, changes the captions, never the voice',
               said[idx] == last and caps[idx] == 'what', f"said {' '.join(said)}; captions {' '.join(caps)}")
-
-        # end to end: the judge's line, Claude predicts "waiter" before Austin starts, the camera reads "water": Claude
-        # carries the word into the lock (and the dashboard's source), and the sentence's prediction summary says so
-        lock_c = LockModel(tau0=0.5, tau_min=0.5, tau_max=0.5, agree_floor=0.05)
-        core = Fusion(search, Gate(), lock_c, svr=None, repair_s=0.0, claude_end=False)
-        out = core.feed('partner.text', {'text': 'what do you want', 'is_final': False}, 98.0)
-        out += core.feed('partner.text', {'text': 'what do you want', 'is_final': True}, 98.5)
-        out += core.feed('claude.predict', {'words': [{'w': 'waiter', 'weight': 0.9}], 'phrases': [],
-                                            'predictability': 0.5, 'ttl_s': 30.0, 't': 98.2}, 99.0)
-        for n in range(8, T + 1, 3):
-            msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
-            t = float(msg['frame_t'][-1]) + 0.05
-            out += core.feed('cam.tick', msg, t)
-            out += core.step(t)
-        for k in range(1, 80):
-            out += core.step(t + 0.05 * k)
-            if k == 10:
-                out += core.feed('cam.final', {'seg_id': 1, 'nbest': [{'text': 'I WANT WATER', 'score': 0.0}]},
-                                  t + 0.05 * k)
-        locks = [x['w'] for tp, m in out if tp == 'dec.lock' for x in m['words']]
-        srcs = [m for tp, m in out if tp == 'dec.hyp'][-1]['source']
-        summ = [m for tp, m in out if tp == 'timing.dec' and m.get('stage') == 'prediction']
-        check('Claude carries a predicted word into the lock and the source', locks[-1:] == ['waiter'] and
-              srcs[-1] == 'Claude', f'locks {locks}, source {srcs}')
-        check("the sentence's prediction summary: ready, predicted, carried", len(summ) == 1 and summ[0]['ready'] and
-              summ[0]['predicted'] >= 1 and summ[0]['carried'] >= 1, summ)
-
-        # Claude's please_repeat: ignored once every word of the sentence was spoken, kept while some are not
-        for repair_s, name in ((0.0, 'all spoken'), (30.0, 'words still unspoken')):
-            core = Fusion(search, Gate(), lock, svr=None, repair_s=repair_s, sentences=False)
-            out = []
-            for n in range(8, T + 1, 3):
-                msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
-                t = float(msg['frame_t'][-1]) + 0.05
-                out += core.feed('cam.tick', msg, t)
-                out += core.step(t)
-            rep = core.feed('claude.repair', {'utt_id': 1, 'edits': [], 'please_repeat': True}, t + 0.01)
-            asked = any(tp == 'dec.repeat' for tp, _ in rep)
-            check(f"Claude's please repeat: {name}", asked == (name != 'all spoken'),
-                  f"spoken {[x for tp, m in out if tp == 'voice.say' for x in m['words']]}, dec.repeat {asked}")
 
         # a word below the threshold at the end: Please repeat, and the voice doesn't say it
         lock = LockModel(tau0=0.999, tau_min=0.999, tau_max=0.999, agree_floor=0.0, repeat_floor=0.9999)
@@ -667,17 +578,6 @@ def main():
     check('drain skips stale ticks of a segment, keeps the rest in order',
           [(t, m.get('k')) for t, m in got] == [('emg.raw', None), ('cam.tick', 3), ('cam.tick', 1)],
           str([(t, m.get('seg_id'), m.get('k')) for t, m in got]))
-    # Claude alone can never lock a word (CLAUDE.md): a word only Claude supports fails the camera-EMG agreement rule,
-    # with the default lock model and with the fitted one, however strongly Claude predicts it
-    from fusion.offline import load_params
-    _, fitted, meta = load_params()
-    for name, lk in (('default', LockModel()), ('fitted', fitted if meta else LockModel())):
-        f_claude = lockmod_features(joint=1.0, cam=0.0, emg=0.0, claude=1.0)
-        check(f'Claude alone can never lock a word ({name} lock model)',
-              not lk.may_lock(f_claude, 1.0, 0.0), f'agree {f_claude[FEATURES.index("agree")]}, '
-                                                    f'claude feature {f_claude[FEATURES.index("claude")]}')
-    check("Claude's lock feature is capped", lockmod_features(joint=0.0, cam=0.0, emg=0.0, claude=1.0)[
-        FEATURES.index('claude')] <= 0.3)
     print('FUSION UNITS PASS')
 
 

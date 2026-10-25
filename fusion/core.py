@@ -42,17 +42,14 @@ from collections import deque
 
 import numpy as np
 
-from claude_service.names import always_words
 from fusion import lock as lockmod
-from fusion.search import (CARRY_LOCK_LIP, SHORT_WORDS, CamReading, claude_override, gate_features, softmax,
-                           viterbi_word_ends, word_posteriors)
+from fusion.search import CamReading, gate_features, softmax, viterbi_word_ends, word_posteriors
 
 EMG_RAIL = (8, 1015)       # dashboard/state.py: a pad off the skin pins its channel to a rail of the 10-bit range
 EMG_FLAT = 1.0             # raw-unit standard deviation below this: no contact
 MIN_NEW = 5                # frames (0.2 s, the shortest word) a finished segment's late tick must add to go on,
 STILL_THR = 0.12           # ... with the mouth moving in them (lipread/endpoint.py's STILL_THR)
-PHRASE_WEIGHT = 0.3        # hint weight of a content word that only appears in one of Claude's predicted sentences
-CLAUDE_LOCK_P = 0.9        # a finished word Claude carries (its sentence or word, a lip match) locks at this score
+PHRASE_WEIGHT = 0.3        # hint weight of a word that only appears in one of Claude's predicted phrases
 # When a sentence ends (Sentence). The hold starts once the camera ended its segment (0.5 s of still lips) and the end
 # pass ran (end_wait_s): LIPS_STILL_S after the lips stopped. Only the backstop and the fallbacks are fixed times.
 LIPS_STILL_S = 0.8
@@ -102,9 +99,6 @@ class Sentence:
         self.answered_t = None
         self.claude = False            # this hold asks Claude
         self.reason = None             # why it closed
-        self.start_t = None            # prediction summary: when it started, the judge's line and Claude's prediction
-        self.judge_began = self.judge_at = self.pred_at = self.pred_asked = None
-        self.predicted = set()         # every word Claude predicted while it was open
 
     def before(self, u):
         """The locked words of its segments before u's: u's word i is the sentence's word len(before) + i."""
@@ -144,12 +138,6 @@ class Fusion:
         self.next_id = 1
         self.hints, self.hints_until, self.predictability = {}, -1e18, 0.0
         self.phrases = []              # Claude's predicted phrases, as word lists
-        self.claude_words = {}         # Claude's predicted words (its own weights), for the search's Claude candidates
-        self.always = always_words() if self.use_hints else {}   # the demo's names, from the first second
-        self.predict_at = self.predict_asked = None   # when the newest claude.predict arrived, and when it was asked
-        self.judge_at = None           # when the judge's newest final line arrived
-        self.judge_began = None        # when their line now being spoken (or the newest) began
-        self.judge_speaking = False
         self.raw = deque(maxlen=500)   # the last 0.5 s of raw EMG, for the pads' quality
         self.emg_quality = 1.0
         self.pace, self.effort = 1.0, 1.0
@@ -182,20 +170,12 @@ class Fusion:
             h = {}
             for p in msg.get('phrases') or []:
                 for word in self.search_words(p):
-                    if word not in SHORT_WORDS:
-                        h[word] = max(h.get(word, 0.0), PHRASE_WEIGHT)
+                    h[word] = max(h.get(word, 0.0), PHRASE_WEIGHT)
             for item in msg.get('words') or []:
                 for word in self.search_words(str(item.get('w', ''))):
                     h[word] = max(h.get(word, 0.0), float(item.get('weight', 0.0)))
             self.hints = h
-            self.claude_words = {}
-            for item in msg.get('words') or []:
-                for word in self.search_words(str(item.get('w', ''))):
-                    self.claude_words[word] = max(self.claude_words.get(word, 0.0), float(item.get('weight', 0.0)))
             self.phrases = [self.search_words(str(p)) for p in msg.get('phrases') or []]
-            self.predict_at, self.predict_asked = now, float(msg.get('t', now))
-            if self.sent is not None and self.sent.state != 'closed':
-                self.sent.predicted |= set(self.claude_words) | {x for ph in self.phrases for x in ph}
             self.hints_until = now + float(msg.get('ttl_s', 10.0))
             self.predictability = float(msg.get('predictability', 0.0))
         elif topic == 'claude.repair':
@@ -206,11 +186,8 @@ class Fusion:
                 s.p, s.answered_t = float(msg.get('p_complete', 0.0)), now
         elif topic == 'partner.text':
             text = str(msg.get('text', ''))
-            if not self.judge_speaking and text.strip():
-                self.judge_began, self.judge_speaking = now, True
             if msg.get('is_final'):
                 self.search.lm.add_text(text)
-                self.judge_at, self.judge_speaking = now, False
             if len(text.split()) >= JUDGE_WORDS:
                 out += self._close_held('judge spoke', now)
         return out
@@ -312,10 +289,6 @@ class Fusion:
         if not self.hold or s is None or s.state == 'closed':
             s = self.sent = Sentence(uid)           # its first segment's id: offline, utt_id = segment as before
             self.sentences[uid] = s
-            s.start_t, s.judge_began, s.judge_at = now, self.judge_began, self.judge_at
-            s.pred_at, s.pred_asked = self.predict_at, self.predict_asked
-            if self.use_hints and now < self.hints_until:
-                s.predicted |= set(self.claude_words) | {x for ph in self.phrases for x in ph}
             for k in [k for k in self.sentences if k < uid - 20]:
                 del self.sentences[k]
         else:
@@ -410,25 +383,7 @@ class Fusion:
         """Close a sentence: its last segment sends the voice's final once its words are out (_release)."""
         out = self._sentence_event(s, 'close', now, reason=why)
         s.state, s.reason = 'closed', why
-        out.append(('timing.dec', self._prediction_summary(s)))
         return out
-
-    @staticmethod
-    def _prediction_summary(s):
-        """timing.dec stage 'prediction' (fusion.run prints it): did Claude's prediction come in before Austin started
-        this sentence, and did it hold his words? Times in seconds; None when there was no judge line or prediction."""
-        words = [x for v in s.utts for x in v.locked]
-        content = [x['w'] for x in words if x['w'] not in SHORT_WORDS]
-        r = lambda x: None if x is None else round(x, 2)   # noqa: E731
-        ready = (s.pred_at is not None and s.pred_at <= s.start_t and s.judge_began is not None
-                 and s.pred_asked is not None and s.pred_asked >= s.judge_began - 0.5)
-        return {'stage': 'prediction', 'utt_id': s.sid,
-                'after_judge_s': r(s.start_t - s.judge_at) if s.judge_at is not None else None,
-                'prediction_age_s': r(s.start_t - s.pred_at) if s.pred_at is not None else None,
-                'ready': bool(ready), 'words': len(words), 'content_words': len(content),
-                'predicted': sum(w in s.predicted for w in content),
-                'carried': sum(1 for x in words if x.get('claude') and x.get('cam_top') != x['w']),
-                'text': ' '.join(x['w'] for x in words)}
 
     def _close_held(self, why, now):
         s = self.sent
@@ -474,20 +429,11 @@ class Fusion:
         start = float(u.cam.frame_t[0]) if u.carried_from is not None else u.seg_start   # carried EMG: read already
         job = self._pool.submit(self.svr.read, True, start) if self.use_emg else None
         gf, w = self._weights(u.cam, self.last_emg_read if self.use_emg else None)
-        claude_live = self.use_hints and now < self.hints_until
-        hints = dict(self.always)          # the demo's names always; Claude's prediction while it is fresh
-        cwords = dict(self.always)
-        if claude_live:
-            for word, x in self.hints.items():
-                hints[word] = max(hints.get(word, 0.0), x)
-            for word, x in self.claude_words.items():
-                cwords[word] = max(cwords.get(word, 0.0), x)
+        hints = self.hints if (self.use_hints and now < self.hints_until) else {}
         locked = [x['w'] for x in u.locked]
         cands = self.search.candidates(u.cam, w, hints, locked, [h['text'] for h in nbest], final,
-                                       phrases=self.phrases if claude_live else (),
-                                       locked_tokens=[x['tokens'] for x in u.locked],
-                                       claude_words=cwords or None,
-                                       claude_phrases=self.phrases if claude_live else ())
+                                       phrases=self.phrases if hints else (),
+                                       locked_tokens=[x['tokens'] for x in u.locked])
         emg_read = job.result() if job is not None else None
         if emg_read is not None:
             self.last_emg_read = emg_read
@@ -502,11 +448,11 @@ class Fusion:
             w['emg'] = 0.0
         emg_fn = self.svr.verify if emg_read is not None else None
         scores = self.search.judge_scores(cands, u.cam, emg_fn, hints, final, nbest)
-        P = softmax(claude_override(cands, self.search.combine(scores, w)))   # Claude carries
+        P = softmax(self.search.combine(scores, w))
         Pc = softmax(self.gate.t_cam * scores[:, 0])
         Pe = softmax(self.gate.t_emg * scores[:, 1]) if emg_read is not None else np.full(len(cands), 1.0 / len(cands))
         best, post = word_posteriors(cands, P, start=len(locked))
-        tau = self.lock.threshold(self.predictability if claude_live else 0.0, final)
+        tau = self.lock.threshold(self.predictability if hints else 0.0, final)
         pause = 1.0 - float(u.cam.activity[-8:].mean()) if u.cam is not None and len(u.cam.activity) else 1.0
         quiet = 1.0 - float(np.mean(emg_read['speak_prob'][-26:])) if emg_read is not None else 0.0
         words = []
@@ -523,26 +469,16 @@ class Fusion:
             prev = u.stable.get(i)
             stable = prev[1] + 1 if prev and prev[0] == word else 0
             u.stable[i] = (word, stable)
-            cam_s = mc.get(word, 0.0)
-            emg_s = me.get(word, 0.0) if emg_read is not None else cam_s
-            carried = best.cw > 0 and best.lip > 0     # Claude's sentence or word won, and it looks like the lips
-            finished = final or i < n_best - 1
-            sure = carried and (final or best.lip >= CARRY_LOCK_LIP)
-            if sure:                                   # a close lip match (or the sentence's end): the lips agree with
-                cam_s, emg_s = max(cam_s, best.lip), max(emg_s, best.lip)   # it as far as they can tell
-            f = lockmod.features(d.get(word, 0.0), cam_s, emg_s, max(hints.get(word, 0.0), best.cw if carried else 0.0),
-                                 finished, pause, quiet, stable, u.cam.face_ok if u.cam is not None else False,
-                                 self.emg_quality)
+            f = lockmod.features(d.get(word, 0.0), mc.get(word, 0.0), me.get(word, 0.0) if emg_read is not None
+                                 else mc.get(word, 0.0), hints.get(word, 0.0), final or i < n_best - 1, pause, quiet,
+                                 stable, u.cam.face_ok if u.cam is not None else False, self.emg_quality)
             p = float(self.lock.prob(f))
-            if sure and finished:
-                p = max(p, CLAUDE_LOCK_P)       # Claude carries: a finished word it predicted, matching the lips, locks
             alts = self._alts(word, i, best, cands, d)
             words.append(dict(i=i, w=word, p=p, f=f, alts=alts, cam=mc.get(word, 0.0), tokens=best.tokens[i],
                               emg=me.get(word, 0.0) if emg_read is not None else None,
                               cam_top=max(mc, key=mc.get) if mc else word,
                               emg_top=max(me, key=me.get) if (me and emg_read is not None) else None,
-                              claude=max(hints.get(word, 0.0), best.cw if carried else 0.0),
-                              cands=sorted(d.items(), key=lambda kv: -kv[1])[:3], carried=carried,
+                              claude=hints.get(word, 0.0), cands=sorted(d.items(), key=lambda kv: -kv[1])[:3],
                               mc=mc, me=me))
         prior = u.sent.before(u) if u.sent is not None else []     # the sentence's earlier segments' words
         sid = u.sent.sid if u.sent is not None else u.utt_id
@@ -557,7 +493,7 @@ class Fusion:
                 new.append(x)
         for x in new:
             u.locked.append(dict(w=x['w'], conf=x['p'], alts=x['alts'], cam=x['cam'], emg=x['emg'], t=now,
-                                 cam_top=x['cam_top'], emg_top=x['emg_top'], tokens=x['tokens'], claude=x['claude']))
+                                 cam_top=x['cam_top'], emg_top=x['emg_top'], tokens=x['tokens']))
             u.queue.append((now + self.repair_s, len(u.locked) - 1))
         rest = words[len(new):]
         u.unlocked = [x['w'] for x in rest]
@@ -663,10 +599,7 @@ class Fusion:
                 if frm[:1] == [v.locked[j]['w']]:
                     v.locked[j].setdefault('voice', v.locked[j]['w'])
                     v.locked[j]['w'] = words[0]     # the captions only: the voice says what locked, window or not
-        # Claude's "please repeat" only while something of the sentence is still unspoken: once the voice has said it
-        # all, asking to repeat a sentence the judge already heard would only confuse the screen
-        unspoken = any(j >= v.spoken for v, j in at) or any(v.unlocked for v in s.utts)
-        if msg.get('please_repeat') and unspoken and not any(v.repeat_sent for v in s.utts):
+        if msg.get('please_repeat') and not any(v.repeat_sent for v in s.utts):
             out.append(('dec.repeat', {'utt_id': s.sid, 'reason': {
                 'reader': 'Claude', 'words': [dict(index=i, w=v.locked[j]['w'], alts=v.locked[j]['alts'])
                                               for i, (v, j) in enumerate(at) if j >= v.spoken]}}))

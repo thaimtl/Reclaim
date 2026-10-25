@@ -356,13 +356,6 @@ class Launcher:
         check(bool(self.cloudflared()), 'cloudflared', 'install it (DEMO.md) or put cloudflared(.exe) in '
                                                        f'{self.work}')
         check(gpu_ok(), 'NVIDIA GPU', 'nvidia-smi failed: check the driver, and that the laptop uses the RTX 5060')
-        power = gpu_power()
-        if power is not None:   # a warning, never a block: with pads on, the laptop must run on battery
-            limit = power['limit']
-            say(f"GPU power limit {limit:.0f} W (now drawing {power['draw']:.0f} W)" if limit >= GPU_FULL_W else
-                f"GPU power limit only {limit:.0f} W, not the full {GPU_FULL_W:.0f} W: plug in (pads off, --no-emg) or "
-                "set Windows to Best performance and NVIDIA to maximum performance; the camera and decoder slow down",
-                limit >= GPU_FULL_W)
         if a.rehearse:
             check((self.work / 'logs' / REHEARSAL_LOG).exists(), f'rehearsal log logs/{REHEARSAL_LOG}',
                   'copy it from Frank, or run without --rehearse')
@@ -445,7 +438,6 @@ class Launcher:
                                                      '--control', f'http://127.0.0.1:{self.control_port}'),
                             ('http', f'http://127.0.0.1:{self.dash_port}/', (200,)), 30))
             self.ready_banner()
-            threading.Thread(target=watch_gpu_power, args=(GPU_WATCH_S,), name='gpu-power', daemon=True).start()
             self.watch()
         except KeyboardInterrupt:
             print()
@@ -643,40 +635,6 @@ def charging():
         except OSError:
             pass
     return False
-
-
-GPU_FULL_W = 110.0     # the RTX 5060 laptop GPU at full power is 115 W; below this it is capped (battery, power mode)
-GPU_WATCH_S = 60.0     # while running: a GPU power line this often
-
-
-def gpu_power():
-    """{'draw', 'limit'} in watts from nvidia-smi (limit: the enforced cap, which battery mode lowers), or None."""
-    gpu = shutil.which('nvidia-smi')
-    if not gpu:
-        return None
-    try:
-        r = subprocess.run([gpu, '--query-gpu=power.draw,enforced.power.limit,power.limit', '--format=csv,noheader,nounits'],
-                           capture_output=True, text=True, timeout=20)
-        vals = []
-        for x in r.stdout.splitlines()[0].split(','):
-            try:
-                vals.append(float(x))
-            except ValueError:
-                vals.append(None)
-        draw, enforced, limit = (vals + [None, None, None])[:3]
-        cap = enforced if enforced is not None else limit
-        return None if cap is None else {'draw': draw or 0.0, 'limit': cap}
-    except (OSError, subprocess.TimeoutExpired, IndexError):
-        return None
-
-
-def watch_gpu_power(every_s):
-    """While the demo runs: the GPU's draw and cap every every_s, so a capped GPU (battery) shows in the log."""
-    while True:
-        time.sleep(every_s)
-        p = gpu_power()
-        if p is not None:
-            say(f"GPU power: drawing {p['draw']:.0f} W of a {p['limit']:.0f} W limit", p['limit'] >= GPU_FULL_W)
 
 
 def gpu_ok():
