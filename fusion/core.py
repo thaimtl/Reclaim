@@ -599,7 +599,10 @@ class Fusion:
                 if frm[:1] == [v.locked[j]['w']]:
                     v.locked[j].setdefault('voice', v.locked[j]['w'])
                     v.locked[j]['w'] = words[0]     # the captions only: the voice says what locked, window or not
-        if msg.get('please_repeat') and not any(v.repeat_sent for v in s.utts):
+        # Claude's "please repeat" only while something of the sentence is still unspoken: once the voice has said it
+        # all, asking to repeat a sentence the judge already heard would only confuse the screen
+        unspoken = any(j >= v.spoken for v, j in at) or any(v.unlocked for v in s.utts)
+        if msg.get('please_repeat') and unspoken and not any(v.repeat_sent for v in s.utts):
             out.append(('dec.repeat', {'utt_id': s.sid, 'reason': {
                 'reader': 'Claude', 'words': [dict(index=i, w=v.locked[j]['w'], alts=v.locked[j]['alts'])
                                               for i, (v, j) in enumerate(at) if j >= v.spoken]}}))

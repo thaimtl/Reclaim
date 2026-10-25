@@ -457,6 +457,20 @@ def main():
         check('a repair, even inside the repair window, changes the captions, never the voice',
               said[idx] == last and caps[idx] == 'what', f"said {' '.join(said)}; captions {' '.join(caps)}")
 
+        # Claude's please_repeat: ignored once every word of the sentence was spoken, kept while some are not
+        for repair_s, name in ((0.0, 'all spoken'), (30.0, 'words still unspoken')):
+            core = Fusion(search, Gate(), lock, svr=None, repair_s=repair_s, sentences=False)
+            out = []
+            for n in range(8, T + 1, 3):
+                msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
+                t = float(msg['frame_t'][-1]) + 0.05
+                out += core.feed('cam.tick', msg, t)
+                out += core.step(t)
+            rep = core.feed('claude.repair', {'utt_id': 1, 'edits': [], 'please_repeat': True}, t + 0.01)
+            asked = any(tp == 'dec.repeat' for tp, _ in rep)
+            check(f"Claude's please repeat: {name}", asked == (name != 'all spoken'),
+                  f"spoken {[x for tp, m in out if tp == 'voice.say' for x in m['words']]}, dec.repeat {asked}")
+
         # a word below the threshold at the end: Please repeat, and the voice doesn't say it
         lock = LockModel(tau0=0.999, tau_min=0.999, tau_max=0.999, agree_floor=0.0, repeat_floor=0.9999)
         core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3, sentences=False)
