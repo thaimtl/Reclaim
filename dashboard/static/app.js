@@ -13,7 +13,7 @@ const MOUTH = { left: 61, right: 291, top: 13, bottom: 14 };
 const W = 760, H = 1080, PREVIEW_STALE_MS = 2000;
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
-let snap = null, lastPreview = 0, previewUrl = null, speaking = false, toneLabel = 'neutral';
+let snap = null, lastPreview = -Infinity, speaking = false, toneLabel = 'neutral';
 
 // ---- the 1920 x 1080 stage, scaled to the window -------------------------------------------------------
 function fit() {
@@ -28,9 +28,9 @@ function connect() {
   ws.binaryType = 'blob';
   ws.onmessage = e => {
     if (typeof e.data === 'string') { snap = JSON.parse(e.data); render(snap); return; }
-    const url = URL.createObjectURL(e.data), img = $('cam');
-    img.onload = () => { if (previewUrl) URL.revokeObjectURL(previewUrl); previewUrl = url; };
-    img.src = url; lastPreview = performance.now();
+    const img = $('cam'), old = img.src;
+    img.src = URL.createObjectURL(e.data); lastPreview = performance.now();
+    if (old.startsWith('blob:')) URL.revokeObjectURL(old);
   };
   ws.onclose = () => setTimeout(connect, 1000);
 }
@@ -67,6 +67,7 @@ function renderConversation(s) {
   $('judge-text').textContent = judge;
   $('judge-text').classList.toggle('live', !!s.judge_live);
   const a = s.austin, words = $('words');
+  $('austin').classList.toggle('waiting', s.mode !== 'live');
   const current = a && !(a.final && lastJudge >= 0 && t[lastJudge].t > (a.t || 0)) ? a : null;
   const cut = s.judge_live ? t.length : Math.max(0, lastJudge);
   const past = t.slice(0, cut).filter(x => !(current && x.who === 'austin' && x.utt_id === current.utt_id));
@@ -76,18 +77,19 @@ function renderConversation(s) {
     words.innerHTML = `<div class="word"><span class="w">${s.mode === 'live' ? 'Listening' : 'Not on a call yet'}</span></div>`;
   } else {
     words.className = 'words';
+    const thr = current.cands && current.cands.threshold;
     words.innerHTML = current.words.map(w => {
       const src = w.locked ? (SRC[w.src] || 'camera') : 'pending';
       const was = w.was ? `<span class="was">${esc(w.was)}</span>` : '';
       return `<div class="word${w.locked ? '' : ' pending'}">${was}<span class="w">${esc(w.w)}</span>` +
-             `<div class="bar"><i class="src-${src}" style="width:${barWidth(w)}%"></i></div></div>`;
+             `<div class="bar"><i class="src-${src}" style="width:${barWidth(w, thr)}%"></i></div></div>`;
     }).join('');
   }
   renderExplain(s, current);
 }
 
-// the bar under a word: the decoder's confidence for it, when sent; else full for a locked word, empty for pending
-const barWidth = w => w.conf != null ? Math.round(100 * Math.min(1, Math.max(0, w.conf))) : (w.locked ? 100 : 0);
+// the bar under a word: full once locked; a pending word fills toward the lock threshold
+const barWidth = (w, thr) => w.locked ? 100 : w.conf == null ? 0 : Math.round(100 * Math.min(1, Math.max(0, w.conf / (thr || 1))));
 
 function renderExplain(s, a) {
   let html = '';
