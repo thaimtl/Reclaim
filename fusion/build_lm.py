@@ -47,29 +47,31 @@ SOURCES = {
 SUBTITLE_LINES, SUBTITLE_STRIDE = 36_000_000, 3
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
-from svr.text import clean_text  # noqa: E402  the same normalisation as SVR-1's targets
+from svr.text import clean_text  # noqa: E402
 MAX_WORDS = 40
 
 
 def download():
     for name, url in SOURCES.items():
         d = os.path.join(RAW, name)
-        os.makedirs(d, exist_ok=True)
-        if os.listdir(d):
+        dest = os.path.join(d, {'opensubtitles': 'sample.txt', 'dailydialog': 'train.parquet'}.get(name, os.path.basename(url)))
+        if os.path.exists(dest):
             print(f'{name}: already downloaded')
             continue
+        os.makedirs(d, exist_ok=True)
         print(f'{name}: {url}', flush=True)
+        part = dest + '.part'  # renamed only when complete, so an interrupted download is retried
         if name == 'opensubtitles':  # stream: keep every 3rd line of the first 36M (spreads over more films)
             with urllib.request.urlopen(url) as r, gzip.open(r, 'rt', encoding='utf-8', errors='replace') as f, \
-                    open(os.path.join(d, 'sample.txt'), 'w') as out:
+                    open(part, 'w') as out:
                 for i, line in enumerate(f):
                     if i >= SUBTITLE_LINES:
                         break
                     if i % SUBTITLE_STRIDE == 0:
                         out.write(line)
         else:
-            urllib.request.urlretrieve(url, os.path.join(d, 'train.parquet' if name == 'dailydialog'
-                                                         else os.path.basename(url)))
+            urllib.request.urlretrieve(url, part)
+        os.replace(part, dest)
 
 
 def raw_lines():
@@ -81,7 +83,7 @@ def raw_lines():
         name = next(n for n in z.namelist() if n.endswith('movie_lines.txt'))
         for line in io.TextIOWrapper(z.open(name), encoding='iso-8859-1'):
             yield 'cornell', line.split(' +++$+++ ')[-1]
-    import pyarrow.parquet as pq  # the original site is gone; a Hugging Face copy (roskoN/dailydialog), train split
+    import pyarrow.parquet as pq  # DailyDialog's own site is gone: Hugging Face copy
     for dialogue in pq.read_table(os.path.join(RAW, 'dailydialog', 'train.parquet'), columns=['utterances']).to_pylist():
         for utt in dialogue['utterances']:
             yield 'dailydialog', utt
@@ -129,14 +131,13 @@ def build():
     if not kb:
         sys.exit('set KENLM_BIN to the folder with lmplz and build_binary (github.com/kpu/kenlm)')
     arpa = os.path.join(OUT, 'conversational.arpa')
-    # lmplz memory-maps its sort files: they must be on a local disk (a network or Windows share, like a 9p mount,
-    # segfaults it), so they go to the system temp dir unless LMPLZ_TMP says otherwise
+    # lmplz memory-maps its sort files: a network share (e.g. a 9p mount) segfaults it
     tmp = os.environ.get('LMPLZ_TMP', tempfile.gettempdir())
     os.makedirs(tmp, exist_ok=True)
     with open(CORPUS) as f_in, open(arpa, 'w') as f_out:
         subprocess.run([os.path.join(kb, 'lmplz'), '-o', '4', '--prune', '0', '0', '1', '1', '-S',
                         os.environ.get('LMPLZ_MEMORY', '8G'), '-T', tmp], stdin=f_in, stdout=f_out, check=True)
-    local = os.path.join(tmp, 'conversational.binary')  # build_binary also needs a local disk for its output
+    local = os.path.join(tmp, 'conversational.binary')  # build_binary also needs a local disk
     subprocess.run([os.path.join(kb, 'build_binary'), '-q', '8', '-b', '8', 'trie', arpa, local], check=True)
     shutil.copyfile(local, LM + '.tmp')
     os.replace(LM + '.tmp', LM)

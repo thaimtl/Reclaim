@@ -14,7 +14,7 @@ P(w | h) = (1 - lam) * P_ngram(w | h) + lam * P_cache(w | previous word), where
               become likely at once, even words the n-gram never saw. Counts fade with a half-life of
               `half_life` words, so the current topic counts most.
     lam       grows with the cache from 0 (empty: the n-gram alone) towards `cache_weight`.
-Words are normalised like SVR-1's text (svr.text.clean_text). A query costs microseconds, so the joint search can
+Words are normalised like SVR-1's text (svr.text.clean_text). A query costs about 2 us, so the joint search can
 score every hypothesis on every 100 ms pass. Claude's predictions are separate: a bonus in the joint search (hints).
 """
 import math
@@ -24,13 +24,12 @@ import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 WORK = os.environ.get('RECLAIM_WORKDIR', ROOT)
 DEFAULT_LM = os.path.join(WORK, 'data', 'lm', 'conversational.binary')
-LN10 = math.log(10)
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+from svr.text import clean_text  # noqa: E402
 
 
 def _normalise(text):
-    if ROOT not in sys.path:
-        sys.path.insert(0, ROOT)
-    from svr.text import clean_text
     return clean_text(text).split()
 
 
