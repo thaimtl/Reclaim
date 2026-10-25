@@ -9,16 +9,11 @@ included). rig/reader.py reports drops as a running total, so a gap shows as cou
 short of the next one's counter, and a message never spans a gap: sample i is always at t0 + i / fs. The reader
 does not say where in a chunk frames went missing, so the gap is put at the start of that chunk.
 
-Timestamps come from the sample clock, not from when a read returned: USB hands over samples in bursts a few
-ms late, so each sample's time is offset + index / fs, with offset the lower envelope of t_read - index / fs
-(the read with the least delay). The envelope rises by LEAK s per s, so it follows the Uno's resonator if that
-runs slow (up to 0.5%); if it runs fast the envelope follows on its own.
+Timestamps come from the sample clock, not the USB read time: offset + index / fs, with offset the lower envelope
+of t_read - index / fs, rising LEAK s per s to follow a slow resonator.
 
-The Uno's frame counter is 7 bits, so rig/reader.py sees a gap of 128 frames or more as 128 fewer. The sample clock
-catches it: when a chunk that starts after a reported gap lands WRAP / 2 or more samples later than the counted index
-allows, the missing multiples of WRAP are added to the lost count (USB delays are a few ms, far below 64). Only after
-a reported gap, so a read that is merely late (the laptop stalled, nothing lost) never invents samples; a gap of
-exactly a multiple of 128 frames stays unseen.
+The Uno's counter is 7 bits, so a gap of 128+ frames reads as 128 fewer. After a reported gap, if the sample clock
+says WRAP / 2 or more samples are missing beyond the count, the missing multiples of WRAP are added.
 """
 import argparse
 import signal
@@ -75,12 +70,7 @@ def batches(chunks, fs=FS, size=BATCH, leak=LEAK, wrap=WRAP):
 
 
 def _msg(offset, start, rows, fs, sent):
-    """The offset is a lower envelope, so it can drop when a read arrives with less delay; stepping t0 down by
-    all of it at once could put a message before the previous one. It may fall at most SLEW_SAMPLES (half a sample,
-    0.5 ms) per message, whatever the message size, so a message always starts after the previous one ended and the
-    estimate still converges (an 11 ms drop in 22 messages, about 0.2 s at 10 samples each).
-    Returns (message, the offset it used). While the clamp holds, t0 can be up to the drop (~10 ms) later than the
-    read for about 0.2 s: the price of time never running backwards for the reader."""
+    """Returns (message, offset used). The offset falls at most SLEW_SAMPLES per message, so t0 never goes back."""
     if sent is not None:
         offset = max(offset, sent - SLEW_SAMPLES / fs)
     return {'t0': offset + start / fs, 'fs': fs, 'samples': np.array(rows, dtype=np.uint16), 'counter': start}, offset

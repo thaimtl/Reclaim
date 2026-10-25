@@ -24,8 +24,7 @@ import bus
 from bus import now, pack_nd
 
 VERSION = bus.VERSION
-ACCEPTED = (1, 2)  # v1: the same envelope for plain maps; the call service stamped it until 2026-10-24, so recorded
-                  # sessions hold it and replay sends it as logged (cam.* messages are checked by their schema)
+ACCEPTED = (1, 2)  # v1: the call service's envelope before 2026-10-24, still in recorded sessions
 CAM_TOPICS = (bus.TICK, bus.FINAL, bus.FACE)
 _DEFAULTS = {
     'emg': 'tcp://127.0.0.1:5555',      # emg.raw (rig/publish.py)

@@ -2,14 +2,9 @@
 
     python -m buslog.record [--out FOLDER] [--rotate-mb 256]
 
-One SUB socket per endpoint, so each record knows which endpoint it came from (replay binds the same one).
-Producers never wait on us: PUB/SUB drops for a slow subscriber instead of blocking, and ZeroMQ's own IO thread
-queues up to RCVHWM messages per endpoint while we write: about 80 s of cam traffic (cam.tick and cam.face)
-and 100 s of emg.raw, so if the disk stalls the worst case held in memory is about 110 MB of cam.tick (55 KB
-each) and a few MB for the rest. Frames are written as
-they arrive, without decoding (a malformed message is logged too), and flushed to the OS every FLUSH_S, so a
-crash of this process loses at most the last FLUSH_S (a crash of the laptop may lose what the OS had not yet
-written).
+One SUB socket per endpoint, so each record knows its endpoint (replay binds the same one). Producers never wait
+on us: ZeroMQ queues up to RCVHWM messages per endpoint (~110 MB worst case if the disk stalls). Frames are
+written raw, undecoded, and flushed every FLUSH_S, so a crash of this process loses at most FLUSH_S.
 """
 import argparse
 import os

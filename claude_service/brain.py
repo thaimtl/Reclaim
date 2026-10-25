@@ -26,8 +26,8 @@ MAX_UTTS = 8           # utterances kept for late locks and reviews
 MAX_MESSAGES = 400     # history bound: at this many turns, drop to the newest KEEP_MESSAGES
 KEEP_MESSAGES = 200
 BACKOFF_S = (1.0, 2.0, 4.0, 8.0)  # wait after 1, 2, 3, 4+ failed calls in a row, from the moment it failed
-MAX_FAILURES = 3       # failed calls in a row after which what the failing request carried is dropped (see failed)
-MAX_PENDING_LINES = 20  # judge lines kept for the next request while calls fail: the newest
+MAX_FAILURES = 3       # failed calls in a row after which the failing request's content is dropped
+MAX_PENDING_LINES = 20  # newest judge lines kept while calls fail
 
 SYSTEM = """You are the conversation model inside Reclaim, a silent-speech system for people who lost their voice box. \
 Austin is on a phone call with a judge. The judge speaks normally; their words reach you as text from a speech \
@@ -167,8 +167,7 @@ class Brain:
         self.unlocked = unlocked
 
     def due(self, now, mouthing):
-        # While mouthing, only when the unlocked words moved, at most every PREDICT_EVERY_S: no "nothing new" calls.
-        # After failed calls, not before the backoff: a 429 or an outage gets a few spaced calls, not one per loop.
+        # while mouthing, only when the unlocked words moved; never before the backoff after a failure
         if now < self.retry_at:
             return False
         return bool(self.events or self.review) or (mouthing and self.fresh and now - self.last_request >= PREDICT_EVERY_S)
@@ -177,8 +176,7 @@ class Brain:
         """Append the next user message; return what it puts under review (the utterance may move on mid-call).
         One utterance is reviewed per call, the oldest first; the others stay due for the next one."""
         if len(self.messages) >= MAX_MESSAGES:
-            # Trim in one big step, starting on a user turn, so the cached prefix stays append-only between trims
-            # and the cache is rebuilt once every ~KEEP_MESSAGES / 2 calls, not every call.
+            # one big trim, starting on a user turn, so the cache is rebuilt rarely
             m = self.messages[-KEEP_MESSAGES:]
             while m and m[0]["role"] != "user":
                 m = m[1:]
@@ -255,13 +253,8 @@ class Brain:
             self.messages.pop()
 
     def failed(self, target, now, refused=False):
-        """Every failed call ends here (error, timeout, refusal, cut short, unreadable). Only whole exchanges stay in
-        the history, so the unanswered turn goes (a half or refused turn would fail every later call; the prefix
-        before it stays cached). Then, after a backoff from now: judge lines and the request's own words under review
-        go into the next request, so a short outage or a 429 loses nothing. After MAX_FAILURES failures in a row,
-        Claude is down or the content itself keeps failing, so what the failing request carried is dropped instead
-        (nothing grows or loops); the captions go on without Claude. A refused request's words are not retried.
-        Returns whether its content was kept."""
+        """Every failed call ends here: drop the unanswered turn, back off, and requeue its content for the next
+        request, unless MAX_FAILURES in a row or a refusal (its words are not retried). Returns whether it was kept."""
         self._drop_unanswered()
         self.failures += 1
         self.retry_at = now + BACKOFF_S[min(self.failures, len(BACKOFF_S)) - 1]
@@ -303,10 +296,9 @@ class Brain:
             if not ok:
                 rejected.append(e)
                 continue
-            # Our copy follows the edit so Claude's view of the utterance stays consistent; whether the edit still
-            # reaches the voice or only the captions is the decoder's call (repair window).
+            # our copy follows the edit, so Claude's view stays consistent; the decoder decides voice vs captions
             w = words[i]
-            w["alts"] =[a for a in w.get("alts", []) if _norm(a) != _norm(e["to"])] + [w["w"]]
+            w["alts"] = [a for a in w.get("alts", []) if _norm(a) != _norm(e["to"])] + [w["w"]]
             edits.append({"index": i, "from": w["w"], "to": _norm(e["to"])})
             done.add(i)                 # one edit per word: a second (e.g. swapping it back) is rejected
             w["w"] = _norm(e["to"])

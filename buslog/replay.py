@@ -26,8 +26,7 @@ from bus.team import ENDPOINTS, Pub, decode, encode
 from buslog import matches, read_raw, session_topics, topic_of
 
 SNDHWM = 10000  # a fast replay must not drop at the default 100
-# topic prefix -> fields holding bus.now() seconds (numbers or arrays), from the Interfaces table
-# (docs/TEAM_TASKS_AND_INTERFACES.md); 'words[].t' is the t of every item in the list words. t_pub is in every message.
+# topic prefix -> bus.now() fields (docs/TEAM_TASKS_AND_INTERFACES.md); 'words[].t' is t in every item of words
 TIME_FIELDS = {
     '': ('t_pub',),
     'emg.raw': ('t0',),
@@ -66,7 +65,7 @@ def retime(frames, offset):
         if topic.startswith(prefix):
             for f in fields:
                 _shift(msg, f, offset)
-    # seq and v as logged (a v1 message stays v1, so a version bug replays); no t_pub: stamped now
+    # seq and v as logged, t_pub shifted with the other times
     return encode(topic, msg, seq=msg.get('seq', 0), t_pub=msg.get('t_pub'), v=msg['v'])
 
 
@@ -74,8 +73,7 @@ def replay(session, speed=1.0, topics=None, endpoints=None, ctx=None, wait_s=1.0
            stop=lambda: False):
     """Re-publish the session; returns the number of messages sent."""
     endpoints = dict(endpoints or ENDPOINTS)
-    # the endpoints to bind: from meta.json when the logger closed cleanly, else a first pass over the log (the
-    # second pass streams, so a long session never sits in memory)
+    # endpoints to bind: from meta.json, else a first pass over the log
     logged = session_topics(session)
     if logged is not None:
         names = {name for name, ts in logged.items() if any(matches(t, topics) for t in ts)}
