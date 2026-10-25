@@ -4,8 +4,11 @@ final text.
 
 NoiseGate: at the expo the judge's phone also hears everyone nearby, and Ink transcribes them too (first live call:
 bystanders' sentences in the judge's captions, and turns that never ended). The judge holds the phone to their ear, so
-their voice is far louder at the mic than voices across the room. The gate tracks the background level and passes only
-audio clearly above it; the rest becomes mu-law silence, so Ink hears the caller alone and turns end when they stop.
+their voice is far louder at the mic than voices across the room. The gate passes only audio clearly above the
+background AND close to the caller's own speaking level (a bystander a few metres away is ~20 dB below it, even while
+talking: a floor alone doesn't stop them, since phones already silence the background between words; on a test call
+it passed 65% of the audio). The rest becomes mu-law silence, so Ink hears the caller alone and turns end when they
+stop. The phone itself is the first line: an iPhone at the ear with Voice Isolation (call/README.md).
 """
 import asyncio
 import logging
@@ -25,6 +28,11 @@ HANGOVER_FRAMES = 15        # keep open 300 ms after the last loud frame (word e
 FLOOR_WINDOW = 150          # background level = 20th percentile of the last 150 quiet frames' levels
 LEARN_FRAMES = 25           # the first 0.5 s always count, so a noisy room still sets a floor
 LOUD_EVERY = 5              # 1 in 5 loud frames feeds the floor too
+BELOW_TALKER_DB = 15.0      # pass only frames within this of the caller's speaking level
+TALK_WINDOW = 500           # the caller's level: 80th percentile of the frames that passed in the last 10 s
+TALK_MIN = 25               # ... once there is 0.5 s of them; before that, the floor alone decides
+TALK_HOLD = 150             # after 3 s with nothing passing, the caller's level relaxes (they moved the phone away) ...
+TALK_DECAY_DB = 2.0 / 50    # ... by 2 dB a second: a quieter caller is back in seconds, a bystander needs ~6 s of talk
 
 
 def _mulaw_table():
@@ -49,9 +57,13 @@ class NoiseGate:
     hangover; otherwise replace it with silence. The background is a low percentile of recent levels, so a talking
     caller does not raise it."""
 
-    def __init__(self, open_db=OPEN_DB, min_dbfs=MIN_DBFS, hangover=HANGOVER_FRAMES, window=FLOOR_WINDOW):
+    def __init__(self, open_db=OPEN_DB, min_dbfs=MIN_DBFS, hangover=HANGOVER_FRAMES, window=FLOOR_WINDOW,
+                 below_talker_db=BELOW_TALKER_DB):
         self.open_db, self.min_dbfs, self.hangover = open_db, min_dbfs, hangover
+        self.below_talker_db = below_talker_db
         self.levels = deque(maxlen=window)
+        self.talk = deque()                 # (frame index, level) of the frames that passed, last TALK_WINDOW frames
+        self.last_pass = 0                  # frame index of the last frame that passed on its own level
         self.hold = 0
         self.passed = self.total = 0
 
@@ -59,12 +71,33 @@ class NoiseGate:
     def floor(self):
         return float(np.percentile(self.levels, 20)) if self.levels else -90.0
 
+    @property
+    def talker(self):
+        """The caller's speaking level (dBFS), or None until there is enough of it (or after 10 s of their silence)."""
+        while self.talk and self.talk[0][0] <= self.total - TALK_WINDOW:
+            self.talk.popleft()
+        return float(np.percentile([lv for _, lv in self.talk], 80)) if len(self.talk) >= TALK_MIN else None
+
+    @property
+    def relax(self):
+        """dB the caller's level is lowered by after TALK_HOLD frames with nothing passing."""
+        return TALK_DECAY_DB * max(0, self.total - self.last_pass - TALK_HOLD)
+
     def push(self, frame):
         lv = level_dbfs(frame)
-        loud = lv >= max(self.floor + self.open_db, self.min_dbfs)
-        # the floor learns from background, not from the caller's speech (a long sentence would raise it and shut the
-        # gate), but loud frames still count 1 in LOUD_EVERY, so a room that gets louder lifts the floor over ~10 s
-        if not loud or len(self.levels) < LEARN_FRAMES or self.total % LOUD_EVERY == 0:
+        talker = self.talker
+        above_floor = lv >= max(self.floor + self.open_db, self.min_dbfs)
+        loud = above_floor and (talker is None or lv >= talker - self.relax - self.below_talker_db)
+        if loud:
+            if talker is not None and lv < talker - self.below_talker_db:
+                # passed only because the level relaxed: the caller is quieter now, forget their louder past
+                self.talk = deque((i, x) for i, x in self.talk if x < lv + self.below_talker_db)
+            self.talk.append((self.total, lv))
+            self.last_pass = self.total
+        # the floor learns from background, not from speech (a long sentence would raise it and shut the gate; speech
+        # too far below the caller's is still speech, a bystander or the caller further from the phone), but frames
+        # above it still count 1 in LOUD_EVERY, so a room that gets louder lifts the floor over ~10 s
+        if not above_floor or len(self.levels) < LEARN_FRAMES or self.total % LOUD_EVERY == 0:
             self.levels.append(lv)
         self.hold = self.hangover if loud else max(0, self.hold - 1)
         self.total += 1
@@ -94,7 +127,8 @@ class Ink:
             from cartesia import AsyncCartesia
             self.client = AsyncCartesia(api_key=self.cfg.cartesia_key)
         self._cm = self.client.stt.auto_finalize.websocket(model=self.cfg.stt_model, encoding='pcm_mulaw',
-                                                           sample_rate=8000)
+                                                           sample_rate=8000, keyterm=list(self.cfg.stt_keyterms),
+                                                           turn_start_threshold=self.cfg.turn_start_threshold)
         self.conn = await self._cm.__aenter__()
         self.tasks = [asyncio.create_task(self._send()), asyncio.create_task(self._recv())]
         log.info('Ink websocket open (model %s)', self.cfg.stt_model)
@@ -143,8 +177,10 @@ class Ink:
         for t in self.tasks:
             t.cancel()
         if self.gate is not None and self.gate.total:
-            log.info('noise gate passed %.0f%% of call audio (background %.0f dBFS)',
-                     100 * self.gate.passed / self.gate.total, self.gate.floor)
+            talker = self.gate.talker
+            log.info('noise gate passed %.0f%% of call audio (background %.0f dBFS, caller %s dBFS)',
+                     100 * self.gate.passed / self.gate.total, self.gate.floor,
+                     '--' if talker is None else f'{talker:.0f}')
         if self.record and self.raw:
             with open(self.record, 'wb') as f:
                 f.write(bytes(self.raw))

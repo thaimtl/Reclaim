@@ -25,7 +25,7 @@ from call.voice import Utterance, Voice, generation_config  # noqa: E402
 
 # --- pure pieces -----------------------------------------------------------------------------------------------
 def test_generation_config_maps_and_clamps():
-    assert generation_config('happy', 0.9) == {'emotion': 'happy', 'speed': 1.1}
+    assert generation_config('happy', 0.9) == {'emotion': 'excited', 'speed': 1.1}   # Sonic's stronger happy
     assert generation_config('happy', 0.2)['emotion'] == 'neutral'         # unsure face: neutral voice
     assert generation_config('confused', 1.0)['emotion'] == 'neutral'      # unknown label
     assert generation_config('happy', 1.0, effort=1.0)['volume'] == 1.0     # effort 1.0 = his normal = normal volume
@@ -110,7 +110,7 @@ class FakeTTS:
 
 def cfg(**kw):
     base = dict(cartesia_key='k', voice_id='austin', tts_model='sonic-3.6', public_host='h', media_token='tok',
-                call_pub='inproc://call', dec_pub='inproc://dec', cam_pub='inproc://cam')
+                call_pub='inproc://call', dec_pub='inproc://dec', cam_pub='inproc://cam', paced=False)   # paced: below
     base.update(kw)
     return Config(**base)
 
@@ -136,11 +136,11 @@ async def test_voice_streams_words_then_closes_context():
     await asyncio.sleep(0.05)
     ctx = conn.contexts[0]
     assert len(conn.contexts) == 1, 'one context per utterance'
-    assert [p[0] for p in ctx.pushed] == ['A burrito', ' it was', ' amazing.']   # each word as it arrives (the plan)
-    assert ctx.defaults['generation_config']['emotion'] == 'happy'
+    assert [p[0] for p in ctx.pushed] == ['A burrito', ' it was', ' amazing!']   # happy face: '!' (Sonic reads it)
+    assert ctx.defaults['generation_config']['emotion'] == 'excited'
     assert ctx.defaults['output_format']['encoding'] == 'pcm_mulaw' and ctx.defaults['voice'] == {'id': 'austin'}
     assert ctx.closed
-    assert heard == [b'A burrito', b' it was', b' amazing.']
+    assert heard == [b'A burrito', b' it was', b' amazing!']
     await v.say(7, ['AGAIN'])                     # after final: ignored
     assert len(ctx.pushed) == 3
     await v.close()
@@ -221,9 +221,9 @@ async def test_service_end_to_end(aiohttp_client):
         m = json.loads((await asyncio.wait_for(ws.receive(), 2)).data)
         out.append(m)
     assert out[0]['event'] == 'media' and out[0]['streamSid'] == 'MZ1'
-    assert base64.b64decode(out[0]['media']['payload']) == b'I got the pills.'
+    assert base64.b64decode(out[0]['media']['payload']) == b'I got the pills!'   # happy face
     assert out[1] == {'event': 'mark', 'streamSid': 'MZ1', 'mark': {'name': 'utt-3-1'}}
-    assert conn.contexts[0].defaults['generation_config']['emotion'] == 'happy'   # set when the context opens
+    assert conn.contexts[0].defaults['generation_config']['emotion'] == 'excited'   # set when the context opens
     await ws.send_str(json.dumps({'event': 'mark', 'mark': {'name': 'utt-3-1'}}))   # Twilio: it has played
     await ws.send_str(json.dumps({'event': 'stop'}))
     await asyncio.sleep(0.05)
@@ -261,7 +261,8 @@ def test_speakable_text():
     from call.voice import end_mark, speakable
     assert speakable(['I', 'GOT', 'THE', 'PILLS'], True) == 'I got the pills'
     assert speakable(["I'M", 'FINE'], False) == "I'm fine"
-    assert end_mark('WHAT') == '?' and end_mark('TELL') == '.'
+    assert end_mark(['WHAT']) == '?' and end_mark(['TELL']) == '.'
+    assert end_mark(['CAN', 'YOU', 'HEAR']) == '?' and end_mark(['HAVE', 'A', 'GOOD', 'DAY'], 'excited') == '!'
 
 
 async def test_final_without_new_words_still_ends_the_sentence():
@@ -480,6 +481,7 @@ async def test_failed_final_push_still_ends_the_utterance():
     tts.conns[0].dead = True
     await v.say(5, ['HELLO', 'THERE'], final=True)              # both attempts fail
     await v.say(6, ['STILL', 'WORKS'], final=True)             # the next one is not stuck behind it
+    await asyncio.sleep(0.05)                                   # its words tried the fallback first, then it ended
     assert v.utts[5].ended
     await v.close()
 
@@ -566,17 +568,9 @@ async def test_whole_sentence_fallback_when_streaming_keeps_failing():
     await v.close()
 
 
-def test_inline_tags_only_for_changes_inside_a_context():
-    from call.voice import inline_tags
-    base = {'emotion': 'neutral', 'speed': 1.1}
-    assert inline_tags(base, dict(base)) == ''
-    assert inline_tags(base, {'emotion': 'happy', 'speed': 1.1}) == '<emotion value="happy"/> '
-    assert inline_tags(base, {'emotion': 'neutral', 'speed': 1.32, 'volume': 1.8}) == \
-        '<speed ratio="1.32"/><volume ratio="1.80"/> '
-    assert inline_tags(None, base) == ''
-
-
-async def test_a_change_mid_sentence_goes_inline_not_in_generation_config():
+async def test_a_change_mid_sentence_rides_on_that_push():
+    """Unpaced: every push carries the generation_config of its moment (the SDK would otherwise resend the context's
+    first one, which overrides inline tags)."""
     conn = FakeConn()
     v = Voice(cfg(), lambda b: asyncio.sleep(0), client=SimpleNamespace(tts=FakeTTS(conn)))
     await v.start()
@@ -585,11 +579,11 @@ async def test_a_change_mid_sentence_goes_inline_not_in_generation_config():
     v.set_emotion('happy', 1.0)                                 # his face changes mid-sentence
     await v.say(3, ['IT'], effort=1.8)                          # and he stresses a word
     await v.say(3, ['TODAY'], final=True)
-    pushed = [p for p, _ in conn.contexts[0].pushed]
+    pushed = conn.contexts[0].pushed
     assert len(conn.contexts) == 1 and conn.contexts[0].defaults['generation_config']['emotion'] == 'neutral'
-    assert pushed[1] == ' <emotion value="happy"/><volume ratio="1.80"/> it'
-    assert pushed[2] == ' today.'                               # no effort sent: the volume stays as it is
-    assert all(g is None for _, g in conn.contexts[0].pushed)   # generation_config only when the context opens
+    assert [p for p, _ in pushed] == ['I got', ' it', ' today!']
+    assert pushed[0][1]['emotion'] == 'neutral' and pushed[1][1] == {'emotion': 'excited', 'speed': 1.1, 'volume': 1.8}
+    assert pushed[2][1]['volume'] == 1.8                        # no effort sent: the volume stays as it is
     await v.close()
 
 
@@ -649,8 +643,9 @@ async def test_effort_and_pace_carry_over_when_a_message_leaves_them_out():
     await v.say(4, ['SO'], pace=1.0, effort=1.0)
     await v.say(4, ['LOUD'], effort=2.0)
     await v.say(4, ['RIGHT', 'NOW'], final=True)              # no pace or effort: keep the last ones
-    pushed = [p for p, _ in conn.contexts[0].pushed]
-    assert pushed[1] == ' <volume ratio="2.00"/> loud' and pushed[2] == ' right now.'
+    pushed = conn.contexts[0].pushed
+    assert [p for p, _ in pushed] == ['So', ' loud', ' right now.']
+    assert pushed[1][1]['volume'] == 2.0 and pushed[2][1]['volume'] == 2.0
     assert v.utts[4].gen['volume'] == 2.0 and v.utts[4].gen['speed'] == conn.contexts[0].defaults['generation_config']['speed']
     await v.close()
 
@@ -694,3 +689,66 @@ async def test_a_lost_final_does_not_hold_the_next_sentence(monkeypatch):
     await asyncio.sleep(0.1)
     assert len(heard) == 3
     await v.close()
+
+
+def test_gate_drops_a_bystander_who_talks_between_the_callers_sentences():
+    """The phone silences the room between words (floor ~ -70 dBFS), so a bystander at -35 dBFS is far above the floor;
+    only the caller's own level (~ -14 dBFS) tells them apart."""
+    import numpy as np
+    from call.ink import FRAME, NoiseGate
+    from call.audio import to_mulaw
+
+    rng = np.random.default_rng(1)
+
+    def frames(rms, n):
+        return [to_mulaw((rng.normal(0, rms, FRAME) * 32767).clip(-32768, 32767)) for _ in range(n)]
+    quiet, caller, bystander = frames(0.0003, 100), frames(0.2, 100), frames(0.018, 100)
+    silent = bytes([0xFF]) * FRAME
+    g = NoiseGate()
+    [g.push(f) for f in quiet]
+    assert all(g.push(f) == f for f in caller)                      # the caller passes untouched
+    out = [g.push(f) for f in bystander]
+    assert all(f == silent for f in out[16:]), 'bystander silenced after the hangover'
+    assert all(g.push(f) == f for f in caller[:20])                 # the caller again, at once
+    old = NoiseGate(below_talker_db=200)                             # the floor alone (before): lets them through
+    [old.push(f) for f in quiet + caller]
+    assert sum(old.push(f) != silent for f in bystander) > 80
+
+
+def test_gate_lets_a_caller_who_got_quieter_back_in_within_seconds():
+    """The judge lowers the phone (18 dB quieter): muted at first (it could be a bystander), back within ~6 s."""
+    import numpy as np
+    from call.ink import FRAME, NoiseGate
+    from call.audio import to_mulaw
+
+    rng = np.random.default_rng(2)
+
+    def frames(rms, n):
+        return [to_mulaw((rng.normal(0, rms, FRAME) * 32767).clip(-32768, 32767)) for _ in range(n)]
+    silent = bytes([0xFF]) * FRAME
+    g = NoiseGate()
+    [g.push(f) for f in frames(0.0003, 100) + frames(0.2, 100)]
+    out = [g.push(f) != silent for f in frames(0.025, 500)]         # 10 s of the quieter caller
+    assert not any(out[20:150]), 'muted while it could be a bystander'
+    first = out.index(True, 20)
+    assert first < 400 and all(out[first + 5:]), 'then back, and stays'
+
+
+def test_gate_keeps_the_callers_level_through_their_own_soft_syllables():
+    """Soft syllables of a loud caller pass (within 15 dB) and never lower the bar for a bystander."""
+    import numpy as np
+    from call.ink import FRAME, NoiseGate
+    from call.audio import to_mulaw
+
+    rng = np.random.default_rng(3)
+
+    def frames(rms, n):
+        return [to_mulaw((rng.normal(0, rms, FRAME) * 32767).clip(-32768, 32767)) for _ in range(n)]
+    silent = bytes([0xFF]) * FRAME
+    g = NoiseGate()
+    [g.push(f) for f in frames(0.0003, 100)]
+    for _ in range(5):                                               # loud words with soft syllables between
+        [g.push(f) for f in frames(0.25, 20) + frames(0.06, 10)]
+    level = g.talker
+    out = [g.push(f) != silent for f in frames(0.018, 100)]         # then a bystander, ~ -35 dBFS
+    assert abs(g.talker - level) < 1.5 and not any(out[16:])
