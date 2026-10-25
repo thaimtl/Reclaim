@@ -38,12 +38,13 @@ Pending = namedtuple('Pending', 't gray anchors mouth_open blend mouth_pts eye_d
 
 
 class LiveFaceObs(FaceObs):
-    __slots__ = ('blend', 'pose')
+    __slots__ = ('blend', 'pose', 'z')
 
-    def __init__(self, pts, blend=None, pose=None):
+    def __init__(self, pts, blend=None, pose=None, z=None):
         super().__init__(pts)
         self.blend = blend
         self.pose = pose
+        self.z = z                          # MediaPipe's depth per point, on x's scale (for cam.preview)
 
 
 def head_pose(matrix):
@@ -80,6 +81,7 @@ class BlendTracker(FaceTracker):
             return None
         h, w = frame_bgr.shape[:2]
         pts = np.array([(p.x * w, p.y * h) for p in res.face_landmarks[0]], dtype=np.float32)
+        z = np.array([p.z for p in res.face_landmarks[0]], dtype=np.float32)
         blend = None
         if res.face_blendshapes:
             cats = res.face_blendshapes[0]
@@ -88,7 +90,7 @@ class BlendTracker(FaceTracker):
             blend = np.array([c.score for c in cats], dtype=np.float32)
         pose = head_pose(res.facial_transformation_matrixes[0]) if self.pose and res.facial_transformation_matrixes \
             else None
-        return LiveFaceObs(pts, blend, pose)
+        return LiveFaceObs(pts, blend, pose, z)
 
 
 def align(gray, lms_i, window, crop=CROP):
@@ -120,6 +122,7 @@ class LiveCropper:
         self.times = deque(maxlen=FPS)
         self.last_face = None
         self.last_pose = None
+        self.last_z = None
 
     def detect(self, image, t):
         return self.tracker.detect(image, int(round(t * 1000)))
@@ -130,6 +133,7 @@ class LiveCropper:
         obs = self.detect(frame.image, frame.t)
         self.last_face = None if obs is None else (frame.t, obs.pts, obs.blend)
         self.last_pose = None if obs is None else obs.pose
+        self.last_z = None if obs is None else getattr(obs, 'z', None)
         gray = cv2.cvtColor(frame.image, cv2.COLOR_BGR2GRAY)
         if obs is None:
             self.pending.append(Pending(frame.t, gray, None, 0.0, None, None, 0.0))
