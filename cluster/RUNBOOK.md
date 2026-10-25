@@ -23,7 +23,7 @@ Two runs, one GPU each:
 
 ## 1. The working copy (code and data from the bucket, no git)
 
-The code comes from the bucket's `repo/` folder: a snapshot of the Reclaim repo, this runbook included, since the cluster can't reach GitHub. It is uploaded only with `cluster/upload_snapshot.sh`, from a clean checkout of a pushed commit. `cluster/VERSION` holds that commit (`git rev-parse HEAD`), `cluster/setup.sh` prints it, and the night report records it. Data comes from `data/`.
+The code comes from the bucket's `repo/` folder: a snapshot of the Silent Voice repo, this runbook included, since the cluster can't reach GitHub. It is uploaded only with `cluster/upload_snapshot.sh`, from a clean checkout of a pushed commit. `cluster/VERSION` holds that commit (`git rev-parse HEAD`), `cluster/setup.sh` prints it, and the night report records it. Data comes from `data/`.
 
 ```bash
 cd <project root>

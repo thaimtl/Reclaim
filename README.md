@@ -1,7 +1,7 @@
-# Reclaim
+# Silent Voice
 
-Reclaim gives a voice back to people who lost their voice box.
-You mouth the words without a sound, and Reclaim speaks them in your own voice while you're still mouthing, even on a phone call.
+Silent Voice gives a voice back to people who lost their voice box.
+You mouth the words without a sound, and Silent Voice speaks them in your own voice while you're still mouthing, even on a phone call.
 
 We built it at Cal Hacks 13.0.
 
@@ -16,7 +16,7 @@ Our demo speaker is Austin, who's healthy, and no patients take part in the demo
 
 ## How it works
 
-Reclaim has one mode, open mouth, no sound, in real time.
+Silent Voice has one mode, open mouth, no sound, in real time.
 Three readers work together, because each one sees what the others can't.
 Every 100 ms one joint search combines them and locks in each word as soon as they're confident enough.
 

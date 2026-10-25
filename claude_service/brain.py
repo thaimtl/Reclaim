@@ -1,4 +1,4 @@
-"""Claude's side of Reclaim: follows the conversation, predicts Austin's next words, repairs look-alikes.
+"""Claude's side of Silent Voice: follows the conversation, predicts Austin's next words, repairs look-alikes.
 
 One conversation with Claude per run, append-only: every request is the previous request plus one new
 user message (what happened since) and Claude's reply to it, so prompt caching reuses everything before.
@@ -29,7 +29,7 @@ BACKOFF_S = (1.0, 2.0, 4.0, 8.0)  # wait after 1, 2, 3, 4+ failed calls in a row
 MAX_FAILURES = 3       # failed calls in a row after which the failing request's content is dropped
 MAX_PENDING_LINES = 20  # newest judge lines kept while calls fail
 
-SYSTEM = """You are the conversation model inside Reclaim, a silent-speech system for people who lost their voice box. \
+SYSTEM = """You are the conversation model inside Silent Voice, a silent-speech system for people who lost their voice box. \
 Austin is on a phone call with a judge. The judge speaks normally; their words reach you as text from a speech \
 recogniser. Austin only mouths his words, without sound. A camera lip reader and a muscle (EMG) reader decode his mouthing \
 word by word, and his words are spoken into the call in his own cloned voice as they lock.

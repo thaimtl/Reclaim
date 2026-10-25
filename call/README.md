@@ -1,6 +1,6 @@
-# Reclaim call service
+# Silent Voice call service
 
-Reclaim lets someone who lost their voice box talk on the phone again, in their own voice, without making a sound.
+Silent Voice lets someone who lost their voice box talk on the phone again, in their own voice, without making a sound.
 Austin mouths his words silently; the lip reader and EMG decoder turn them into text; this service speaks that text into a
 real phone call in his cloned voice, while he is still mouthing, and transcribes the person on the other end.
 
@@ -17,7 +17,7 @@ flowchart LR
 
 ## What Cartesia does here
 
-| Cartesia feature | What it does in Reclaim |
+| Cartesia feature | What it does in Silent Voice |
 | --- | --- |
 | **Instant Voice Clone** | Austin's own voice, made from his recordings with his consent. Without it he would sound like an electrolarynx. |
 | **Sonic 3.6 over the WebSocket, continuations** | One context per sentence. Locked words are pushed as natural phrases (`continue: true`, one flush each, no server buffer): at Austin's pauses or every ~4 words, so speech starts while he is still mouthing and sounds like talking. Sonic pads each flush with ~0.5 s of silence; it is trimmed to a natural pause (`call/audio.py`). |
