@@ -317,3 +317,26 @@ def test_a_preview_with_x_y_z_points_keeps_them():
     own = [[0.5, 0.6, -0.02]] * 478
     d.handle(encode('cam.preview', {'t': 1.0, 'w': 640, 'h': 360, 'jpeg': b'\xff\xd8z', 'pts': own}))
     assert unpack(d.frame)[0]['pts'][0] == [0.5, 0.6, -0.02]
+
+
+def test_end_summary_counts_austins_tones_in_order(shots):
+    assert shots['end']['summary']['tones'] == {'warm': 3, 'concerned': 1, 'calm': 1}
+    assert list(shots['end']['summary']['tones']) == ['warm', 'concerned', 'calm']
+
+
+def test_end_summary_benchmark_is_none_until_a_session_is_scored(shots):
+    assert shots['end']['summary']['benchmark'] is None
+    st = CallState(benchmark={'lips': 22.0, 'lips_muscles': 14.0, 'claude': 4.0, 'session': 'session_03'})
+    assert st.summary(40, 0.0)['benchmark']['claude'] == 4.0
+
+
+def test_load_benchmark_reads_a_scored_session_and_ignores_bad_files(tmp_path):
+    from dashboard.server import load_benchmark
+    good = tmp_path / 'wer.json'
+    good.write_text(json.dumps({'session': 'session_03', 'lips': 21.5, 'lips_muscles': 13, 'claude': 3.9}))
+    assert load_benchmark(good) == {'lips': 21.5, 'lips_muscles': 13.0, 'claude': 3.9, 'session': 'session_03'}
+    assert load_benchmark(tmp_path / 'missing.json') is None
+    (tmp_path / 'bad.json').write_text('{not json')
+    assert load_benchmark(tmp_path / 'bad.json') is None
+    (tmp_path / 'short.json').write_text(json.dumps({'lips': 20}))
+    assert load_benchmark(tmp_path / 'short.json') is None
