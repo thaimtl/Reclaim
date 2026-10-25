@@ -420,8 +420,9 @@ def main():
         out = core.feed('cam.tick', reading(pieces, ['i', 'want', 'water'], seg_id=1, t0=500.0), 501.0)
         check('a restarted camera reusing seg_id 1 still starts a new sentence',
               any(tp == 'dec.hyp' and m['utt_id'] == 2 for tp, m in out))
-        # no repair window (the default): every word still said once, in order, with one final
-        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.0)
+        # no repair window (the default): every word still said once, in order, with one final (no Claude here to say
+        # Austin has finished, so the sentence closes after the no-Claude hold)
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.0, claude_end=False)
         out = []
         for n in range(8, T + 1, 3):
             msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
