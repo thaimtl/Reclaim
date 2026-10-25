@@ -67,8 +67,7 @@ class LiveSVR1:
         self.size = int(buffer_seconds * EMG_RATE)
         self.ring = np.zeros((self.size, 4), np.float64)   # filtered 1 kHz signal, rig column order
         self.n = 0                                         # samples received so far (absolute index of the next one)
-        self.clock = None                                  # (absolute index, bus time) of the latest message
-        self.floor = 0                                     # reads never reach back before this sample (reset())
+        self.clock = None                                  # (absolute index, monotonic time) of the latest message
         self.max_s, self.ctx_s, self.idle_s = (int(s * EMG_RATE) for s in (max_seconds, context_seconds, idle_seconds))
         self.thr, self.pre_roll, self.end_silence = speak_threshold, pre_roll, end_silence
         self.seg_id, self.seg_start, self.win_start, self.last_active = 0, None, None, None
@@ -76,14 +75,14 @@ class LiveSVR1:
 
     # ------------------------------------------------------------------ input
     def feed(self, samples, t0=None):
-        """One emg.raw message: samples (n, 4) raw readings in pin order A0..A3; t0 = bus.now() of the first."""
+        """One emg.raw message: samples (n, 4) raw readings in pin order A0..A3; t0 = monotonic time of the first."""
         x = np.asarray(samples, np.float64).reshape(-1, 4)
         if not len(x):
             return
         y = self.filter(x)
         idx = (self.n + np.arange(len(y))) % self.size
         self.ring[idx] = y
-        self.clock = (self.n, time.perf_counter() - len(x) / EMG_RATE if t0 is None else float(t0))
+        self.clock = (self.n, time.monotonic() - len(x) / EMG_RATE if t0 is None else float(t0))
         self.n += len(x)
 
     def time_of(self, i):
@@ -91,17 +90,9 @@ class LiveSVR1:
         return t0 + (i - i0) / EMG_RATE
 
     def _window(self, start):
-        start = max(start, self.n - self.size + 1, 0, self.floor)
+        start = max(start, self.n - self.size + 1, 0)
         idx = np.arange(start, self.n) % self.size
         return start, self.ring[idx]
-
-    def reset(self):
-        """Forget the signal so far, after the Uno was unplugged or frames were lost for long: a fresh filter (its
-        state starts from the next sample), no open segment, and reads only look at samples fed from now on."""
-        self.filter = rig_filters.EmgFilter()
-        self.seg_start = self.win_start = self.last_active = None
-        self.last_out = None
-        self.floor = self.n
 
     # ------------------------------------------------------------------ calibration
     def calibrate(self, raw, speak_threshold=None):

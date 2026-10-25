@@ -92,7 +92,6 @@ pyparsing==3.3.2
 python-dateutil==2.9.0.post0
 python-levenshtein==0.27.3
 pyyaml==6.0.3
-pyzmq==27.2.0
 rapidfuzz==3.14.5
 regex==2026.4.4
 requests==2.33.1
