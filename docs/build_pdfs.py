@@ -20,7 +20,7 @@ from playwright.sync_api import sync_playwright
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-DOCS = ['REALTIME_PIPELINE.md', 'BUILD_PLAN.md', 'SVR1_SPEC.md', 'TEAM_TASKS_AND_INTERFACES.md', 'EVAN_REALTIME_LIP_READING.md']
+DOCS = ['REALTIME_PIPELINE.md', 'SVR1_SPEC.md', 'TEAM_TASKS_AND_INTERFACES.md', 'EVAN_REALTIME_LIP_READING.md']
 MERMAID = os.path.join(HERE, 'vendor', 'mermaid.min.js')
 MERMAID_JS = ''
 REPO_URL = 'https://github.com/thaimtl/Reclaim/blob/main/'
