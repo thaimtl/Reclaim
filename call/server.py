@@ -67,6 +67,8 @@ class Service:
                                                                  record=cfg.record_inbound))
         self.call = None
         self.marks = {}             # mark name -> (utt_id, time sent)
+        self.runs = 0               # each played run gets its own mark name (an utterance can play twice: fallback)
+        self.says = asyncio.Queue()     # voice.say for the voice worker: the bus reader never waits on Sonic
         self.tasks = []
 
     # --- audio and events -------------------------------------------------------------------------------------
@@ -83,7 +85,8 @@ class Service:
     async def _voice_done(self, utt_id, t_first_text):
         """Sonic finished an utterance: queue a mark behind its audio; Twilio echoes it once the judge heard it all."""
         if self.call is not None:
-            name = f'utt-{utt_id}'
+            self.runs += 1
+            name = f'utt-{utt_id}-{self.runs}'
             self.marks[name] = (utt_id, t_first_text or time.perf_counter())
             await self.call.out.put(name)
 
@@ -99,11 +102,18 @@ class Service:
                     if 'label' in e:
                         self.voice.set_emotion(e['label'], e.get('confidence', 1.0))
                 elif topic == bus.VOICE_SAY:
-                    utt = msg['utt_id']
-                    await self.voice.say(utt, list(msg.get('words', [])), bool(msg.get('final', False)),
-                                         msg.get('pace'), msg.get('effort'), msg.get('offset'))
+                    self.says.put_nowait(msg)       # in order; a slow Sonic (reconnect) doesn't hold up emotion
             except Exception:  # noqa: BLE001  one bad message must not end the call
                 log.exception('bad %s message', topic)
+
+    async def say_loop(self):
+        while True:
+            msg = await self.says.get()
+            try:
+                await self.voice.say(msg['utt_id'], list(msg.get('words', [])), bool(msg.get('final', False)),
+                                     msg.get('pace'), msg.get('effort'), msg.get('offset'))
+            except Exception:  # noqa: BLE001  one bad message must not end the call
+                log.exception('bad voice.say message')
 
     # --- Twilio ---------------------------------------------------------------------------------------------------
     async def twiml(self, request):
@@ -140,6 +150,10 @@ class Service:
                         await asyncio.wait_for(ink.start(), INK_START_S)
                     except Exception:  # noqa: BLE001  the voice still works without the judge's captions
                         log.exception('Ink did not start: no judge captions on this call')
+                        try:
+                            await ink.close()          # a half-open Ink websocket would stay open (and billed)
+                        except Exception:  # noqa: BLE001
+                            log.exception('closing the half-started Ink failed')
                         ink = None
                     await self._state('connected', call_sid=msg['start'].get('callSid'), ink=ink is not None)
                 elif ev == 'media' and ink is not None and msg['media'].get('track', 'inbound') == 'inbound':
@@ -182,6 +196,7 @@ class Service:
     async def _startup(self, app):
         await self.voice.start()
         self.tasks.append(asyncio.create_task(self.bus_loop()))
+        self.tasks.append(asyncio.create_task(self.say_loop()))
 
     async def _cleanup(self, app):
         for t in self.tasks:
@@ -197,9 +212,9 @@ def main():
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(message)s')
     cfg = Config()
-    need = cfg.missing('cartesia_key', 'voice_id', 'public_host')
+    need = cfg.missing('cartesia_key', 'voice_id', 'public_host', 'twilio_token')   # the token signs every /twiml
     if args.dial:
-        need += cfg.missing('twilio_sid', 'twilio_token', 'twilio_number')
+        need += cfg.missing('twilio_sid', 'twilio_number')
     if need:
         raise SystemExit(f'missing settings in call/keys.env: {", ".join(n.upper() for n in need)}')
     service = Service(cfg)

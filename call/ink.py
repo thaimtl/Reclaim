@@ -22,7 +22,9 @@ SILENCE = 0xFF              # mu-law code for 0
 OPEN_DB = 12.0              # caller must be this far above the background level
 MIN_DBFS = -50.0            # never open below this (line noise)
 HANGOVER_FRAMES = 15        # keep open 300 ms after the last loud frame (word endings, short pauses)
-FLOOR_WINDOW = 150          # background level = 20th percentile of the last 3 s of frame levels
+FLOOR_WINDOW = 150          # background level = 20th percentile of the last 150 quiet frames' levels
+LEARN_FRAMES = 25           # the first 0.5 s always count, so a noisy room still sets a floor
+LOUD_EVERY = 5              # 1 in 5 loud frames feeds the floor too
 
 
 def _mulaw_table():
@@ -60,7 +62,10 @@ class NoiseGate:
     def push(self, frame):
         lv = level_dbfs(frame)
         loud = lv >= max(self.floor + self.open_db, self.min_dbfs)
-        self.levels.append(lv)
+        # the floor learns from background, not from the caller's speech (a long sentence would raise it and shut the
+        # gate), but loud frames still count 1 in LOUD_EVERY, so a room that gets louder lifts the floor over ~10 s
+        if not loud or len(self.levels) < LEARN_FRAMES or self.total % LOUD_EVERY == 0:
+            self.levels.append(lv)
         self.hold = self.hangover if loud else max(0, self.hold - 1)
         self.total += 1
         if loud or self.hold:

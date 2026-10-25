@@ -26,8 +26,7 @@ spoken in one non-streaming request (tts.generate), after whatever did stream.
 voice.say may carry only the new words or the whole utterance so far; Utterance.new_words() handles both, and an
 explicit `offset` (index of the first word in the message) removes the guesswork when the decoder sends it.
 Emotion comes from the newest cam.tick (Evan's camera reader); pace and effort from voice.say. All three go through
-generation_config: emotion name, speed 0.6-1.5, volume 0.5-2.0. pace and effort are relative, 1.0 = Austin's normal
-(docs/TEAM_TASKS_AND_INTERFACES.md), so effort 1.0 is volume 1.0.
+generation_config: emotion name, speed 0.6-1.5, volume 0.5-2.0.
 """
 import asyncio
 import logging
@@ -36,7 +35,7 @@ import time
 log = logging.getLogger(__name__)
 
 OUTPUT = {'container': 'raw', 'encoding': 'pcm_mulaw', 'sample_rate': 8000}
-# camera label (bus.EMOTIONS, lipread/) -> Sonic emotion; all five exist in Sonic's list
+# camera label (live/types.py EMOTIONS) -> Sonic emotion; all five exist in Sonic's list
 EMOTION = {'neutral': 'neutral', 'happy': 'happy', 'sad': 'sad', 'angry': 'angry', 'surprised': 'surprised'}
 MIN_CONFIDENCE = 0.5        # below this the face label is a guess: speak neutral
 SPEED_BIAS = 1.1            # speech plays about as fast as Austin mouths; 10% faster keeps the voice up with him
@@ -44,6 +43,7 @@ FIRST_WORDS, NEXT_WORDS, MAX_WORDS = 2, 3, 5
 PAUSE_S = 0.5               # Austin stopped mouthing for this long: speak what is waiting
 CONTEXT_TIMEOUT_S = 20.0    # a context that hears nothing from Sonic for this long is given up (dead socket)
 REUSE_S = 10.0              # a message for a finished utt_id older than this starts a new utterance (decoder restart)
+STALE_S = 3.0               # an open utterance silent this long, with a newer one waiting to play, is closed (lost final)
 FUNCTION_WORDS = {'a', 'an', 'the', 'to', 'of', 'and', 'or', 'but', 'in', 'on', 'at', 'for', 'with', 'my', 'your',
                   'his', 'her', 'our', 'their', 'is', 'are', 'was', 'were', 'i', 'you', 'we', 'they', 'it', 'that',
                   'this', 'very', 'so', 'if', 'than', 'from', 'by', 'as', 'be', 'have', 'has', 'had', 'will',
@@ -72,13 +72,28 @@ def end_mark(first_word):
 
 
 def generation_config(emotion=None, confidence=1.0, pace=None, effort=None):
-    """Map the face label, pace (1.0 = normal, times SPEED_BIAS) and effort (1.0 = normal: soft below, emphatic above)
-    onto Sonic's generation_config."""
+    """Map the face label, pace and effort onto Sonic's generation_config. Pace and effort are relative to Austin's
+    normal (1.0 = normal; svr/live.py: effort = mouthing RMS / his median speaking RMS): speed = pace x SPEED_BIAS,
+    volume = effort, each clamped to Sonic's range."""
     cfg = {'emotion': EMOTION.get(emotion, 'neutral') if confidence >= MIN_CONFIDENCE else 'neutral',
            'speed': round(min(1.5, max(0.6, SPEED_BIAS * (1.0 if pace is None else float(pace)))), 2)}
     if effort is not None:
         cfg['volume'] = round(min(2.0, max(0.5, float(effort))), 2)
     return cfg
+
+
+def inline_tags(said, want):
+    """Sonic keeps a context's generation_config for its whole life, so a change mid-sentence goes inline as Sonic 3's
+    self-closing SSML tags (<speed ratio/>, <volume ratio/>, <emotion value/>), whole in one push, never split."""
+    if not said or not want:
+        return ''
+    tags = ''
+    if want.get('emotion') != said.get('emotion'):
+        tags += f'<emotion value="{want["emotion"]}"/>'
+    for key in ('speed', 'volume'):
+        if want.get(key) is not None and abs(want[key] - said.get(key, 1.0)) >= 0.05:
+            tags += f'<{key} ratio="{want[key]:.2f}"/>'
+    return tags + ' ' if tags else ''
 
 
 def ready(pending, spoken, phrase_words=1):
@@ -103,20 +118,22 @@ class Utterance:
         self.utt_id, self.sent, self.final = utt_id, [], False
         self.pending, self.spoken = [], 0
         self.gen, self.timer, self.seq = None, None, 0
+        self.said_gen = None                # the speed / volume / emotion Sonic is speaking with in this context
         self.ctx, self.reader = None, None
         self.audio = asyncio.Queue()        # bytes, then None when the utterance's audio is complete
         self.queued = self.ended = False
         self.lost = []                      # words streaming couldn't take: spoken whole at the end (fallback)
+        self.broken = False                 # streaming failed twice: every later word goes to `lost`, keeping order
+        self.pace = self.effort = None      # the last pace and effort the decoder sent (a message may leave them out)
         self.t_first_text = self.t_first_audio = self.t_final = None
+        self.t_last = time.perf_counter()   # last voice.say for this utt_id
 
     def new_words(self, words, offset=None):
         words = [w for w in words if w]
-        if offset is not None:              # explicit position from the decoder: no guessing
+        if offset is not None:              # position of words[0] in the sentence: resent words are skipped
             new = words[max(0, len(self.sent) - int(offset)):]
-        elif len(words) >= len(self.sent) and words[:len(self.sent)] == self.sent:
-            new = words[len(self.sent):]    # cumulative message: the prefix we already took
-        else:
-            new = words                     # delta message
+        else:                               # no offset: only the new words (the decoder's voice.say), never a guess
+            new = words
         self.sent += new
         return new
 
@@ -204,10 +221,13 @@ class Voice:
                 u = self.utts[utt_id] = Utterance(utt_id)
                 self._prune()
             u.seq += 1
+            u.t_last = time.perf_counter()
             if u.t_first_text is None and words:
                 u.t_first_text = time.perf_counter()
             u.pending += u.new_words(words, offset)
-            u.gen = generation_config(*self.emotion, pace=pace, effort=effort)
+            u.pace = u.pace if pace is None else pace
+            u.effort = u.effort if effort is None else effort
+            u.gen = generation_config(*self.emotion, pace=u.pace, effort=u.effort)
             if final:
                 await self._finish(u)
                 return
@@ -229,30 +249,40 @@ class Voice:
                 except Exception:  # noqa: BLE001
                     log.exception('closing utterance %s failed', u.utt_id)
                     u.end_audio()
-            else:                   # nothing in flight for it (empty, or lost in a reconnect)
-                await self._speak_lost(u)
+            elif u.lost:            # nothing in flight, words left over: the slow fallback runs off the lock,
+                self._ensure_run(u)     # its place in the play order kept
+                self._spawn(self._lost_then_end(u))
+            else:
                 u.end_audio()
 
     async def _send(self, u, n, end=False):
         """Send the first n pending words as one chunk; they leave `pending` only once Sonic accepted them. Sonic joins
         continued chunks exactly as written: a leading space after the first chunk, closing punctuation on the last."""
         words = u.pending[:n]
-        text = (('' if not u.spoken else ' ') + speakable(words, not u.spoken)) if words else ''
+        tags = inline_tags(u.said_gen, u.gen) if u.ctx is not None and words else ''
+        text = (('' if not u.spoken else ' ') + tags + speakable(words, not u.spoken)) if words else ''
         if end and (u.spoken or words):
             text += end_mark(u.sent[0])
-        if not text:
+        if not text or (not words and u.ctx is None):   # only the end mark, and no context left to close
+            return
+        if u.broken:                # streaming already failed twice: the rest goes to the fallback, in order
+            u.lost += words
+            u.pending, u.spoken = u.pending[n:], u.spoken + len(words)
             return
         for attempt in (1, 2):
             try:
                 if not self._alive():
                     await self._reconnect()
                 ctx = u.ctx or self._open(u)
-                await ctx.push(transcript=text, generation_config=u.gen)
+                await ctx.push(transcript=text)       # the context's generation_config is fixed when it opens
+                if tags:
+                    u.said_gen = u.gen
                 break
             except Exception:  # noqa: BLE001
                 if attempt == 2:
-                    log.exception('Sonic streaming failed twice: "%s" will be spoken whole at the end', text)
+                    log.exception('Sonic streaming failed twice: "%s" and the rest are spoken whole at the end', text)
                     u.lost += words
+                    u.broken = True
                     break
                 try:
                     await self._reconnect()
@@ -275,16 +305,22 @@ class Voice:
                 await self._send(u, len(u.pending))
 
     # --- audio out ------------------------------------------------------------------------------------------------
-    def _open(self, u):
-        if u.ended:                         # its earlier context timed out: start a fresh audio run for the rest
+    def _ensure_run(self, u):
+        """Queue u's audio for the player. An utterance whose audio already ended (a context that timed out, or words
+        left for the fallback) gets a fresh run, queued as its own item, so the player never waits on a finished one."""
+        if u.ended:
             u.audio, u.ended, u.queued = asyncio.Queue(), False, False
+        if not u.queued:
+            u.queued = True
+            self.order.put_nowait((u, u.audio))
+
+    def _open(self, u):
+        self._ensure_run(u)
+        u.said_gen = u.gen
         u.ctx = self.conn.context(f'utt-{u.utt_id}-{int(time.perf_counter() * 1000)}', timeout=CONTEXT_TIMEOUT_S,
                                   model_id=self.cfg.tts_model, voice={'id': self.cfg.voice_id}, output_format=OUTPUT,
                                   generation_config=u.gen, max_buffer_delay_ms=self.cfg.max_buffer_delay_ms)
         u.reader = self._spawn(self._read(u, u.ctx))
-        if not u.queued:
-            u.queued = True
-            self.order.put_nowait(u)
         return u.ctx
 
     async def _read(self, u, ctx):
@@ -315,6 +351,10 @@ class Voice:
             await self._speak_lost(u)
         u.end_audio()
 
+    async def _lost_then_end(self, u):
+        await self._speak_lost(u)
+        u.end_audio()
+
     async def _speak_lost(self, u):
         """The fallback: the words streaming couldn't take, as one whole-sentence request, queued after the rest."""
         if not u.lost:
@@ -329,22 +369,38 @@ class Voice:
         except Exception:  # noqa: BLE001
             log.exception('fallback voice failed too: "%s" not spoken', text)
             return
-        if not u.queued:
-            u.queued = True
-            self.order.put_nowait(u)
+        self._ensure_run(u)
         u.audio.put_nowait(audio)
         log.warning('spoke "%s" with the whole-sentence fallback', text)
 
     async def _play(self):
         """Utterances one after another, each to its end, so audio never interleaves."""
         while True:
-            u = await self.order.get()
+            u, run = await self.order.get()
             heard = False
-            while (b := await u.audio.get()) is not None:
+            while True:
+                try:
+                    b = await asyncio.wait_for(run.get(), 0.5)
+                except TimeoutError:
+                    self._close_if_stale(u)
+                    continue
+                if b is None:
+                    break
                 await self.sink(b)
                 heard = True
             if heard and self.on_done:
                 await self.on_done(u.utt_id, u.t_first_text)
+
+    def _close_if_stale(self, u):
+        """A lost final (decoder crash, dropped message) would hold every later sentence behind this one."""
+        if not u.final and not self.order.empty() and time.perf_counter() - u.t_last > STALE_S:
+            log.warning('utterance %s got no final for %.0f s while another waits: closing it', u.utt_id, STALE_S)
+            u.final, u.t_final = True, time.perf_counter()     # once; a late message for it is ignored as usual
+            self._spawn(self._close_stale(u))
+
+    async def _close_stale(self, u):
+        async with self._lock:
+            await self._finish(u)
 
     def _prune(self):
         """Forget utterances whose audio finished a while ago."""
