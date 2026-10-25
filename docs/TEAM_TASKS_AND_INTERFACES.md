@@ -99,15 +99,16 @@ flowchart TD
 | `cam.tick` | Evan → Austin, Frank | every 100 ms | `seg_id`, `seg_start`, `frame_t` (T), `topk_ids` (T × 32), `topk_logp` (T × 32), `blank_logp` (T), `greedy`, `activity` (T), `face_ok`, `emotion` {`label`, `confidence`, `scores`}, `timing_ms` |
 | `cam.final` | Evan → Austin | at segment end | `seg_id`, `nbest` [{`text`, `score`}] |
 | `cam.face` | Evan → dashboard | ~12.5 Hz | `t`, `w`, `h`, `face_ok`, `pts` (478 × 2, normalised), `blend` (52), `pose` (yaw, pitch, roll) |
-| `dec.hyp` | Austin → dashboard | every 100 ms | `utt_id`, `locked` [words], `unlocked` [words], `confidence` per word, `source` per word (camera / EMG / Claude) |
-| `dec.lock` | Austin → Claude, dashboard | on lock | `utt_id`, `words` [{`w`, `conf`, `alts`, `cam`, `emg`, `t`}] |
-| `dec.repeat` | Austin → dashboard | at sentence end | `utt_id`, `reason` (which reader disagreed, confidences) |
+| `cam.preview` | Evan → dashboard | ~10 Hz (optional) | `t`, `w`, `h`, `jpeg` (the processed frame, 640 px wide): the dashboard's mirror of the webcam, which only the lip reader can open |
+| `dec.hyp` | Austin → dashboard | every 100 ms | `utt_id`, `locked` [words], `unlocked` [words], `confidence` per word, `source` per word (camera / EMG / Claude); optional for the dashboard: `cands` [{`w`, `cam`, `emg`, `claude`}] (top 3 for the newest word) and `threshold` |
+| `dec.lock` | Austin → Claude, dashboard | on lock | `utt_id`, `words` [{`w`, `conf`, `alts`, `cam`, `emg`, `t`}]; optional for the dashboard: per word `cam_top`, `emg_top` (each reader's own pick, for the end screen's disagreement bars) |
+| `dec.repeat` | Austin → dashboard | at sentence end | `utt_id`, `reason` (which reader disagreed, confidences); the dashboard reads `reason` as {`reader` (camera / EMG / Claude), `words` [{`index`, `w`, `alts`}]} |
 | `claude.predict` | Claude → Austin | on judge line, ~2 s | `words` [{`w`, `weight`}], `phrases`, `predictability` (0 to 1), `ttl_s` |
 | `claude.repair` | Claude → Austin, dashboard | on reply | `utt_id`, `edits` [{`index`, `from`, `to`}], `please_repeat` |
 | `voice.say` | Austin → Frank | words leaving the repair window | `utt_id`, `words` (only the new ones), `offset` (index of `words[0]` in the sentence, optional), `final`, `pace`, `effort` (both relative, 1.0 = Austin's normal; below) |
 | `partner.text` | Frank → Claude, dashboard | streaming | `text`, `is_final`, `t` |
 | `call.state` | Frank → dashboard | on change | `state` (`connected` / `ended`), `t`, plus `call_sid` and `ink` on connect |
-| `timing.*` | everyone → logger | every event | the stage and its duration in ms (the camera's ride in `cam.tick.timing_ms`) |
+| `timing.*` | everyone → logger | every event | the stage and its duration in ms (the camera's ride in `cam.tick.timing_ms`); the dashboard's latency strip reads `timing.dec` {`stage`: `lock` (lock decision) or `window` (repair window), `ms`}, `timing.voice` {`stage`: `sonic_first_audio` or `played_to_judge`, `utt_id`, `ms`} and `timing.claude` {`ms`, `error`} |
 
 Austin applies Claude's repairs before forwarding words on `voice.say`, so the voice never needs to know about Claude. The logger subscribes to every topic.
 

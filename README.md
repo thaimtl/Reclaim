@@ -79,6 +79,7 @@ All code lives in this repo; datasets, checkpoints, results and Python environme
 | `bus/` | The team bus: ZeroMQ wire format, the camera's topics (`__init__.py`) and every other endpoint and port (`team.py`) |
 | `buslog/` | Logs every bus message to `$RECLAIM_WORKDIR/logs/` (`record.py`) and replays a session (`replay.py`) |
 | `claude_service/` | The Claude service: predicts Austin's next words and repairs look-alikes (`brain.py`), on the bus (`service.py`) |
+| `dashboard/` | The live dashboard judges watch, from Thai's Figma v5, fed by the bus ([dashboard/README.md](dashboard/README.md)) |
 | `demo/dashboard/` | Captions dashboard prototype, sample data ([demo/dashboard/README.md](demo/dashboard/README.md)) |
 | `call/` | The phone call: Twilio, Austin's cloned voice (Cartesia Sonic) and the judge's captions (Cartesia Ink) ([call/README.md](call/README.md)) |
 | `figures/` | The SVR-1 architecture figure, the SVR-1 vs Gaddy & Klein results (`svr1_vs_gaddy_4ch*`), and the scripts that draw them |
