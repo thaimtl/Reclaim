@@ -136,6 +136,25 @@ def test_a_dead_call_server_is_restarted_even_if_a_call_was_on(tmp_path):
     assert p.restarts == 1 and not lc.in_call
 
 
+def test_a_crashed_logger_comes_back_in_a_new_folder(tmp_path):
+    # buslog never appends to an existing session folder: a restart into the same one dies at once
+    lc = launcher(tmp_path)
+    p = lc.plan()[0]
+    p.cmd[0] = sys.executable
+    p.start(lc.folder, lc.env)
+    try:
+        assert p.wait_ready()
+        p.proc.kill()
+        p.proc.wait()
+        lc.parts.append(p)
+        with redirect_stdout(io.StringIO()):
+            lc.check_parts(backoff_s=0)
+        time.sleep(1.5)
+        assert p.alive() and p.restarts == 1 and (lc.folder / 'bus-r1').is_dir(), p.tail()
+    finally:
+        p.stop(1)
+
+
 def test_a_restart_is_ready_only_from_its_own_output(tmp_path):
     p = Part('Decoder', py('print("fusion: running")'), ('line', r'fusion: running'), 0.5)
     p.start(tmp_path, {})

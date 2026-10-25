@@ -518,6 +518,8 @@ class Launcher:
             if part.name == 'Decoder':          # a restart skips the calibration: nobody is told to mouth for it
                 part.cmd = [x for i, x in enumerate(part.cmd) if x != '--calibrate' and
                             not (i and part.cmd[i - 1] == '--calibrate')]
+            if part.name == 'Logger':           # buslog never appends to a session folder: each restart gets its own
+                part.cmd[part.cmd.index('--out') + 1] = str(self.folder / f'bus-r{part.restarts}')
             time.sleep(backoff_s * part.restarts)
             say(f'restarting {part.name} ({part.restarts}/{MAX_RESTARTS})')
             part.reported = False
