@@ -39,9 +39,6 @@ The code is in `claude_service/`, and [docs/REALTIME_PIPELINE.md](../docs/REALTI
 
 ## Built with Claude Code, hardware included
 
-Four people shipped 99 commits, 31 merged PRs, and 271 tests between October 23 and 25, and every one of us did it with Claude Code.
-Most of Austin's, Frank's, and Evan's commits carry the Claude Code trailer, and Thai's don't only because his git rules leave it off.
-
 Thai is an Anthropic Claude Builder Campus Ambassador and runs the Claude Builder Club at McGill, so he showed up with tricks.
 - A project `CLAUDE.md` holds every decision the team already made, so no agent wastes an hour re-arguing them.
 - Skills turn our habits into commands, like a fixed commit and PR format, a code review pass, and a "do less" mode that keeps the code small.
