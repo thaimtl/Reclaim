@@ -375,14 +375,14 @@ GY, GH = 1005, 150
 panel(5, GY, 1988, GH, '(G) Real-Time Loop: text and voice while you mouth')
 row1 = [('Claude predicts likely words\nbefore you mouth', 'mod'), ('Every 100 ms while mouthing:\nre-read clip, camera + EMG', 'mod'),
         ('Joint search: camera + EMG\n+ LM$^{(H, I)}$ + Claude hints', 'new'), ('Confidence lock: one learned\nscore, threshold moves with context', 'new'),
-        ('Locked words: grey \u2192 black\n+ Cartesia voice into the call', 'lit'), ('Everything logged,\nreplay any session', 'op')]
+        ('Locked words: grey \u2192 black\n+ Cartesia voice into the call', 'lit')]
 row2 = [('Endpoint$^{(G)}$: ~0.5 s of\nEMG quiet + lips still', 'new'), ('Final pass: camera beam\n+ look-alikes$^{(C)}$ + verifier$^{(B)}$ + Claude', 'new'),
         ('Corrected text\nreplaces live text', 'lit'), ('Still unsure: \u201cPlease repeat\u201d\n+ reasons in the error log', 'new')]
 bw, gap = 290, 44
 for i, (t, k) in enumerate(row1):
     x = 22 + i * (bw + gap)
     box(x, GY + 34, bw, 46, t, k, fs=10.5)
-    if i and i != 5:
+    if i:
         arrow([(x - gap, GY + 57), (x, GY + 57)])
 for i, (t, k) in enumerate(row2):
     x = 22 + i * (bw + gap)
