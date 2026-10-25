@@ -1,4 +1,4 @@
-// Reclaim live dashboard: draws each snapshot from dashboard/server.py (dashboard/state.py) as Thai's Figma v5.
+// Silent Voice live dashboard: draws each snapshot from dashboard/server.py (dashboard/state.py) as Thai's Figma v5.
 // Text frames are snapshots (JSON); binary frames are cam.preview JPEGs with their face points (server.py pack_frame).
 'use strict';
 const $ = id => document.getElementById(id);

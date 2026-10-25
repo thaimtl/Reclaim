@@ -48,7 +48,7 @@ You can feel it with two fingers under your chin while saying "ta ta ta", then "
 - IN+ and IN− go about 2 cm apart on the same muscle, since the amplifier measures the difference between them.
 - REF is the zero point, on bone with no muscle on top, so it picks up only the hum for the amplifier to subtract.
   Each board has its own REF pad on bone, away from hair: A0 and A2 behind the right ear, A1 and A3 behind the left.
-- No pad goes on the throat, since the people Reclaim is for have had their voice box removed.
+- No pad goes on the throat, since the people Silent Voice is for have had their voice box removed.
 - Wipe each spot with alcohol, and mark it with a skin marker so pads go back in the same place every session.
 - Run every cable back behind the ears, so the webcam can still see the lips.
 

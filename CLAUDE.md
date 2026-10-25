@@ -1,4 +1,4 @@
-# Reclaim
+# Silent Voice
 
 Cal Hacks 13.0 project, October 23 to 25, 2026: silent speech for people who lost their voice box.
 Read README.md, HARDWARE.md and docs/TEAM_TASKS_AND_INTERFACES.md before answering; docs/REALTIME_PIPELINE.md explains how the system works.

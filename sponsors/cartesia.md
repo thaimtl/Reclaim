@@ -2,7 +2,7 @@
 
 Source: https://docs.cartesia.ai/calhacks, read October 23, 2026.
 Prize: Meta glasses for the winning team, up to 4 people.
-Cartesia is the part that gives someone their own voice back, which makes this track the closest fit to what Reclaim is for.
+Cartesia is the part that gives someone their own voice back, which makes this track the closest fit to what Silent Voice is for.
 
 ## How they judge, 25% each
 
