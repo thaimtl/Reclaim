@@ -27,6 +27,7 @@ CHIP = {'neutral': 'Neutral face', 'happy': 'Smiling', 'sad': 'Frowning', 'surpr
         'angry': 'Tense'}
 TONE = {'neutral': 'Sounds calm', 'happy': 'Sounds warm', 'sad': 'Sounds concerned', 'surprised': 'Sounds surprised',
         'angry': 'Sounds firm'}
+TONE_ORDER = ('warm', 'concerned', 'calm', 'surprised', 'firm')    # the end screen's donut, in this colour order
 REUSE_S = 10.0              # a finished sentence's utt_id seen again after this long: the decoder restarted
 SPEAKING_MAX_S = 8.0        # no 'played' mark this long after the first audio: the voice has stopped anyway
 STALE_S = {'cam': 1.0, 'emg': 1.0, 'claude': 60.0, 'voice': 120.0, 'log': 5.0}
@@ -46,8 +47,9 @@ def _median(xs):
 
 
 class CallState:
-    def __init__(self, number=''):
+    def __init__(self, number='', benchmark=None):
         self.number = number
+        self.benchmark = benchmark           # word error per reader on a scored session (end screen), or None
         self.seen = {}                       # producer -> last bus.now() a message came from it
         self.emg = [dict(level=0.0, peak=MIN_PEAK, contact=False) for _ in PADS]
         self.emg_mean = None
@@ -384,7 +386,9 @@ class CallState:
         lat = {k: _median(self.lat[k]) for k in ('read', 'lock', 'sonic', 'lips_to_voice')}
         claude = self.claude_stage()
         lat['claude'], lat['claude_label'] = claude['ms'], claude['label']
-        return dict(seconds=elapsed, words=n_words,
+        said = [TONE.get(s.get('emotion'), '').replace('Sounds ', '') for s in austin]
+        tones = {t: said.count(t) for t in TONE_ORDER if said.count(t)}
+        return dict(seconds=elapsed, words=n_words, tones=tones, benchmark=self.benchmark,
                     wpm=round(n_words / (elapsed / 60)) if elapsed >= 10 else None,
                     repairs=self.repairs[:], repeats=self.repeats[:], face_hidden_s=round(hidden, 1),
                     emg_words=self.emg_words, disagree=disagree, latency=lat, transcript=self.transcript[:])
