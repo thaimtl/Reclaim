@@ -58,6 +58,7 @@ costs the same. The file (about 100 MB) lives in `data/face_adapter/`, outside g
 
 ```bash
 venv-live/bin/python -m lipread.adapt --sessions session_01 --test-every 5    # train on 4/5, report on the held-out 1/5
+venv-live/bin/python -m lipread.adapt --sessions session_01 --test-sessions session_02   # report on a session it never saw
 venv-live/bin/python -m lipread.adapt --sessions session_01 session_02         # train on everything -> data/face_adapter/austin.pth
 venv-live/bin/python -m lipread.run --cam 0 --face-adapter data/face_adapter/austin.pth
 ```

@@ -29,9 +29,21 @@ def test_sentence_clips_skip_rest_clips_and_sort(tmp_path):
     assert [r['id'] for r in sentence_clips(['session_01'], root=str(tmp_path))] == ['s1_001', 's1_002']
 
 
+def test_sentence_clips_read_from_the_folder_given(tmp_path):
+    d = tmp_path / 'session_02_EMG-dropped-frames'
+    d.mkdir()
+    (d / 'manifest.jsonl').write_text(json.dumps(dict(id='s2_001', session='session_02', prompt='Hi.')) + '\n')
+    assert [r['dir'] for r in sentence_clips([d.name], root=str(tmp_path))] == [d.name]
+
+
 def test_never_trains_on_session_3():
     with pytest.raises(SystemExit):
         main(['--sessions', 'session_01', 'session_03'])
+
+
+def test_a_session_is_not_both_trained_on_and_held_out():
+    with pytest.raises(SystemExit):
+        main(['--sessions', 'session_01', '--test-sessions', 'session_01'])
 
 
 @pytest.fixture(scope='module')

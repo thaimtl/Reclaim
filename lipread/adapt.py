@@ -5,12 +5,15 @@ augmentation); the rest of Auto-AVSR, the CTC head, the decoder and the LM keep 
 same (lipread/MEASURED.md). Crops are made as live: the recording shrunk to --process-size, then LiveCropper.
 
     venv-live/bin/python -m lipread.adapt --sessions session_01 --test-every 5    # 4/5 train, 1/5 held out, report
+    venv-live/bin/python -m lipread.adapt --sessions session_01 --test-sessions session_02   # held out: a new session
     venv-live/bin/python -m lipread.adapt --sessions session_01 session_02         # train on everything, save
     venv-live/bin/python -m lipread.run --cam 0 --face-adapter data/face_adapter/austin.pth
 
-With --test-every, the held-out clips are scored before and after (greedy = the tick reading, beam 5 + LM = the final
-pass) and the adapter is saved only if the final pass is not worse (--force saves anyway). Rest clips are skipped.
-The file goes to data/ in RECLAIM_WORKDIR (outside git); never train on session 3, the test session.
+With --test-every or --test-sessions, the held-out clips are scored before and after (greedy = the tick reading,
+beam 5 + LM = the final pass) and the adapter is saved only if the final pass is not worse (--force saves anyway).
+Rest clips are skipped. A session is a folder under recordings/ (a renamed folder works: clips are read from the
+folder given, not the manifest's session field). Crops are cached per clip in data/face_adapter/crops/. The adapter
+goes to data/ in RECLAIM_WORKDIR (outside git); never train on session 3, the test session.
 """
 import argparse
 import json
@@ -29,6 +32,7 @@ from lipread.model import FACE_ADAPTER_PREFIXES
 from lipread.source import RECORDINGS, ReplaySource
 
 DEFAULT_OUT = os.path.join(lipread.WORK, 'data', 'face_adapter', 'austin.pth')
+CROP_CACHE = os.path.join(lipread.WORK, 'data', 'face_adapter', 'crops')
 
 
 def norm(text):
@@ -37,11 +41,11 @@ def norm(text):
 
 
 def sentence_clips(sessions, root=RECORDINGS):
-    """Manifest rows with a prompt (rest clips out), in id order, across the sessions."""
+    """Manifest rows with a prompt (rest clips out), in id order, across the sessions. row['dir'] is the folder."""
     rows = []
     for s in sessions:
         with open(os.path.join(root, s, 'manifest.jsonl')) as f:
-            rows += [json.loads(line) for line in f if line.strip()]
+            rows += [dict(json.loads(line), dir=s) for line in f if line.strip()]
     return sorted((r for r in rows if r.get('prompt') and '_rest' not in r['id']), key=lambda r: r['id'])
 
 
@@ -54,11 +58,15 @@ def split(rows, test_every):
             [r for i, r in enumerate(rows) if not (i + 1) % test_every])
 
 
-def crops(row, face_model, process_size=(1280, 720), root=RECORDINGS):
-    """(T, 96, 96) uint8 mouth crops at 25 fps of one recording, as the live reader makes them."""
+def crops(row, face_model, process_size=(1280, 720), root=RECORDINGS, cache=CROP_CACHE):
+    """(T, 96, 96) uint8 mouth crops at 25 fps of one recording, as the live reader makes them (cached in cache/,
+    None: no cache)."""
     from lipread.crop import LiveCropper
     from lipread.run import fit
-    src = ReplaySource(row['id'], realtime=False, root=os.path.join(root, row['session']))
+    path = cache and os.path.join(cache, f"{row['id']}_{process_size[0]}x{process_size[1]}.npy")
+    if path and os.path.exists(path):
+        return np.load(path)
+    src = ReplaySource(row['id'], realtime=False, root=os.path.join(root, row.get('dir', row['session'])))
     cropper = LiveCropper(face_model)
     try:
         out = [c.roi96 for f in src.frames() for c in cropper.push(fit(f, process_size))]
@@ -66,7 +74,12 @@ def crops(row, face_model, process_size=(1280, 720), root=RECORDINGS):
     finally:
         src.close()
         cropper.close()
-    return np.stack(out)
+    out = np.stack(out)
+    if path:
+        os.makedirs(cache, exist_ok=True)
+        np.save(path + '.tmp.npy', out)
+        os.replace(path + '.tmp.npy', path)
+    return out
 
 
 def score(reader, beam, clips):
@@ -95,6 +108,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--sessions', nargs='+', default=['session_01'], help='folders under recordings/')
     ap.add_argument('--test-every', type=int, default=0, help='hold out every Nth clip and report (0: train on all)')
+    ap.add_argument('--test-sessions', nargs='+', default=[], help='hold out these whole sessions and report')
     ap.add_argument('--epochs', type=int, default=6)
     ap.add_argument('--lr', type=float, default=1e-4)
     ap.add_argument('--out', default=DEFAULT_OUT)
@@ -102,16 +116,20 @@ def main(argv=None):
     args = ap.parse_args(argv)
     if any('session_03' in s for s in args.sessions):
         ap.error('session 3 is the test session: never train on it')
+    if set(args.sessions) & set(args.test_sessions):
+        ap.error('a session cannot be both trained on and held out')
 
     from lipflow.train_vsr import DEFAULT_SCOPE, finetune
     from lipflow.vsr import LipReader
     from lipread.final import Beam
     face = os.path.join(lipread.LIPFLOW_MODELS, 'face_landmarker.task')
     train_rows, test_rows = split(sentence_clips(args.sessions), args.test_every)
+    test_rows += sentence_clips(args.test_sessions)
     t0 = time.time()
     train = [dict(rois=crops(r, face), text=r['prompt']) for r in train_rows]
     test = [dict(rois=crops(r, face), text=r['prompt']) for r in test_rows]
-    print(f'{len(train)} train / {len(test)} held-out clips from {", ".join(args.sessions)}, crops in '
+    print(f'{len(train)} train clips from {", ".join(args.sessions)} / {len(test)} held out '
+          f'({", ".join(args.test_sessions) or (f"every {args.test_every}th" if args.test_every else "none")}), crops in '
           f'{time.time() - t0:.0f} s; scope {DEFAULT_SCOPE}, {args.epochs} epochs, lr {args.lr}', flush=True)
 
     reader = LipReader(personal=False)

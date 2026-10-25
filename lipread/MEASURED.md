@@ -230,3 +230,18 @@ Findings:
   29 ms. The final pass is unchanged (it reuses the tick's encoder output).
 - Caveats: train and test are the same session (same day, light, pads), and test sentences share words with the
   training ones, so this is optimistic. Check on session 2; never train on session 3.
+
+### Face adapter on a new session: trained on session 1, tested on session 2, 2026-10-25 (5090 dev box)
+
+- `python -m lipread.adapt --sessions session_01 --test-sessions session_02_EMG-dropped-frames`: trained on all 250
+  session 1 sentences (96 s), scored on all 250 session 2 sentences (recorded the same day, a darker room; its video
+  is fine, only its EMG has gaps).
+
+  | 250 session 2 clips | Base | Face adapter (session 1 only) |
+  | --- | --- | --- |
+  | Tick reading (greedy CTC) WER | 0.426 (33 exact) | **0.262** (74 exact) |
+  | Final pass (beam 5 + LM) WER | 0.343 (79 exact) | **0.191** (129 exact) |
+
+- So the gain holds on a session it never saw, and is larger there. Adopted.
+- Demo adapter: `--sessions session_01 session_02_EMG-dropped-frames`, 500 sentences, 161 s ->
+  `data/face_adapter/austin.pth`. Session 3 (the test session) is read with it once, for the final numbers.
