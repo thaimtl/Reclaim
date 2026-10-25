@@ -47,8 +47,8 @@ PCM = {'container': 'raw', 'encoding': 'pcm_s16le', 'sample_rate': RATE}     # p
 # "happy" is weak in Sonic; "excited" carries
 EMOTION = {'neutral': 'neutral', 'happy': 'excited', 'sad': 'sad', 'angry': 'angry', 'surprised': 'surprised'}
 EXCLAIM = {'excited', 'surprised', 'angry'}    # Sonic emotions whose sentences end in '!'
-SSML_TAG = re.compile(r'<[^>]*>')
-PART_END = re.compile(r'[.!]$')     # a part's end mark (a face change mid-sentence), shown as the pause it is    # the volume tags around a clenched word: not shown in the captions
+SSML_TAG = re.compile(r'<[^>]*>')   # the volume tags around a clenched word: not shown in the captions
+PART_END = re.compile(r'[.!]$')     # a part's end mark (a face change mid-sentence), shown as the pause it is
 MIN_CONFIDENCE = 0.5        # below this the face label is a guess: speak neutral
 FACE_HOLD_S = 0.8           # a new face must hold this long to split a sentence into a fresh recording
 SPEED_BIAS = 1.1            # speech plays about as fast as Austin mouths; 10% faster keeps the voice up with him

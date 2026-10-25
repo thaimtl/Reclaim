@@ -80,10 +80,14 @@ def review_input(state):
                 post = rep[1] if rep else w
                 cam = u['cam_top'][i] if i < len(u['cam_top']) and u['cam_top'][i] else pre
                 final.append(post), before.append(pre), lips.append(cam)
+            if u.get('caption'):        # Opus rewrote the caption at the sentence's end (claude.caption)
+                final = [str(w) for w in u['caption']]
             readers = {'lips': norm(' '.join(lips)), 'lips_muscles': norm(' '.join(before)),
                        'claude': norm(' '.join(final))}
             words = [dict(caption=f, **({'before_claude': b} if b != f else {}), **({'lips_alone': c} if c != b else {}))
                      for f, b, c in zip(final, before, lips)]
+            if u.get('caption'):        # a rewrite can change the word count: show the readers' words side by side
+                words = {'caption': ' '.join(final), 'before_claude': ' '.join(before), 'lips_alone': ' '.join(lips)}
         sid = len(sentences) + 1
         sentences.append({'id': sid, 'readers': readers, 'captions': captions})
         turns.append({'austin': {'id': sid, 'captions': captions, 'words': words}})

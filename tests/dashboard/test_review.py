@@ -35,6 +35,14 @@ def test_opus_sees_the_call_in_order_with_each_readers_words():
     assert words[2] == {'caption': 'MY', 'lips_alone': 'BY'} and words[3] == {'caption': 'BAG', 'before_claude': 'PACK'}
 
 
+def test_opus_rewritten_captions_are_what_claude_is_scored_on():
+    st = finished_call()
+    st.feed('claude.caption', {'utt_id': 1, 'words': ['I', 'LOST', 'MY', 'BLACK', 'BAG'], 'changed': True}, 4.5)
+    data = rv.review_input(st)
+    assert data['sentences'][0]['readers']['claude'] == ['i', 'lost', 'my', 'black', 'bag']
+    assert data['turns'][1]['austin']['words']['before_claude'] == 'I LOST MY PACK'
+
+
 def test_each_reader_is_scored_against_what_he_meant():
     data = rv.review_input(finished_call())
     out = rv.score(data['sentences'], {1: ('I lost my bag.', False)})
