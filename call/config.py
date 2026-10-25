@@ -44,7 +44,7 @@ class Config:
     # Ink turn detection: how sure it must be that the caller started a turn (Cartesia: 0.5-0.9, default 0.8)
     turn_start_threshold: float = field(default_factory=lambda: float(_env('INK_TURN_START', '0.8')))
     # words Ink should get right (Cartesia keyterm boosting)
-    stt_keyterms: tuple = ('Reclaim', 'Austin', 'Cal Hacks', 'Cartesia', 'Claude', 'Anthropic', 'laryngectomy', 'EMG')
+    stt_keyterms: tuple = ('Silent Voice', 'Austin', 'Cal Hacks', 'Cartesia', 'Claude', 'Anthropic', 'laryngectomy', 'EMG')
     # debug only, with the caller's consent: write the caller's raw audio (mu-law 8 kHz) here to tune the gate
     record_inbound: str = field(default_factory=lambda: _env('RECORD_INBOUND'))
     # unguessable path for the media websocket: only Twilio (who gets it in our TwiML) can open it

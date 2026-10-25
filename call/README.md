@@ -69,7 +69,7 @@ Times on the bus are `time.perf_counter()` (the team clock).
   (Control Center during the call; on iOS 18 "Automatic" does it at the ear), never speakerphone; (2) a gate here
   passes only audio near the caller's own speaking level (on a test call at the expo: caller -12 to -20 dBFS, people
   nearby -40 to -60), so they are muted even while they talk; if the caller gets quieter, the gate follows within a
-  few seconds (`NOISE_GATE=0` turns it off); (3) Ink is told our words (`keyterm`: Reclaim, Austin, Cal Hacks, ...) and
+  few seconds (`NOISE_GATE=0` turns it off); (3) Ink is told our words (`keyterm`: Silent Voice, Austin, Cal Hacks, ...) and
   how sure to be that a turn started (`INK_TURN_START`, default 0.8).
 - The judge's speech is transcribed but not barge-in aware: Austin's voice is not cut off when the judge talks over it.
 - Phrases (default): measured on real Sonic (a sentence mouthed in 5.5 s with two pauses), first sound 0.6 s after he
