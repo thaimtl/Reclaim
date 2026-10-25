@@ -25,9 +25,9 @@ import threading
 
 import bus
 from bus.team import Pub, Sub
-from claude_service.brain import MAX_END, MAX_LIVE, MAX_REPAIRS, Brain
+from claude_service.brain import MAX_CAPTION, MAX_END, MAX_LIVE, MAX_REPAIRS, Brain
 
-TOPICS = ("partner.text", "dec.lock", "dec.hyp", "dec.pause")
+TOPICS = ("dec.sentence", "partner.text", "dec.lock", "dec.hyp", "dec.pause")
 MOUTHING_S = 0.5  # dec.hyp showed unlocked words this recently
 
 
@@ -105,7 +105,7 @@ def finish(brain, call, pub, now):
 
 def run(brain, sub, pub, stop=lambda: False):
     """sub: a bus.Sub on TOPICS; pub: a bus.Pub. Runs until stop() is true."""
-    convo, live, repairs, ends, last_mouth = None, [], [], [], -1e9  # one conversation call, MAX_LIVE live,
+    convo, live, repairs, ends, captions, last_mouth = None, [], [], [], [], -1e9  # one conversation call, MAX_LIVE live,
     # MAX_REPAIRS repairs, MAX_END end checks
     while not stop():
         timeout = 20
@@ -125,6 +125,8 @@ def run(brain, sub, pub, stop=lambda: False):
                         last_mouth = bus.now()
                 elif topic == "dec.pause":
                     brain.pause(msg)
+                elif topic == "dec.sentence":
+                    brain.sentence(msg)
             except Exception as e:  # one bad message must not stop the service
                 report(pub, f"bad message: {type(e).__name__}: {e}")
             timeout = 0
@@ -142,6 +144,16 @@ def run(brain, sub, pub, stop=lambda: False):
         for call in [c for c in ends if c.done()]:
             finish(brain, call, pub, now)
             ends.remove(call)
+        for call in [c for c in captions if c.done()]:
+            finish(brain, call, pub, now)
+            captions.remove(call)
+        if len(captions) < MAX_CAPTION:   # a sentence closed: Opus rewrites its caption (never the voice)
+            try:
+                if (req := brain.next_caption(now)) is not None:
+                    captions.append(Call(brain, req[1], req[0]))
+            except Exception as e:
+                report(pub, f"caption request failed: {type(e).__name__}: {e}")
+                brain.captions = []
         if len(ends) < MAX_END:     # Austin's lips stopped: has he finished? (the decoder holds his sentence)
             try:
                 if (req := brain.next_end(now)) is not None:

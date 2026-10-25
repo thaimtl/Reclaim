@@ -16,6 +16,11 @@ Two lanes, one conversation (docs/REALTIME_PIPELINE.md, "Claude"):
   appended: the conversation stays append-only (no thinking block is ever replayed after an edited prefix), and
   every repair call reads the same cached prefix. What it decided reaches the conversation in the next
   conversation-lane message.
+- The caption lane: when a sentence closes (dec.sentence close), Opus reads the whole conversation and the sentence as
+  decoded, and writes the sentence Austin most likely said, free to change, add or drop words (names, numbers,
+  dropped short words, look-alikes), as claude.caption. It changes the captions only, never the voice, so it takes
+  its time. Like a repair call it appends nothing; the corrected sentence reaches the conversation in the next
+  conversation-lane message.
 - The end lane: when Austin's lips stop, the decoder holds his sentence and asks (dec.pause) whether he has finished;
   each check is one Haiku call on the conversation so far plus his sentence and how long he has been still, with a
   one-number reply, P(finished), published as claude.end. Like a repair call it appends nothing. The decoder decides
@@ -45,7 +50,6 @@ requeues its words for review, each until MAX_FAILURES in a row; a refused repai
 import json
 import time
 
-from claude_service.names import always_phrases, always_words
 
 MODEL = "claude-haiku-5-5"           # predictions (conversation and live lanes): speed
 REPAIR_MODEL = "claude-opus-5-5"     # repairs: accuracy (they only fix the captions, so its ~5 s costs nothing)
@@ -60,15 +64,11 @@ MAX_LIVE = 3           # live prediction calls in flight at once
 LIVE_JUDGE_EVERY_S = 0.3  # a new word in the judge's live line starts a live call at most this often
 LIVE_EVERY_S = 0.3     # otherwise the next live call starts this soon after the last one is back
 LIVE_IDLE_S = 3.0      # ... and an unchanged context is asked again only after this long
-# filler the language model already covers: never a hint, so Claude's hints go to the words that decide a sentence
-STOPWORDS = frozenset(
-    'a an the i im i\'m it its it\'s to of in on at for and or but so um uh like is are was were be been am do does did '
-    'have has had will would can could just that this these those my me you your we our they them he she his her yes '
-    'no ok okay yeah sure thanks thank well oh not very really too also then there here what with from'.split())
 BACKOFF_S = (1.0, 2.0, 4.0, 8.0)  # wait after 1, 2, 3, 4+ failed calls in a row, from the moment it failed
 MAX_FAILURES = 3       # failed calls in a row after which the failing request's content is dropped
 MAX_PENDING_LINES = 20  # newest judge lines kept while calls fail
 MAX_END = 2            # end checks in flight at once (a newer one replaces a check not yet sent)
+MAX_CAPTION = 2        # caption passes in flight at once
 END_MAX_TOKENS = 300   # the end check's reply is one number
 
 SYSTEM = """You are the conversation model inside Silent Voice, a silent-speech system for people who lost their voice box. \
@@ -85,22 +85,15 @@ utterance as locked so far, one word per line with its index, and the repairs yo
 list words under "review" with the decoder's confidence (conf), the camera and EMG support (cam, emg, 0 to 1) and \
 the alternatives it considered (alts), including the word's lip look-alikes.
 
-Background: this is Cal Hacks, a student hackathon in San Francisco, and the judge is a hackathon judge evaluating \
-the project, not a court judge. Austin is a student at McGill University; his team (with Frank) built Silent Voice for \
-patients who lost their voice box (laryngectomy, ALS). Words that often come up: Austin, Frank, Cal Hacks, McGill \
-University, Red Bull, coffee, Meta, Anthropic, Cartesia, ASL, ALS, patients, laryngectomy, voice box. The judge may \
-also ask ordinary small talk (food, sleep, school, plans): answer it with concrete, everyday content.
-
 You have two jobs, and every reply does both.
 
-1. Predict what Austin will mouth next, given the whole conversation: his answer to the judge's last question, or the \
-rest of his current sentence. The lip reader already knows filler and grammar words (the, a, i, it, to, and, so, is, \
-yes, okay): never list those. Predict the content words that decide the sentence: nouns, names, numbers, places, \
-foods, verbs and adjectives that answer the question. Give each word a weight from 0 to 1 for how likely it is to \
-appear in his next few words. Then give several full likely sentences Austin could say as phrases, written out in \
-full ("my name is austin", "i had burritos for breakfast", "i study at mcgill university"). Up to 30 words and 8 \
-phrases, lowercase, no punctuation. Set predictability from 0 to 1: high when the next words are strongly constrained \
-(a yes-or-no question, his name, the end of a set phrase), low when he could say almost anything.
+1. Predict. Give the words and phrases Austin is likely to mouth next, given the whole conversation: answers to the \
+judge's last question, the natural continuation of his current utterance, common short replies. Give each word a \
+weight from 0 to 1 for how likely it is to appear in his next few words. Give the phrases as full sentences he could \
+say, written out in full ("my name is austin", "i study at mcgill university"): the decoder tries each one against his \
+lips, so a likely sentence you write out can be what he said. Up to 30 words and 8 phrases, lowercase, no \
+punctuation. Set predictability from 0 to 1: high when the next words are strongly constrained (a yes-or-no question, \
+the end of a set phrase), low when he could say almost anything.
 
 2. Repair. For each word under review, decide whether the locked word is what Austin meant. If an alternative fits \
 the conversation clearly better, return an edit with that word's index, the locked word as "from" and the alternative \
@@ -148,6 +141,23 @@ END_SCHEMA = {
     "required": ["p_complete"],
     "additionalProperties": False,
 }
+
+CAPTION_SCHEMA = {
+    "type": "object",
+    "properties": {"text": {"type": "string"}},
+    "required": ["text"],
+    "additionalProperties": False,
+}
+
+CAPTION_CHECK = """Caption pass (this message only asks this, with its own rules; no predictions or repairs). Austin's \
+sentence {utt} has ended. The decoder read it from his lips and face muscles as:
+{words}
+Lip reading confuses words that look alike on the lips (b/m/p, f/v, t/d/n, k/g, sounds behind the teeth), drops \
+short words, splits or merges words, and mangles names and numbers. Using the whole conversation, write the sentence \
+Austin most likely mouthed, for the on-screen caption: change, add or remove any words you need to, and fix names, \
+numbers and grammar. Keep what he meant: never add an idea he didn't express. If the reading is too broken to tell, \
+stay close to the decoded words. Reply with text: the corrected sentence, lowercase, no punctuation except \
+apostrophes."""
 
 END_CHECK = """End-of-sentence check (this message only asks this; no predictions or repairs). Austin stopped \
 mouthing {silence:.1f} s ago. His current sentence so far, as the decoder read it (it may hold look-alike mistakes):
@@ -226,6 +236,7 @@ class Brain:
         self.live_at = -1e9   # when the last live call started
         self.live_asked = ""  # the context it was asked on
         self.end = None       # the newest dec.pause not yet asked (end lane)
+        self.captions = []    # closed sentences waiting for their caption pass (caption lane), oldest first
 
     def partner(self, msg):
         text = msg.get("text", "").strip()
@@ -294,6 +305,26 @@ class Brain:
                                    judge=judge)
         return _cached(self.messages) + [{"role": "user", "content": content}], \
             {"utt_id": e["utt_id"], "words": [], "review": [], "sent": now, "lane": "end", "ask": e["ask"]}
+
+    def sentence(self, msg):
+        """dec.sentence: a closed sentence with locked words gets a caption pass."""
+        utt = msg.get("utt_id")
+        if msg.get("event") == "close" and utt in self.utts and any(w["w"] != "?" for w in self.utts[utt]) \
+                and utt not in self.captions:
+            self.captions.append(utt)
+
+    def next_caption(self, now):
+        """A caption-lane call for the oldest closed sentence waiting: (messages, target), or None. The messages are the
+        conversation so far plus the check; nothing is appended to the conversation."""
+        if not self.captions or now < self.retry_at:
+            return None
+        utt = self.captions.pop(0)
+        if utt not in self.utts:
+            return None
+        words = [w["w"] for w in self.utts[utt]]
+        content = CAPTION_CHECK.format(utt=utt, words=" ".join(words))
+        return _cached(self.messages) + [{"role": "user", "content": content}], \
+            {"utt_id": utt, "words": words, "review": [], "sent": now, "lane": "caption"}
 
     def _touch(self, utt):
         if utt not in self.updated:
@@ -394,13 +425,14 @@ class Brain:
         t0 = time.perf_counter()
         log = {"stage": "claude", "lane": lane, "request": msgs[-1]["content"]}
         try:
-            schema = END_SCHEMA if lane == "end" else SCHEMA
+            schema = END_SCHEMA if lane == "end" else CAPTION_SCHEMA if lane == "caption" else SCHEMA
             common = dict(system=SYSTEM, messages=msgs, cache_control={"type": "ephemeral"},
                           output_config={"effort": "low", "format": {"type": "json_schema", "schema": schema}})
             if lane == "end":       # Haiku, one number back: the end check is on the clock (the sentence holds)
                 r = self.client.beta.messages.create(model=MODEL, max_tokens=END_MAX_TOKENS,
                                                      thinking={"type": "disabled"}, **common)
-            elif lane == "repair":  # Opus: Haiku swapped right words on the session 3 replay (0.8 edits a sentence)
+            elif lane in ("repair", "caption"):  # Opus: captions only, so its time costs nothing; Haiku swapped right
+                # words for wrong ones on the session 3 replay (0.8 edits a sentence)
                 r = self.client.beta.messages.create(model=REPAIR_MODEL, max_tokens=REPAIR_MAX_TOKENS,
                                                      betas=[FALLBACK_BETA], fallbacks="default", **common)
             else:
@@ -452,6 +484,9 @@ class Brain:
             self.notes = target.get("notes", []) + self.notes
             self.updated = [u for u in target.get("updated", []) if u in self.utts and u not in self.updated] + self.updated
             self.fresh = self.fresh or target.get("unlocked", False)
+        elif target.get("lane") == "caption":   # a caption pass is retried, unless refused
+            if not refused and target["utt_id"] in self.utts and target["utt_id"] not in self.captions:
+                self.captions.insert(0, target["utt_id"])
         else:  # a refused repair's words are not retried
             utt = target["utt_id"]
             if not refused and target["review"] and utt in self.utts:
@@ -476,18 +511,24 @@ class Brain:
         if target.get("lane") == "end":
             return [("claude.end", {"utt_id": target["utt_id"], "p_complete": _clip(reply["p_complete"]),
                                     "ask": target.get("ask"), "t": now})], []
+        if target.get("lane") == "caption":
+            utt, before = target["utt_id"], target["words"]
+            words = [w for w in _norm(reply["text"]).replace(",", " ").replace(".", " ").split() if w]
+            if not words:
+                return [], []
+            if words != before:     # the conversation hears the corrected sentence in its next message
+                self.notes.append(f"utterance {utt}, caption corrected: {' '.join(before)} -> {' '.join(words)}")
+                if utt in self.utts:
+                    self.utts[utt] = [{"w": w, "alts": [], "conf": None, "cam": None, "emg": None, "t": None}
+                                      for w in words]
+                    self.review.pop(utt, None)
+                    self._touch(utt)
+            return [("claude.caption", {"utt_id": utt, "words": words, "from": before, "changed": words != before,
+                                        "t": now})], []
         if sent >= self.predict_sent:
-            words = {}
-            for p in reply["predict_words"]:   # content words only: filler is the language model's job
-                w = _norm(p["w"])
-                if w and w not in STOPWORDS:
-                    words[w] = max(words.get(w, 0.0), _clip(p["weight"]))
-            for w, x in always_words().items():   # the demo's names, always (claude_service/names.py)
-                words[w] = max(words.get(w, 0.0), x)
-            phrases = [_norm(p) for p in reply["predict_phrases"] if _norm(p)]
             self.predict = {
-                "words": [{"w": w, "weight": x} for w, x in sorted(words.items(), key=lambda kv: -kv[1])],
-                "phrases": phrases + [p for p in always_phrases() if p not in phrases],
+                "words": [{"w": _norm(p["w"]), "weight": _clip(p["weight"])} for p in reply["predict_words"] if _norm(p["w"])],
+                "phrases": [_norm(p) for p in reply["predict_phrases"] if _norm(p)],
                 "predictability": _clip(reply["predictability"]),
                 "ttl_s": max(0.0, PREDICT_TTL_S - (now - sent)),
                 "t": sent,

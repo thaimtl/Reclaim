@@ -25,6 +25,7 @@ finished candidates costs one GPU call instead of thousands of tiny ones.
 The gate is a softmax over (camera, EMG, LM) from a linear layer on six signals, times one learned scale; it is
 fitted on sessions 1 and 2 by making the true sentence win among the candidates (python -m fusion.offline fit).
 """
+import functools
 import math
 import os
 import sys
@@ -247,11 +248,69 @@ def gate_features(cam, emg_read, emg_quality):
     return np.array([conf, face, act, speak, emg_quality, rate])
 
 
-class Cand:
-    __slots__ = ('words', 'tokens', 'source')
+# Claude carries: its predicted sentences and words enter the race wherever they are even roughly a lip match for what
+# the camera read, and then count more than the camera and EMG (JointSearch.claude_candidates, claude_override).
+LIP_MIN = 0.35         # lip similarity (0 to 1, viseme sequences) a Claude word or sentence needs to enter the race
+CLAUDE_GAIN = 10.0     # a Claude candidate scores the best camera reading + CLAUDE_GAIN x its weight x lip similarity
+CLAUDE_MARGIN = 1.0    # ... minus this
+PHRASE_CLAUDE_WEIGHT = 0.8   # the weight of one of Claude's full predicted sentences (they carry no weight of their own)
+CLAUDE_SWAP_WEIGHT = 0.3     # a predicted word below this weight is never swapped in
+COMBO_LIP = 0.45             # a swap joins the all-at-once candidate only on a lip match this close
+CARRY_LOCK_LIP = 0.6         # a word Claude carries locks while he mouths only on a lip match this close; a rougher
+#                              match wins the caption at once but locks at the sentence's end (it may still move)
 
-    def __init__(self, words, tokens, source):
+
+# letters -> rough lip shapes, for words no lexicon knows (the camera's own inventions, "burinadoes")
+LETTER_VISEME = {**{c: 'P' for c in 'bmp'}, **{c: 'F' for c in 'fv'}, **{c: 'T' for c in 'tdnl'},
+                 **{c: 'S' for c in 'szcx'}, **{c: 'K' for c in 'kgq'}, 'j': 'SH', 'r': 'R', 'w': 'W', 'y': 'Y',
+                 'h': 'H', 'a': 'A', 'e': 'E', 'i': 'E', 'o': 'O', 'u': 'O'}
+
+
+@functools.lru_cache(maxsize=50000)
+def visemes(word):
+    """A word's lip shapes: its pronunciation (CMUdict + our supplement) as viseme classes, else from its letters
+    (doubled letters once)."""
+    from bench.lookalikes import VISEME
+    from svr.phonemes import cmudict
+    p = cmudict().get(word)
+    # "h" is just breath on the lips, nothing like the k/g group bench.lookalikes files it under
+    if p:
+        return tuple('H' if x == 'HH' else VISEME.get(x, x) for x in p)
+    out = []
+    for i, ch in enumerate(word):
+        v = LETTER_VISEME.get(ch)
+        if v and not (i and word[i - 1] == ch):
+            out.append(v)
+    return tuple(out)
+
+
+def lip_similarity(a, b):
+    """How alike two word sequences look on the lips: 1 - viseme edit distance / the longer sequence (1 = identical).
+    Cached: the same pairs come back on every 100 ms pass."""
+    return _lip(tuple(a), tuple(b))
+
+
+@functools.lru_cache(maxsize=200000)
+def _lip(a, b):
+    x = [v for w in a for v in visemes(w)]
+    y = [v for w in b for v in visemes(w)]
+    if not x or not y:
+        return 0.0
+    d = list(range(len(y) + 1))
+    for i, xi in enumerate(x, 1):
+        prev, d[0] = d[0], i
+        for j, yj in enumerate(y, 1):
+            prev, d[j] = d[j], min(d[j] + 1, d[j - 1] + 1, prev + (xi != yj))
+    return 1.0 - d[-1] / max(len(x), len(y))
+
+
+class Cand:
+    __slots__ = ('words', 'tokens', 'source', 'lip', 'cw', 'base')
+
+    def __init__(self, words, tokens, source, lip=0.0, cw=0.0, base=None):
         self.words, self.tokens, self.source = tuple(words), tuple(tuple(t) for t in tokens), source
+        self.lip, self.cw = lip, cw    # Claude's candidates: lip similarity to the camera's reading, Claude's weight
+        self.base = base               # ... and the camera reading it was made from
 
     def flat(self):
         """The camera's pieces; a word with no pieces was inserted without the camera seeing it."""
@@ -262,7 +321,7 @@ class Cand:
 
 
 class JointSearch:
-    def __init__(self, lm, pieces=None, lexicon=None, beam=16, lookalikes=6, swap_top=4, max_cands=80,
+    def __init__(self, lm, pieces=None, lexicon=None, beam=16, lookalikes=6, swap_top=4, max_cands=96,
                  max_new=8, inserts=12, phrase_cands=8):
         """lm: fusion.lm.ConversationLM; lexicon: bench.lookalikes.Lexicon (None: no look-alike swaps)."""
         self.lm, self.pieces, self.lexicon = lm, pieces or Pieces(), lexicon
@@ -336,7 +395,8 @@ class JointSearch:
             out = self._lk[word] = alts[:self.n_lookalikes]
         return out
 
-    def candidates(self, cam, w, hints, locked=(), extra_texts=(), final=False, phrases=(), locked_tokens=None):
+    def candidates(self, cam, w, hints, locked=(), extra_texts=(), final=False, phrases=(), locked_tokens=None,
+                   claude_words=None, claude_phrases=()):
         """Candidates for this pass: the camera beam, extra texts (cam.final's n-best, SVR-1's greedy reading), the
         beam's best reading with short words from Claude's predicted phrases filled in, then short words inserted
         where the LM gains most, then look-alike swaps of the beam's best few and of the first extra. Inserted words
@@ -370,6 +430,19 @@ class JointSearch:
                 add(words, tokens, 'phrase')
         for words, tokens in self.short_inserts(base, len(locked), final)[:self.inserts]:
             add(words, tokens, 'insert')
+        if base and (claude_words or claude_phrases):    # Claude's own sentences and words, before the look-alikes
+            by_words = {c.words: c for c in out}
+            for words, lip, cw, frm in self.claude_candidates(base, locked, claude_words or {}, claude_phrases):
+                words = locked + tuple(words[len(locked):])
+                if words in by_words:          # the camera already read it: Claude agrees, it carries Claude's weight
+                    c = by_words[words]
+                    if cw * lip > c.cw * c.lip:
+                        c.lip, c.cw, c.base = lip, cw, c.words if c.source != 'claude' else frm
+                elif len(out) < self.max_cands:
+                    c = Cand(words, lock_tok + [p.word_ids(x) for x in words[len(locked):]], 'claude', lip, cw, frm)
+                    out.append(c)
+                    by_words[words] = c
+                    seen.add(words)
         firsts = [c for c in out if c.source == 'camera'][:self.swap_top]
         firsts += [c for c in out if c.source == 'extra'][:1] if final else []   # cam.final's best
         for c in firsts:
@@ -380,6 +453,68 @@ class JointSearch:
         if not out:
             add(locked, lock_tok, 'locked')
         return out
+
+    def claude_candidates(self, base, locked, words, phrases):
+        """(words, lip similarity, Claude's weight, the reading it came from) of each Claude candidate at least LIP_MIN like what the
+        camera read: each predicted sentence, cut to as many words as the camera read after the locked ones (from the
+        sentence's start, or after its own copy of the locked words), and the camera's best two readings with one word
+        swapped for a predicted word that looks like it."""
+        out = []
+        locked = tuple(locked)
+        k = len(locked)
+        read = base[0].words[k:]
+        if read:
+            for ph in phrases:
+                ph = tuple(ph)
+                starts = {0}
+                if k and len(ph) > k and lip_similarity(ph[:k], locked) >= 0.6:
+                    starts.add(k)
+                for s in starts:
+                    span = ph[s:s + len(read)]
+                    if span:
+                        lip = lip_similarity(span, read)
+                        if lip >= LIP_MIN:
+                            out.append((locked + span, lip, PHRASE_CLAUDE_WEIGHT, base[0].words))
+        for c in base[:2]:
+            for wd, x in words.items():   # each predicted word into one place: where it looks most like the lips
+                if x < CLAUDE_SWAP_WEIGHT or wd in c.words or wd in SHORT_WORDS:
+                    continue
+                # never over a short function word ("had", "the"): the LM's job, and where wild placements come from
+                spots = sorted(((lip_similarity((wd,), (c.words[i],)), i) for i in range(k, len(c.words))
+                                if c.words[i] not in SHORT_WORDS), reverse=True)
+                for lip, i in spots[:2]:     # its best spot, and a second one nearly as good (the LM picks)
+                    if lip >= LIP_MIN and lip >= spots[0][0] - 0.1:
+                        out.append((c.words[:i] + (wd,) + c.words[i + 1:], lip, x, c.words))
+        # every Claude word at once: the best set of swaps on the camera's best reading (each word once, each spot once,
+        # good lip matches only), one candidate
+        best_read = base[0].words
+        opts = []
+        for words_c, lip, x, frm in out:
+            if frm == best_read and len(words_c) == len(best_read) and lip >= COMBO_LIP:
+                diff = [i for i in range(len(best_read)) if words_c[i] != best_read[i]]
+                if len(diff) == 1:
+                    opts.append((lip * x, diff[0], words_c[diff[0]], lip, x))
+        opts = sorted(opts, reverse=True)[:12]
+        best_set = []
+
+        def pick(j, chosen, total):
+            nonlocal best_set
+            if total > sum(o[0] for o in best_set):
+                best_set = list(chosen)
+            for m in range(j, len(opts)):
+                o = opts[m]
+                if all(o[1] != c[1] and o[2] != c[2] for c in chosen):
+                    pick(m + 1, chosen + [o], total + o[0])
+
+        pick(0, [], 0.0)
+        if len(best_set) > 1:
+            combo = list(best_read)
+            for _, i, wd, _, _ in best_set:
+                combo[i] = wd
+            out.append((tuple(combo), sum(o[3] for o in best_set) / len(best_set), max(o[4] for o in best_set),
+                        best_read))
+        out.sort(key=lambda t: -t[1] * t[2])
+        return out[:24]
 
     def short_inserts(self, base, start, final):
         """(words, tokens) of each base reading with one short word inserted (unseen), best LM gain first."""
@@ -483,6 +618,22 @@ class JointSearch:
         """S per candidate from the judge scores and this pass's weights."""
         return (w['cam'] * scores[:, 0] + w['emg'] * scores[:, 1] + w['lm'] * scores[:, 2] + w['beta'] * scores[:, 3]
                 + w['gamma'] * scores[:, 4] + w.get('final', 0.0) * scores[:, 5] + w.get('unseen', 0.0) * scores[:, 6])
+
+
+def claude_override(cands, S):
+    """Claude carries: a Claude candidate (or a camera one Claude predicted) scores at least the camera reading it
+    was made from, plus CLAUDE_GAIN x its weight x its lip similarity, minus CLAUDE_MARGIN."""
+    S = np.array(S, np.float64)
+    own = {c.words: s for c, s in zip(cands, S)}
+    plain = [s for c, s in zip(cands, S) if c.cw <= 0]
+    if not len(S):
+        return S
+    top = max(plain) if plain else float(S.max())
+    for j, c in enumerate(cands):
+        if c.cw > 0:
+            ref = own.get(c.base, top) if c.base is not None else top
+            S[j] = max(S[j], ref + CLAUDE_GAIN * c.cw * c.lip - CLAUDE_MARGIN)
+    return S
 
 
 def fix_infeasible(scores):
