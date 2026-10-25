@@ -171,6 +171,35 @@ def live_lane():
     check('live: a late reply never replaces a newer one', late == [] and b.predict['words'][0]['w'] == 'burritos')
 
 
+def caption():
+    """A closed sentence gets one Opus caption pass on the whole conversation: the corrected sentence (words may change,
+    appear or go) goes out as claude.caption, the conversation hears it next, a failed pass is retried, and the
+    caption lane appends nothing."""
+    fake = FakeClient([{'text': 'i study at mcgill university'}, {'text': 'i study at mcgill university'}])
+    b = Brain(fake)
+    b.locked(lock(5, ('i', []), ('study', []), ('at', []), ('mecca', ['mega']), ('university', [])))
+    check('caption: nothing before the sentence closes', b.next_caption(0.0) is None)
+    b.sentence({'utt_id': 5, 'event': 'hold'})
+    check('caption: a hold is not a close', b.next_caption(0.0) is None)
+    b.sentence({'utt_id': 5, 'event': 'close'})
+    b.sentence({'utt_id': 5, 'event': 'close'})
+    msgs, target = b.next_caption(1.0)
+    check('caption: one pass per closed sentence, on the decoded words', b.captions == [] and target['lane'] == 'caption'
+          and 'i study at mecca university' in msgs[-1]['content'])
+    b.failed(target, 1.5)
+    check('caption: a failed pass is retried', b.captions == [5])
+    b.succeeded()
+    msgs, target = b.next_caption(2.0)
+    r, log = b.ask(msgs, lane='caption')
+    out, _ = b.apply(r, target, 3.0)
+    check('caption: Opus, nothing appended', b.messages == [] and fake.calls[-1]['model'] == brain_mod.REPAIR_MODEL)
+    check('caption: claude.caption with the corrected words', out == [('claude.caption', {
+        'utt_id': 5, 'words': ['i', 'study', 'at', 'mcgill', 'university'],
+        'from': ['i', 'study', 'at', 'mecca', 'university'], 'changed': True, 't': 3.0})], out)
+    check('caption: the conversation hears it next', 'mecca university -> i study at mcgill' in ' '.join(b.notes)
+          and 5 in b.updated and [w['w'] for w in b.utts[5]][3] == 'mcgill')
+
+
 def stale_predict():
     """A prediction from an older request never replaces a newer one; refresh resends the newest while mouthing."""
     b = Brain(FakeClient([]))
@@ -525,6 +554,7 @@ if __name__ == '__main__':
     unit()
     end_lane()
     live_lane()
+    caption()
     stale_predict()
     late_lock()
     empty_reply()
