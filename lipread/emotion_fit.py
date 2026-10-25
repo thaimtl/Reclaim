@@ -3,12 +3,8 @@
     venv-live/bin/python -m lipread.emotion_fit                                         # writes data/emotion/head.npz
     venv-live/bin/python -m lipread.emotion_fit --sessions session_01 --test session_02
 
-What carries to a new call, measured on Austin's sessions 1 to 3 (each scored by a head fitted on the others):
-the HSEmotion scores alone (--features logits, the default) with strong regularisation (C 0.01). The 52 blendshapes
-fit one session and fail the next (the EMG pads on the cheeks move between sessions). Training subtracts each
-session's median face (where the running baseline settles, so it looks ahead); scoring replays the live, causal
-RunningBaseline on sessions the head never saw. With one session, 5-fold by clip shares that session's median
-(no labels in it) between folds.
+Defaults (--features logits, C 0.01) are what carried across Austin's sessions 1 to 3: the blendshapes did not.
+Training subtracts each session's median face, scoring replays the live RunningBaseline.
 """
 import argparse
 import itertools
@@ -91,18 +87,15 @@ def extract(root, session, cache=FEATURE_DIR):
 
 
 def session_median(clips):
-    """The session's neutral face for training: the median of its sentence frames (most are neutral), without the
-    ones RunningBaseline keeps out, i.e. where the running baseline settles. It reads no labels."""
+    """The median of the sentence frames RunningBaseline would keep (no labels read); None when there are none."""
     from lipread.emotion import RunningBaseline
-    f = np.vstack([c[4] for c in clips if not c[2]])
-    f = f[~np.isnan(f).any(1)]
     expressive = RunningBaseline().expressive
-    return np.median(f[[not expressive(x) for x in f]], 0)
+    f = [x for c in clips if not c[2] for x in c[4] if not np.isnan(x).any() and not expressive(x)]
+    return np.median(f, 0) if f else None
 
 
 def running_bases(clips):
-    """Per clip, per frame: the baseline the live tagger would hold at that moment (RunningBaseline over the session
-    in recorded order, causal), or None while it warms up."""
+    """Per clip, per frame: the live tagger's baseline at that moment, or None while it warms up."""
     from lipread.emotion import RunningBaseline
     rb, out = RunningBaseline(), []
     for _, _, _, t, f in clips:
@@ -185,9 +178,8 @@ def score(clips, res):
 
 
 def held_out_probs(sessions, C=C_DEFAULT, cols=LOGITS):
-    """Per session, per clip: (T, 4) probabilities from a head that never saw the clip, read the way the live tagger
-    reads it (running baseline). With several sessions, each is scored by a head fitted on the others
-    (leave-one-session-out: the honest test, since a new call is a new session); with one, 5-fold by clip."""
+    """Per session, per clip: (T, 4) probabilities from a head that never saw it (leave-one-session-out, or 5-fold
+    by clip with one session), on the running baseline."""
     probs = [[None] * len(s['clips']) for s in sessions]
     if len(sessions) > 1:
         for k, s in enumerate(sessions):
@@ -222,7 +214,10 @@ def load_session(root, name):
     t_start = next((t for c, bs in zip(clips, bases) for t, b in zip(c[3], bs) if b is not None), None)
     if t_start is None:
         raise SystemExit(f'{name}: not {BASELINE_S:.0f} s of face anywhere')
-    return dict(name=name, clips=clips, bases=bases, t_start=t_start, median=session_median(clips))
+    median = session_median(clips)
+    if median is None:
+        raise SystemExit(f'{name}: no neutral-looking face frames in its sentences')
+    return dict(name=name, clips=clips, bases=bases, t_start=t_start, median=median)
 
 
 def summary(acc, fresh, carry, rest):

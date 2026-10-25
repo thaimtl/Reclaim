@@ -418,3 +418,12 @@ def test_an_old_head_file_without_columns_reads_all_features(tmp_path, caplog):
              smoothing=np.array([0.5, 0.5, 0.3]), info=np.array(''))
     assert len(Head.load(tmp_path / 'old.npz').cols) == N_FEATURES
     assert 'refit' in caplog.text
+
+
+def test_session_median_without_neutral_frames_is_none():
+    smile = np.tile(feats_of('Happiness'), (10, 1))
+    clip = ('c', 'happy', False, np.arange(10) * 0.04, smile)
+    assert emotion_fit.session_median([clip]) is None
+    calm = np.tile(feats_of('Neutral', 1.0), (10, 1))
+    assert np.array_equal(emotion_fit.session_median([clip, ('d', 'neutral', False, np.arange(10) * 0.04, calm)]),
+                          feats_of('Neutral', 1.0))
