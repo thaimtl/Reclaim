@@ -56,9 +56,11 @@ The demo is two minutes, live, at our table.
 
 ## Stack
 
+We took the best open lip reader, made it work in real time, and paired it with muscle sensing and Claude.
+
 | Part | Tool |
 |---|---|
-| Lip reading | [Auto-AVSR](https://github.com/mpc001/auto_avsr), as is, re-read every 100 ms for real time |
+| Lip reading | [Auto-AVSR](https://github.com/mpc001/auto_avsr), the open lip reader that held up best on new video in a [2026 study](https://arxiv.org/abs/2606.07259) (45.5% of words wrong from lips alone, against 57.9% for USR and 81.5% for Llama-AVSR). We use it as is, with no retraining, and made it real time, so it re-reads the clip every 100 ms, detects when Austin starts and stops, and runs a careful final pass when he finishes. |
 | Face, mouth crop, expression | MediaPipe FaceLandmarker |
 | Muscle signals | BioAmp EXG Pill boards and an Arduino Uno, see [HARDWARE.md](HARDWARE.md) |
 | EMG model | SVR-1, ours: PyTorch, pre-trained on Berkeley's silent speech data, fine-tuned on Austin |
@@ -99,6 +101,9 @@ Data folders are in `.gitignore`.
 - This is a prototype, not a medical device.
 - Lip reading gets about 1 in 5 words wrong even on normal speaking video, and silent mouthing is harder.
   The EMG model and Claude are there to close that gap.
+- On Austin's recordings, the system gets about 23% of words wrong.
+  Our conversational language model takes about 2 points off that, and EMG almost none yet, since most of the camera's misses on Austin are dropped short words like "I'd", not look-alikes.
+  Claude's effect isn't measured yet.
 - The EMG model is trained for one person (Austin), from three recording sessions, see [RECORDING.md](RECORDING.md).
 - The voice runs a little behind the lips, because a word is spoken only once it's confident enough to lock.
 
