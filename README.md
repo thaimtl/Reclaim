@@ -56,9 +56,6 @@ The demo is two minutes, live, at our table.
 
 ## Stack
 
-Lip reading on its own reads finished clips and can't tell "bat" from "pat", so it can't hold a live conversation.
-We rebuilt it for one, so it reads while Austin mouths, our muscle sensors catch the tongue the camera can't see, and Claude uses the conversation to settle the look-alikes.
-
 | Part | Tool |
 |---|---|
 | Live lip reading | Ours (`lipread/`), built on the open [Auto-AVSR](https://github.com/mpc001/auto_avsr) model. We turned a clip-by-clip reader into a live one that streams word guesses as Austin mouths, knows when he starts and stops, and feeds every guess into one joint search with the EMG model and Claude. |
