@@ -62,6 +62,8 @@ def main():
     ap.add_argument('--svr', default=DEFAULT_SVR, help='SVR-1 checkpoint')
     ap.add_argument('--params', default=PARAMS, help='fitted gate and lock model (fusion.offline)')
     ap.add_argument('--repair-s', type=float, default=0.3, help="repair window before a locked word is spoken")
+    ap.add_argument('--tau0', type=float, default=None, help="lock threshold at predictability 0 (default: fitted)")
+    ap.add_argument('--tau-end', type=float, default=None, help="end-of-sentence threshold: below it, Please repeat")
     ap.add_argument('--no-emg', action='store_true', help='camera + LM + Claude only')
     ap.add_argument('--no-claude', action='store_true', help="ignore Claude's predictions and repairs")
     ap.add_argument('--calibrate', type=float, default=0.0, metavar='S', help='refit the EMG gains on the first S s')
@@ -71,6 +73,11 @@ def main():
 
     from fusion.core import Fusion
     gate, lock, meta = load_params(args.params)
+    if args.tau0 is not None:   # keep the fitted range's shape around the new threshold
+        lock.tau_min, lock.tau_max = lock.tau_min + args.tau0 - lock.tau0, min(0.99, lock.tau_max + args.tau0 - lock.tau0)
+        lock.tau0 = args.tau0
+    if args.tau_end is not None:
+        lock.tau_end = args.tau_end
     if not meta:
         print(f'fusion: {args.params} missing: unfitted gate and lock model', file=sys.stderr)
     live = None

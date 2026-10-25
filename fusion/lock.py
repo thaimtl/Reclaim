@@ -3,6 +3,8 @@
     p_lock(w) = sigmoid(theta . f(w) + bias)
     a word locks when p_lock >= tau, tau = clip(tau0 - kappa * predictability, tau_min, tau_max),
     and only when every word before it is locked, and camera-EMG agreement is at least agree_floor.
+    The end-of-sentence passes (which also have the camera's own final-pass score) use min(tau, tau_end); a word
+    still below it then ends the sentence in "Please repeat".
 
 Features f(w), in FEATURES order:
     joint         the joint search's posterior for the word at its position
@@ -19,7 +21,8 @@ Features f(w), in FEATURES order:
 theta is a logistic regression fitted on sessions 1 and 2 (python -m fusion.offline fit): every word on every pass is
 an example, labelled right when it matches the true word at its position and never changes later in the segment.
 tau0 is chosen on the same sessions, each scored by a model fitted on the other one, so that at most 2% of locked
-words are wrong with the shortest delay. kappa can't be fitted offline (Claude has no offline replay): it is a set
+words are wrong with the shortest delay; when no tau gets there (the readers make confident mistakes), tau0 and
+then tau_end maximise right locks minus 3 x wrong locks. kappa can't be fitted offline (Claude has no offline replay): it is a set
 value, checked live.
 """
 import numpy as np
@@ -35,7 +38,8 @@ def features(joint, cam, emg, claude, next_started, pause, quiet, stable, face, 
 
 
 class LockModel:
-    def __init__(self, theta=None, bias=0.0, tau0=0.9, kappa=0.1, tau_min=0.75, tau_max=0.97, agree_floor=0.05):
+    def __init__(self, theta=None, bias=0.0, tau0=0.9, kappa=0.1, tau_min=0.75, tau_max=0.97, agree_floor=0.05,
+                 tau_end=None):
         if theta is None:   # before fitting: lean on the joint posterior and a finished word
             theta = np.zeros(len(FEATURES))
             theta[FEATURES.index('joint')] = 6.0
@@ -44,13 +48,15 @@ class LockModel:
         self.theta, self.bias = np.asarray(theta, np.float64), float(bias)
         self.tau0, self.kappa, self.tau_min, self.tau_max = tau0, kappa, tau_min, tau_max
         self.agree_floor = agree_floor
+        self.tau_end = tau_end   # the end-of-sentence passes' threshold (None: the same as while mouthing)
 
     def prob(self, f):
         z = np.asarray(f, np.float64) @ self.theta + self.bias
         return 1.0 / (1.0 + np.exp(-z))
 
-    def threshold(self, predictability=0.0):
-        return float(np.clip(self.tau0 - self.kappa * (predictability or 0.0), self.tau_min, self.tau_max))
+    def threshold(self, predictability=0.0, final=False):
+        tau = float(np.clip(self.tau0 - self.kappa * (predictability or 0.0), self.tau_min, self.tau_max))
+        return min(tau, self.tau_end) if final and self.tau_end is not None else tau
 
     def may_lock(self, f, p, tau):
         """The lock rule for one word (its predecessors already locked)."""
@@ -79,8 +85,9 @@ class LockModel:
     def to_dict(self):
         return {'theta': self.theta.tolist(), 'bias': self.bias, 'tau0': self.tau0, 'kappa': self.kappa,
                 'tau_min': self.tau_min, 'tau_max': self.tau_max, 'agree_floor': self.agree_floor,
-                'features': list(FEATURES)}
+                'tau_end': self.tau_end, 'features': list(FEATURES)}
 
     @classmethod
     def from_dict(cls, d):
-        return cls(d['theta'], d['bias'], d['tau0'], d['kappa'], d['tau_min'], d['tau_max'], d['agree_floor'])
+        return cls(d['theta'], d['bias'], d['tau0'], d['kappa'], d['tau_min'], d['tau_max'], d['agree_floor'],
+                   d.get('tau_end'))

@@ -32,10 +32,12 @@ Nothing is trained on the pitch or on a script: the judge can ask anything.
 3. Add the speaking-or-not output, partial-sentence training, and augmentation for the recorded deliveries (slow, effort, held expression). Code done.
 4. Train on the cluster: `SVR1_4ch` plus the Gaddy-architecture baseline `G4` on the same 4 sites ([cluster/RUNBOOK.md](../cluster/RUNBOOK.md)).
 5. The recording tool: done, `recorder/record.py` (camera + EMG + the session prompts, in `svr/recordings.py`'s format).
-6. Live EMG reader: subscribe to `emg.raw`, filter, run SVR-1 every 100 ms, compute pace and effort. The SVR-1 side is `svr/live.py`; the bus side comes with the joint search.
-7. The joint search over camera and EMG probabilities, with look-alike expansion, Claude's predicted words, the gate and the language model: our conversational 4-gram plus a cache of the call (`fusion/lm.py`, built by `fusion/build_lm.py`; done).
-8. Confidence locking: compute the lock ingredients per word, train the lock model on sessions 1 and 2, and set the dynamic threshold from Claude's predictability.
-9. "Please repeat" when the final pass still isn't confident, with the reasons in the debug log.
+6. Live EMG reader: subscribe to `emg.raw`, filter, run SVR-1 every 100 ms, compute pace and effort. Done: `svr/live.py`, run inside the fusion process.
+7. The joint search over camera and EMG probabilities, with look-alike expansion, Claude's predicted words, the gate and the language model: our conversational 4-gram plus a cache of the call. Done: `fusion/search.py` (`fusion/lm.py`, built by `fusion/build_lm.py`).
+8. Confidence locking: compute the lock ingredients per word, train the lock model on sessions 1 and 2, and set the dynamic threshold from Claude's predictability. Done: `fusion/lock.py`, fitted by `fusion/offline.py`.
+9. "Please repeat" when the final pass still isn't confident, with the reasons in the debug log. Done: `dec.repeat`, from `fusion/core.py`.
+
+The fusion process is `python -m fusion.run` (venv-svr): it reads `cam.*`, `emg.raw`, `claude.*` and `partner.text`, and publishes every `dec.*` topic, `voice.say` and `timing.dec`.
 10. The logger, which subscribes to every topic and writes everything to disk, and a replay tool.
 11. Fine-tune SVR-1 on sessions 1 and 2, and tune the joint search, gate and lock model; test everything on session 3.
 

@@ -201,7 +201,7 @@ class Fusion:
         Pc = softmax(self.gate.t_cam * scores[:, 0])
         Pe = softmax(self.gate.t_emg * scores[:, 1]) if emg_read is not None else np.full(len(cands), 1.0 / len(cands))
         best, post = word_posteriors(cands, P, start=len(locked))
-        tau = self.lock.threshold(self.predictability if hints else 0.0)
+        tau = self.lock.threshold(self.predictability if hints else 0.0, final)
         pause = 1.0 - float(u.cam.activity[-8:].mean()) if u.cam is not None and len(u.cam.activity) else 1.0
         quiet = 1.0 - float(np.mean(emg_read['speak_prob'][-26:])) if emg_read is not None else 0.0
         words = []

@@ -325,7 +325,7 @@ def gate_wer(rows, gate):
 
 
 # ------------------------------------------------------------------ lock simulation (for tau0)
-def simulate_locks(records, lock, tau):
+def simulate_locks(records, lock, tau, tau_end=None):
     """Approximate locking on no-lock passes: word k locks on the first pass where it is the best candidate's word
     at k with p >= tau (and agreement), after word k-1. Returns per-utterance results."""
     from fusion.search import norm_words
@@ -345,7 +345,7 @@ def simulate_locks(records, lock, tau):
                 if x['i'] != len(locked):
                     continue
                 p = float(lock.prob(x['f']))
-                if not lock.may_lock(x['f'], p, tau):
+                if not lock.may_lock(x['f'], p, min(tau, tau_end) if (r['final'] and tau_end is not None) else tau):
                     break
                 locked.append(x['w'])
                 wrong += int(match[x['i']] is None)
@@ -370,7 +370,7 @@ def lock_summary(res):
                     delays.append(t - r['ends'][j])
     refs = [' '.join(r['ref']) for r in res]
     hyps = [' '.join(r['locked']) for r in res]
-    return dict(utterances=len(res), locked_words=n_locked, wrong_lock_rate=wrong / max(n_locked, 1),
+    return dict(utterances=len(res), locked_words=n_locked, wrong_locks=wrong, wrong_lock_rate=wrong / max(n_locked, 1),
                 repeat_rate=float(np.mean([r['repeat'] for r in res])) if res else 0.0,
                 delay_median_s=float(np.median(delays)) if delays else None,
                 delay_mean_s=float(np.mean(delays)) if delays else None,
@@ -453,17 +453,42 @@ def cmd_fit_lock(a):
     ok = [(t, s) for t, s in rows if s['wrong_lock_rate'] <= a.max_wrong and s['delay_median_s'] is not None]
     if ok:
         t0, s0 = min(ok, key=lambda ts: (ts[1]['delay_median_s'], ts[0]))
-    else:
-        t0, s0 = min(rows, key=lambda ts: ts[1]['wrong_lock_rate'])
-        print(f'no tau reaches {100 * a.max_wrong:.0f}% wrong locks; taking the lowest')
+    else:   # the readers make confident mistakes: weigh each wrong lock as wrong_cost missing words instead
+        def value(s):
+            return (s['locked_words'] - s['wrong_locks']) - a.wrong_cost * s['wrong_locks']
+        t0, s0 = max(rows, key=lambda ts: value(ts[1]))
+        print(f'no tau reaches {100 * a.max_wrong:.0f}% wrong locks; taking the most right locks minus '
+              f'{a.wrong_cost:g} x wrong locks')
+    # then the end-of-sentence threshold, at tau0, by the same value
+    models = {}
+    for k in folds:
+        train = [r for r in recs if r['fold'] != k] if len(folds) > 1 else recs
+        X, y, _ = word_examples(train)
+        models[k] = LockModel().fit(X, y)
+    t_end, s_end = t0, s0
+    for te in taus[taus <= t0]:
+        res = []
+        for k in folds:
+            res += simulate_locks([r for r in recs if r['fold'] == k], models[k], t0, float(te))
+        s = lock_summary(res)
+        print(f"tau_end {te:.2f}: wrong locks {100 * s['wrong_lock_rate']:.1f}%  repeat {100 * s['repeat_rate']:.0f}%  "
+              f"WER locked {100 * s['wer_locked']:.1f}%", flush=True)
+        if (s['locked_words'] - s['wrong_locks']) - a.wrong_cost * s['wrong_locks'] > \
+                (s_end['locked_words'] - s_end['wrong_locks']) - a.wrong_cost * s_end['wrong_locks']:
+            t_end, s_end = float(te), s
     X, y, _ = word_examples(recs)
     lock = LockModel().fit(X, y)
+    lock.tau_end = t_end if t_end < t0 else None
     lock.tau0 = t0
     lock.tau_min, lock.tau_max = max(0.5, t0 - 0.15), min(0.99, t0 + 0.05)
     print(f'tau0 {t0}: {json.dumps(s0)}')
+    print(f'tau_end {t_end}: {json.dumps(s_end)}')
     print('lock', json.dumps(lock.to_dict()))
     save_params(lock=lock, extra={'lock_fit': {'examples': int(len(y)), 'positive_share': float(y.mean()),
-                                               'cross_fitted_at_tau0': s0, 'max_wrong': a.max_wrong,
+                                               'cross_fitted_at_tau0': s0, 'cross_fitted_at_tau_end': s_end,
+                                               'max_wrong': a.max_wrong,
+                                               'wrong_cost': a.wrong_cost,
+                                               'curve': {f'{t:.2f}': s for t, s in rows},
                                                'from': a.passes}}, path=a.params)
 
 
@@ -543,6 +568,8 @@ def main(argv=None):
     q.add_argument('passes', nargs='+')
     q.add_argument('--params', default=PARAMS)
     q.add_argument('--max-wrong', type=float, default=0.02)
+    q.add_argument('--wrong-cost', type=float, default=3.0, help='when max-wrong is out of reach: a wrong lock '
+                   'costs this many missing words')
     q.set_defaults(fn=cmd_fit_lock)
     q = sub.add_parser('test')
     q.add_argument('session')
