@@ -278,3 +278,21 @@ def test_preflight_names_a_busy_port(tmp_path):
         assert f'[{busy}]' in out.getvalue() or str(busy) in out.getvalue()
     finally:
         s.close()
+
+
+def test_no_repair_window_by_default():
+    # Claude's repairs never change the voice, so a wait before speaking only adds delay to every word
+    import argparse
+    seen = {}
+
+    def grab(self, argv=None, namespace=None):
+        seen['ns'] = real(self, argv, namespace)
+        raise SystemExit(0)
+    real = argparse.ArgumentParser.parse_args
+    argparse.ArgumentParser.parse_args = grab
+    try:
+        with pytest.raises(SystemExit):
+            launch.main([])
+    finally:
+        argparse.ArgumentParser.parse_args = real
+    assert seen['ns'].repair_s == 0.0

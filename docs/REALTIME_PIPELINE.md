@@ -163,7 +163,7 @@ Claude does two jobs:
 - **Predict, before Austin mouths.** While the judge is still speaking, from Cartesia Ink's live transcript of their unfinished line, once more when the line is final (its last words can change the answer: "...nervous or excited?"), and again every couple of seconds while Austin talks, Claude returns the words and short phrases Austin is likely to use next, and how predictable the next words are. The predicted words get a boost in the joint search, and the predictability sets the locking threshold. This costs no waiting: the prediction is ready before Austin starts.
 - **Repair.** As words lock, the joint search sends Claude the last few words with the alternatives it considered and how sure it was. Claude may swap a word only for one of those alternatives or a lip look-alike, never add or reword ideas, and answers "please repeat" when it cannot tell. The reply is a short structured list of edits.
 
-A locked word waits a short repair window before it is spoken, 0.3 s by default. Claude's repairs never change the voice, even inside the window: the voice says what locked, and a repair fixes the captions only, with the change highlighted.
+A locked word goes to the voice at once. Claude's repairs never change the voice: the voice says what locked, and a repair fixes the captions only, with the change highlighted. So there is no repair window by default (`--repair-s`, 0 s): waiting 0.3 s for a repair that can't change the voice would only add 0.3 s to every word.
 
 Claude runs through the Claude API with two models. Predictions use `claude-haiku-5-5` with thinking off and low effort, chosen for speed: a call takes about 2 to 3 s, so a prediction is ready while the judge is still speaking. Repairs use `claude-opus-5-5` (low effort), chosen for accuracy: they only correct the captions, so its ~5 s costs nothing, and on a replay of session 3 Haiku swapped about 0.8 words a sentence, mostly right words for wrong ones, where Opus swapped 0.12, mostly real look-alike fixes. The rules and the conversation so far form a prefix that stays the same from call to call, so prompt caching keeps each call fast and cheap; only the newest words are new input.
 
@@ -200,7 +200,7 @@ These are design estimates for the RTX 5060; every one gets measured on the lapt
 | Joint search and locking, per pass | about 5 to 15 ms |
 | Word on screen (grey) after it is mouthed | about 0.15 to 0.2 s |
 | Word locked (black) | as soon as the next word starts and confidence is reached, often within one or two passes |
-| Repair window before speaking | 0.3 s (adjustable, 0 for fastest) |
+| Repair window before speaking | 0 s (repairs fix the captions only; `--repair-s` adds a wait) |
 | First audio from Cartesia | a few tenths of a second |
 | Claude, per call (beside the loop, never in it) | about 2 to 3 s: predictions arrive after the judge's line, repairs after the word was spoken |
 

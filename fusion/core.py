@@ -10,8 +10,8 @@ and the EMG's sample times share (lipread.run --recorder-clock).
 
 One utterance (utt_id) is one camera segment. Every cam.tick is one pass of the joint search (fusion/search.py) over
 the whole segment so far; the lock model (fusion/lock.py) then locks words left to right. Locked words go on
-dec.lock at once (Claude's repair lane) and on voice.say after the repair window (0.3 s); Claude's repairs change the
-captions only, never the voice. When the segment's ticks stop (end_wait_s), or its cam.final comes first, the end
+dec.lock at once (Claude's repair lane) and on voice.say after the repair window (0 s by default: Claude's repairs
+change the captions only, never the voice, so waiting for them buys nothing). When the segment's ticks stop (end_wait_s), or its cam.final comes first, the end
 pass reads it once more as a finished sentence; when cam.final's n-best arrives (or final_wait_s passes) the final
 pass adds it to the candidates, and any word still below the threshold ends the sentence in "Please repeat"
 (dec.repeat) instead of being spoken. A tick that comes after end_wait_s ended its sentence (a camera stall, or the

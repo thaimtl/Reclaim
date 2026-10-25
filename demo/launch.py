@@ -625,7 +625,8 @@ def main(argv=None):
     ap.add_argument('--camera-settings', action='store_true', help='Windows: lock exposure and focus in a dialog')
     ap.add_argument('--port', default=None, help="the Uno's serial port, e.g. COM5 (default: found by itself)")
     ap.add_argument('--calibrate', type=float, default=60.0, help='seconds of EMG calibration at the start (0: none)')
-    ap.add_argument('--repair-s', type=float, default=0.3, help='repair window before a locked word is spoken')
+    ap.add_argument('--repair-s', type=float, default=0.0,
+                    help='wait before a locked word is spoken (default 0: repairs fix the captions only, never the voice)')
     ap.add_argument('--call-port', type=int, default=CALL_PORT)
     ap.add_argument('--dash-port', type=int, default=DASH_PORT)
     ap.add_argument('--number', default=None, help='use this Twilio number instead of TWILIO_NUMBER, e.g. +16282293851')
