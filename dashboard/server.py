@@ -130,10 +130,12 @@ class Dashboard:
             sock.close(linger=0)
 
     def check_logging(self):
-        """The bus logger (buslog.record) wrote within the last few seconds: its newest file is fresh."""
+        """The bus logger (buslog.record) wrote within the last few seconds: its newest file is fresh. The files sit in
+        the newest session folder, or one folder down (the launcher's <run>-demo/bus/, bus-r1/ after a restart)."""
         try:
             sessions = sorted(log_root().iterdir())
-            newest = max((f.stat().st_mtime for f in sessions[-1].glob('bus-*.msgpack')), default=0) if sessions else 0
+            files = [*sessions[-1].glob('bus-*.msgpack'), *sessions[-1].glob('*/bus-*.msgpack')] if sessions else []
+            newest = max((f.stat().st_mtime for f in files), default=0)
         except OSError:
             return
         if time.time() - newest < LOG_FRESH_S:

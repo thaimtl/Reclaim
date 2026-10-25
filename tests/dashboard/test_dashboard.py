@@ -10,6 +10,7 @@ import pytest
 
 pytest.importorskip('aiohttp')      # the dashboard runs in venv-call; venv-live's suite skips it
 
+import bus
 from bus.team import encode
 from dashboard.demo_feed import simulate
 from dashboard.server import Dashboard
@@ -163,6 +164,22 @@ def test_odd_messages_never_break_the_state():
 
 
 # --- server ----------------------------------------------------------------------------------------------------
+def test_logging_is_seen_in_the_launchers_bus_folder_and_a_restarts(tmp_path, monkeypatch):
+    monkeypatch.setenv('RECLAIM_WORKDIR', str(tmp_path))
+    run = tmp_path / 'logs' / '20261025-120000-demo'
+    (run / 'bus').mkdir(parents=True)
+    d = Dashboard()
+    d.check_logging()
+    assert 'Not logging' in d.state.status(bus.now())['text']           # nothing written yet
+    for folder in (run / 'bus', run / 'bus-r1', run):                   # launcher, a logger restart, buslog's own
+        folder.mkdir(exist_ok=True)
+        (folder / 'bus-0001.msgpack').write_bytes(b'x')
+        d = Dashboard()
+        d.check_logging()
+        assert 'Not logging' not in d.state.status(bus.now())['text'], folder
+        (folder / 'bus-0001.msgpack').unlink()
+
+
 def test_server_decodes_skips_bad_frames_and_keeps_the_newest_preview():
     d = Dashboard('(628) 888-6598', endpoints={})
     d.handle(encode('partner.text', {'text': 'hello', 'is_final': True, 't': 1.0}))
