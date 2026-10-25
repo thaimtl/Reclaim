@@ -12,12 +12,13 @@ import numpy as np
 from fusion.core import Fusion
 from fusion.lm import ConversationLM
 from fusion.lock import FEATURES, LockModel
+from fusion.lock import features as _lock_features
 from fusion.offline import align
 from fusion.search import BLANK, CamReading, Gate, JointSearch, Pieces, ctc_loglik, viterbi_word_ends
 
 ARPA = r"""
 \data\
-ngram 1=8
+ngram 1=10
 ngram 2=5
 
 \1-grams:
@@ -29,6 +30,8 @@ ngram 2=5
 -0.9	water	-0.3
 -1.5	waiter	-0.3
 -1.2	what	-0.3
+-1.3	bill	-0.3
+-1.3	mill	-0.3
 
 \2-grams:
 -0.2	<s> i
@@ -39,6 +42,11 @@ ngram 2=5
 
 \end\
 """
+
+
+def lockmod_features(joint, cam, emg, claude):
+    """Lock features of a finished, stable word on a clear face and clean pads."""
+    return _lock_features(joint, cam, emg, claude, True, 1.0, 1.0, 10, True, 1.0)
 
 
 def check(name, ok, detail=''):
@@ -174,6 +182,30 @@ def main():
         check('EMG can overturn the camera on a look-alike', b0[-1] == 'water' and b1[-1] == 'waiter', f'{b0} -> {b1}')
         hint = search.combine(search.judge_scores(cands, cam2, None, {'waiter': 30.0}, True), w)
         check("Claude's hints add to a word's score", cands[int(np.argmax(hint))].words[-1] == 'waiter')
+
+        # Claude's hints at the live weight (fusion/run.py DEFAULT_BETA) against the camera, with the fitted gate's
+        # camera, LM and length weights. "bill" and "mill" look the same on the lips, are one camera piece each, and
+        # the test LM gives both the same probability, so only the camera and the hint decide.
+        from fusion.run import DEFAULT_BETA
+        live_w = {'cam': 4.9, 'emg': 0.0, 'lm': 1.9, 'beta': DEFAULT_BETA, 'gamma': 2.5, 'final': 0.0, 'unseen': -9.0}
+        lk_search = JointSearch(lm, pieces, StubLexicon({'bill': ['mill'], 'mill': ['bill']}))
+
+        def best_with(reading_msg, hints):
+            c = CamReading(reading_msg)
+            cs = lk_search.candidates(c, live_w, hints, final=True)
+            return cs[int(np.argmax(lk_search.combine(lk_search.judge_scores(cs, c, None, hints, True), live_w)))].words, cs
+
+        tie = reading(pieces, ['i', 'want', 'bill'], noise={'bill': ('mill', 0.42)})   # camera: bill 0.48, mill 0.42
+        b0, _ = best_with(tie, {})
+        b1, _ = best_with(tie, {'mill': 0.9})
+        check("a predicted look-alike beats the camera's near-tie (beta %g, weight 0.9)" % DEFAULT_BETA,
+              b0[-1] == 'bill' and b1[-1] == 'mill', f'{b0} -> {b1}')
+        clear = reading(pieces, ['i', 'want', 'bill'])                                   # camera: clearly bill
+        b2, _ = best_with(clear, {'mill': 0.9})
+        check('clear camera evidence still beats a predicted look-alike', b2[-1] == 'bill', b2)
+        b3, cs3 = best_with(clear, {'coffee': 1.0, 'mill': 1.0})
+        check('a predicted word the camera clearly did not see does not appear',
+              b3 == ('i', 'want', 'bill') and not any('coffee' in c.words for c in cs3), b3)
 
         locked = search.candidates(cam, w, {}, locked=['i', 'went'])
         check('every candidate keeps the locked words', all(c.words[:2] == ('i', 'went') for c in locked))
@@ -420,8 +452,9 @@ def main():
         out = core.feed('cam.tick', reading(pieces, ['i', 'want', 'water'], seg_id=1, t0=500.0), 501.0)
         check('a restarted camera reusing seg_id 1 still starts a new sentence',
               any(tp == 'dec.hyp' and m['utt_id'] == 2 for tp, m in out))
-        # no repair window (the default): every word still said once, in order, with one final
-        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.0)
+        # no repair window (the default): every word still said once, in order, with one final (no Claude here to say
+        # Austin has finished, so the sentence closes after the no-Claude hold)
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.0, claude_end=False)
         out = []
         for n in range(8, T + 1, 3):
             msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
@@ -455,6 +488,20 @@ def main():
         caps = [m for tp, m in out if tp == 'dec.hyp'][-1]['locked']
         check('a repair, even inside the repair window, changes the captions, never the voice',
               said[idx] == last and caps[idx] == 'what', f"said {' '.join(said)}; captions {' '.join(caps)}")
+
+        # Claude's please_repeat: ignored once every word of the sentence was spoken, kept while some are not
+        for repair_s, name in ((0.0, 'all spoken'), (30.0, 'words still unspoken')):
+            core = Fusion(search, Gate(), lock, svr=None, repair_s=repair_s, sentences=False)
+            out = []
+            for n in range(8, T + 1, 3):
+                msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
+                t = float(msg['frame_t'][-1]) + 0.05
+                out += core.feed('cam.tick', msg, t)
+                out += core.step(t)
+            rep = core.feed('claude.repair', {'utt_id': 1, 'edits': [], 'please_repeat': True}, t + 0.01)
+            asked = any(tp == 'dec.repeat' for tp, _ in rep)
+            check(f"Claude's please repeat: {name}", asked == (name != 'all spoken'),
+                  f"spoken {[x for tp, m in out if tp == 'voice.say' for x in m['words']]}, dec.repeat {asked}")
 
         # a word below the threshold at the end: Please repeat, and the voice doesn't say it
         lock = LockModel(tau0=0.999, tau_min=0.999, tau_max=0.999, agree_floor=0.0, repeat_floor=0.9999)
@@ -578,6 +625,17 @@ def main():
     check('drain skips stale ticks of a segment, keeps the rest in order',
           [(t, m.get('k')) for t, m in got] == [('emg.raw', None), ('cam.tick', 3), ('cam.tick', 1)],
           str([(t, m.get('seg_id'), m.get('k')) for t, m in got]))
+    # Claude alone can never lock a word (CLAUDE.md): a word only Claude supports fails the camera-EMG agreement rule,
+    # with the default lock model and with the fitted one, however strongly Claude predicts it
+    from fusion.offline import load_params
+    _, fitted, meta = load_params()
+    for name, lk in (('default', LockModel()), ('fitted', fitted if meta else LockModel())):
+        f_claude = lockmod_features(joint=1.0, cam=0.0, emg=0.0, claude=1.0)
+        check(f'Claude alone can never lock a word ({name} lock model)',
+              not lk.may_lock(f_claude, 1.0, 0.0), f'agree {f_claude[FEATURES.index("agree")]}, '
+                                                    f'claude feature {f_claude[FEATURES.index("claude")]}')
+    check("Claude's lock feature is capped", lockmod_features(joint=0.0, cam=0.0, emg=0.0, claude=1.0)[
+        FEATURES.index('claude')] <= 0.3)
     print('FUSION UNITS PASS')
 
 

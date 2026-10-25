@@ -42,14 +42,16 @@ from collections import deque
 
 import numpy as np
 
+from claude_service.names import always_phrases, always_words
 from fusion import lock as lockmod
-from fusion.search import CamReading, gate_features, softmax, viterbi_word_ends, word_posteriors
+from fusion.search import SHORT_WORDS, CamReading, gate_features, softmax, viterbi_word_ends, word_posteriors
 
 EMG_RAIL = (8, 1015)       # dashboard/state.py: a pad off the skin pins its channel to a rail of the 10-bit range
 EMG_FLAT = 1.0             # raw-unit standard deviation below this: no contact
 MIN_NEW = 5                # frames (0.2 s, the shortest word) a finished segment's late tick must add to go on,
 STILL_THR = 0.12           # ... with the mouth moving in them (lipread/endpoint.py's STILL_THR)
-PHRASE_WEIGHT = 0.3        # hint weight of a word that only appears in one of Claude's predicted phrases
+PHRASE_WEIGHT = 0.6        # hint weight of a content word that only appears in one of Claude's predicted full
+#                            sentences (its short words are filled in by the search instead: search.phrase_fill)
 # When a sentence ends (Sentence). The hold starts once the camera ended its segment (0.5 s of still lips) and the end
 # pass ran (end_wait_s): LIPS_STILL_S after the lips stopped. Only the backstop and the fallbacks are fixed times.
 LIPS_STILL_S = 0.8
@@ -138,6 +140,9 @@ class Fusion:
         self.next_id = 1
         self.hints, self.hints_until, self.predictability = {}, -1e18, 0.0
         self.phrases = []              # Claude's predicted phrases, as word lists
+        # the demo's names, hinted from the first second, before Claude's first prediction (claude_service/names.py)
+        self.always = always_words() if self.use_hints else {}
+        self.always_phrases = [self.search_words(p) for p in always_phrases()] if self.use_hints else []
         self.raw = deque(maxlen=500)   # the last 0.5 s of raw EMG, for the pads' quality
         self.emg_quality = 1.0
         self.pace, self.effort = 1.0, 1.0
@@ -170,7 +175,8 @@ class Fusion:
             h = {}
             for p in msg.get('phrases') or []:
                 for word in self.search_words(p):
-                    h[word] = max(h.get(word, 0.0), PHRASE_WEIGHT)
+                    if word not in SHORT_WORDS:
+                        h[word] = max(h.get(word, 0.0), PHRASE_WEIGHT)
             for item in msg.get('words') or []:
                 for word in self.search_words(str(item.get('w', ''))):
                     h[word] = max(h.get(word, 0.0), float(item.get('weight', 0.0)))
@@ -429,10 +435,14 @@ class Fusion:
         start = float(u.cam.frame_t[0]) if u.carried_from is not None else u.seg_start   # carried EMG: read already
         job = self._pool.submit(self.svr.read, True, start) if self.use_emg else None
         gf, w = self._weights(u.cam, self.last_emg_read if self.use_emg else None)
-        hints = self.hints if (self.use_hints and now < self.hints_until) else {}
+        claude_live = self.use_hints and now < self.hints_until
+        hints = dict(self.always)          # the demo's names always; Claude's prediction while it is fresh
+        if claude_live:
+            for word, x in self.hints.items():
+                hints[word] = max(hints.get(word, 0.0), x)
         locked = [x['w'] for x in u.locked]
         cands = self.search.candidates(u.cam, w, hints, locked, [h['text'] for h in nbest], final,
-                                       phrases=self.phrases if hints else (),
+                                       phrases=(self.phrases if claude_live else []) + self.always_phrases,
                                        locked_tokens=[x['tokens'] for x in u.locked])
         emg_read = job.result() if job is not None else None
         if emg_read is not None:
@@ -452,7 +462,7 @@ class Fusion:
         Pc = softmax(self.gate.t_cam * scores[:, 0])
         Pe = softmax(self.gate.t_emg * scores[:, 1]) if emg_read is not None else np.full(len(cands), 1.0 / len(cands))
         best, post = word_posteriors(cands, P, start=len(locked))
-        tau = self.lock.threshold(self.predictability if hints else 0.0, final)
+        tau = self.lock.threshold(self.predictability if claude_live else 0.0, final)
         pause = 1.0 - float(u.cam.activity[-8:].mean()) if u.cam is not None and len(u.cam.activity) else 1.0
         quiet = 1.0 - float(np.mean(emg_read['speak_prob'][-26:])) if emg_read is not None else 0.0
         words = []
@@ -599,7 +609,10 @@ class Fusion:
                 if frm[:1] == [v.locked[j]['w']]:
                     v.locked[j].setdefault('voice', v.locked[j]['w'])
                     v.locked[j]['w'] = words[0]     # the captions only: the voice says what locked, window or not
-        if msg.get('please_repeat') and not any(v.repeat_sent for v in s.utts):
+        # Claude's "please repeat" only while something of the sentence is still unspoken: once the voice has said it
+        # all, asking to repeat a sentence the judge already heard would only confuse the screen
+        unspoken = any(j >= v.spoken for v, j in at) or any(v.unlocked for v in s.utts)
+        if msg.get('please_repeat') and unspoken and not any(v.repeat_sent for v in s.utts):
             out.append(('dec.repeat', {'utt_id': s.sid, 'reason': {
                 'reader': 'Claude', 'words': [dict(index=i, w=v.locked[j]['w'], alts=v.locked[j]['alts'])
                                               for i, (v, j) in enumerate(at) if j >= v.spoken]}}))
