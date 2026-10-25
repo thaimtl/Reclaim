@@ -32,7 +32,7 @@ Nothing is trained on the pitch or on a script: the judge can ask anything.
 3. Add the speaking-or-not output, partial-sentence training, and augmentation for the recorded deliveries (slow, effort, held expression). Code done.
 4. Train on the cluster: `SVR1_4ch` plus the Gaddy-architecture baseline `G4` on the same 4 sites ([cluster/RUNBOOK.md](../cluster/RUNBOOK.md)).
 5. The recording tool: done, `recorder/record.py` (camera + EMG + the session prompts, in `svr/recordings.py`'s format).
-6. Live EMG reader: subscribe to `emg.raw`, filter, run SVR-1 every 100 ms, compute pace and effort. Code done: `svr/live.py` (SVR-1) and `svr/serve.py` (the bus side, its own process, publishing `emg.read`); `fusion/emg.py` turns `emg.read` into word support. `svr/infer.py` replays recordings through the same path for offline scoring.
+6. Live EMG reader: subscribe to `emg.raw`, filter, run SVR-1 every 100 ms, compute pace and effort. The SVR-1 side is `svr/live.py`; the bus side comes with the decoder.
 7. Fusion decoder: the joint search over camera and EMG probabilities, with look-alike expansion, Claude's predicted words and the gate.
 8. Confidence locking: compute the lock ingredients per word, train the lock model on sessions 1 and 2, and set the dynamic threshold from Claude's predictability.
 9. "Please repeat" when the final pass still isn't confident, with the reasons in the debug log.
@@ -74,6 +74,7 @@ Follow [EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md). You can pro
 
 The parts run as separate small programs on the laptop and talk through ZeroMQ publish/subscribe over TCP on the loopback (`tcp://127.0.0.1:<port>`, one port per publisher; the camera reader is 5556), with messages encoded as msgpack (numpy arrays as raw bytes).
 `ipc://` sockets don't work on Windows, which is why it is TCP.
+Ports, each bound by its publisher: camera reader 5556 (`RECLAIM_CAM_PUB`), Austin's decoder 5557 (`RECLAIM_DEC_PUB`), Claude service 5558, call service 5559 (`RECLAIM_CALL_PUB`).
 A message takes well under a millisecond.
 All timestamps are `bus.now()` seconds on the same laptop, which is `time.perf_counter()`: on Windows before Python 3.13, `time.monotonic()` only ticks every 15.6 ms.
 Every message also carries `v` (schema version), `seq` (counts up per topic, so a gap is a drop) and `t_pub` (send time).
@@ -95,17 +96,17 @@ flowchart TD
 | Topic | From → to | Rate | Main fields |
 | --- | --- | --- | --- |
 | `emg.raw` | Thai → Austin | every 10 ms | `t0`, `fs` = 1000, `samples` (n × 4, raw 0 to 1023), `counter` |
-| `emg.read` | Austin's EMG reader → decoder | every 100 ms | `seg_id`, `in_segment`, `segment_started`, `segment_ended`, `seg_start`, `frame_t` (F), `letter_logp` (F × 38, float16), `speak_prob` (F), `rate_z`, `pace`, `effort`, `quality` {`pinned`, `flat`} per pin, `ok` (False: rig gone or channels bad, arrays empty), `gap_ms`, `timing_ms` |
 | `cam.tick` | Evan → Austin, Frank | every 100 ms | `seg_id`, `seg_start`, `frame_t` (T), `topk_ids` (T × 32), `topk_logp` (T × 32), `blank_logp` (T), `greedy`, `activity` (T), `face_ok`, `emotion` {`label`, `confidence`, `scores`}, `timing_ms` |
 | `cam.final` | Evan → Austin | at segment end | `seg_id`, `nbest` [{`text`, `score`}] |
 | `cam.face` | Evan → dashboard | ~12.5 Hz | `t`, `w`, `h`, `face_ok`, `pts` (478 × 2, normalised), `blend` (52), `pose` (yaw, pitch, roll) |
-| `dec.hyp` | Austin → dashboard | every 100 ms | `utt_id`, `locked` [words, the newest 40], `offset` (index of the first one sent), `unlocked` [words], `confidence` and `source` (camera / EMG / Claude) per word, `raw` (each locked word before Claude's repairs), `spoken` (what the voice said), `t0` (capture time of the utterance's first frame) |
+| `dec.hyp` | Austin → dashboard | every 100 ms | `utt_id`, `locked` [words], `unlocked` [words], `confidence` per word, `source` per word (camera / EMG / Claude) |
 | `dec.lock` | Austin → Claude, dashboard | on lock | `utt_id`, `words` [{`w`, `conf`, `alts`, `cam`, `emg`, `t`}] |
-| `dec.repeat` | Austin → dashboard | at sentence end | `utt_id`, `reason` {`reader` (camera / EMG / Claude), `text`, `threshold`, `claude_please_repeat`, `words` [{`index`, `w`, `cam`, `emg`, `claude`, `nbest`, `score`, `alts`}]} |
+| `dec.repeat` | Austin → dashboard | at sentence end | `utt_id`, `reason` (which reader disagreed, confidences) |
 | `claude.predict` | Claude → Austin | on judge line, ~2 s | `words` [{`w`, `weight`}], `phrases`, `predictability` (0 to 1), `ttl_s` |
 | `claude.repair` | Claude → Austin, dashboard | on reply | `utt_id`, `edits` [{`index`, `from`, `to`}], `please_repeat` |
-| `voice.say` | Austin → Frank | words leaving the repair window | `utt_id`, `words`, `final` (sent once per sentence, with `words` [] if nothing locked), `pace`, `effort` (both relative, 1.0 = Austin's normal; below) |
+| `voice.say` | Austin → Frank | words leaving the repair window | `utt_id`, `words` (only the new ones), `offset` (index of `words[0]` in the sentence, optional), `final`, `pace`, `effort` (both relative, 1.0 = Austin's normal; below) |
 | `partner.text` | Frank → Claude, dashboard | streaming | `text`, `is_final`, `t` |
+| `call.state` | Frank → dashboard | on change | `state` (`connected` / `ended`), `t`, plus `call_sid` and `ink` on connect |
 | `timing.*` | everyone → logger | every event | the stage and its duration in ms (the camera's ride in `cam.tick.timing_ms`) |
 
 Austin applies Claude's repairs before forwarding words on `voice.say`, so the voice never needs to know about Claude. The logger subscribes to every topic.
@@ -115,16 +116,10 @@ Austin applies Claude's repairs before forwarding words on `voice.say`, so the v
 - `effort`: muscle effort relative to Austin's normal, the RMS of the EMG over the last 100 ms divided by the session's median while speaking. 1.0 is normal; soft mouthing is below, emphatic above.
 - Both come with every message, so a single stressed word can get its own volume.
 
-Each producer binds one loopback port, overridable by `RECLAIM_<NAME>_PUB`; the code is `bus.team` (`Pub`, `Sub`), on the camera's wire format:
-
-| Endpoint | Port | Topics |
-| --- | --- | --- |
-| `emg` | 5555 | `emg.raw` (`rig/publish.py`) |
-| `cam` | 5556 | `cam.tick`, `cam.final`, `cam.face` (`lipread/run.py`) |
-| `dec` | 5557 | `dec.hyp`, `dec.lock`, `dec.repeat`, `voice.say`, `timing.dec` (`fusion/run.py`) |
-| `claude` | 5558 | `claude.predict`, `claude.repair`, `timing.claude` (`claude_service`) |
-| `call` | 5559 | `partner.text`, `timing.call` (`call/`) |
-| `svr` | 5560 | `emg.read`, `timing.svr` (`svr/serve.py`) |
+`voice.say` sentences:
+- `offset` lets the voice skip a resent word and still speak a real repeat ("no no"); without it, every word in `words` is spoken.
+- Every sentence ends with a `final` message.
+- If a `final` is lost, the voice closes that sentence once it has been silent for 3 s and the next sentence is waiting, and ignores its late messages.
 
 ## Order of work
 
