@@ -12,11 +12,16 @@ from xml.sax.saxutils import quoteattr
 FRAME = 160                 # bytes of mu-law per 20 ms at 8 kHz
 
 
-def twiml_stream(public_host, token):
-    """TwiML that connects the call's audio to our media websocket (both directions)."""
+def twiml_stream(public_host, token, peer=None):
+    """TwiML that connects the call's audio to our media websocket (both directions). peer: the other phone's number,
+    handed back in the stream's start message (customParameters), so a text can be matched to the live call."""
     url = f'wss://{public_host}/media/{token}'
+    param = f'<Parameter name="peer" value={quoteattr(peer)}/>' if peer else ''
     return ('<?xml version="1.0" encoding="UTF-8"?>'
-            f'<Response><Connect><Stream url={quoteattr(url)}/></Connect></Response>')
+            f'<Response><Connect><Stream url={quoteattr(url)}>{param}</Stream></Connect></Response>')
+
+
+EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'     # a text answered with no reply
 
 
 def frames(mulaw):
@@ -56,5 +61,5 @@ def dial(cfg, to_number):
     from twilio.rest import Client
     client = Client(cfg.twilio_sid, cfg.twilio_token)
     call = client.calls.create(to=to_number, from_=cfg.twilio_number,
-                               twiml=twiml_stream(cfg.public_host, cfg.media_token))
+                               twiml=twiml_stream(cfg.public_host, cfg.media_token, to_number))
     return call.sid

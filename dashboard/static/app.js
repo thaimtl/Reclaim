@@ -49,7 +49,9 @@ function render(s) {
   if (s.mode === 'end') { renderEnd(s); return; }
   const live = s.mode === 'live';
   $('live-dot').classList.toggle('off', !live);
-  $('title').textContent = live ? 'Live call with the judge' : 'Waiting for the call';
+  const sms = s.channel === 'sms';
+  $('title').textContent = !live ? 'Waiting for the call' : sms ? 'Live call, the judge is texting' : 'Live call with the judge';
+  $('judge-via').textContent = sms ? '· texted from the phone on the call' : '· transcribed by Cartesia Ink';
   $('sub').textContent = live ? `${mmss(s.elapsed)}${s.number ? ' on ' + s.number : ''}` : (s.number || '');
   $('m-lips').textContent = s.metrics.lips_to_voice == null ? '--' : (s.metrics.lips_to_voice / 1000).toFixed(2) + ' s';
   $('m-fixed').textContent = s.metrics.fixed;
@@ -336,6 +338,7 @@ function renderEnd(s) {
   if (key === endKey) return;                 // the summary never changes once the call is over: build once
   endKey = key;
   const L = m.latency, num = v => v == null ? '--' : v;
+  $('end-judge-who').textContent = s.channel === 'sms' ? 'Judge, by text' : 'Judge, heard by Cartesia Ink';
   $('end-call').textContent = `Call ended ${mmss(m.seconds)}${s.number ? ' on ' + s.number : ''}`;
   const [n, unit] = m.seconds < 120 ? [m.seconds, 'second'] : [Math.round(m.seconds / 60), 'minute'];
   $('end-head').innerHTML = `Austin held a <span class="num">${n}</span>-${unit} phone call without making a sound.`;

@@ -64,8 +64,8 @@ def load_benchmark(path=None):
 
 
 class Dashboard:
-    def __init__(self, number='', endpoints=None, ctx=None, benchmark=None):
-        self.state = CallState(number, benchmark)
+    def __init__(self, number='', endpoints=None, ctx=None, benchmark=None, channel='call'):
+        self.state = CallState(number, benchmark, channel)
         self.endpoints = dict(endpoints or ENDPOINTS)
         self.ctx = ctx or zmq.asyncio.Context.instance()
         self.clients = set()
@@ -231,13 +231,15 @@ def main():
     ap.add_argument('--port', type=int, default=8790)
     ap.add_argument('--host', default='127.0.0.1')
     ap.add_argument('--number', default='', help="the judge's number as shown in the header, e.g. '(628) 888-6598'")
+    ap.add_argument('--channel', choices=('call', 'sms'), default='call',
+                    help="how the judge talks: on the call (Ink) or by text (SMS mode); call.state confirms it")
     ap.add_argument('--benchmark', help='scored word error JSON (default: $RECLAIM_WORKDIR/results/wer_session3.json)')
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(message)s')
     print(f'dashboard: http://{args.host}:{args.port}')
     benchmark = load_benchmark(args.benchmark)
     print('end screen word error:', f"from {benchmark['session'] or 'the benchmark file'}" if benchmark else 'placeholder')
-    web.run_app(Dashboard(args.number, benchmark=benchmark).app(), host=args.host, port=args.port, print=None,
+    web.run_app(Dashboard(args.number, benchmark=benchmark, channel=args.channel).app(), host=args.host, port=args.port, print=None,
                 access_log=None)
 
 

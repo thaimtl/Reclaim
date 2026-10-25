@@ -108,6 +108,19 @@ def test_judge_partial_then_final_and_a_new_call_resets():
     assert st.snapshot(20.0)['transcript'] == []
 
 
+def test_sms_mode_shows_texts_as_the_judges_lines():
+    st = CallState(channel='sms')
+    assert st.snapshot(0.0)['channel'] == 'sms'
+    st.feed('call.state', {'state': 'connected', 't': 1.0, 'ink': False, 'channel': 'sms'}, 1.0)
+    st.feed('partner.text', {'text': 'How was the flight?', 'is_final': True, 't': 2.0, 'source': 'sms'}, 2.0)
+    snap = st.snapshot(3.0)
+    assert snap['mode'] == 'live' and snap['channel'] == 'sms'
+    assert [(x['who'], x['text']) for x in snap['transcript']] == [('judge', 'How was the flight?')]
+    st = CallState()                    # the dashboard started in call mode: the call server's word wins
+    st.feed('call.state', {'state': 'connected', 't': 1.0, 'channel': 'sms'}, 1.0)
+    assert st.snapshot(2.0)['channel'] == 'sms'
+
+
 def test_voice_offset_skips_resent_words_and_keeps_real_repeats():
     st = fed(('voice.say', {'utt_id': 1, 'words': ['no'], 'offset': 0}),
              ('voice.say', {'utt_id': 1, 'words': ['no', 'no', 'way'], 'offset': 0}),

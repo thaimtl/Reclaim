@@ -4,6 +4,8 @@
     venv-call/bin/python -m demo.launch                 # the live demo: camera + EMG + Claude + call + dashboard
     venv-call/bin/python -m demo.launch --check         # pre-flight checks only, nothing starts
     venv-call/bin/python -m demo.launch --no-emg        # pads off: camera + Claude
+    venv-call/bin/python -m demo.launch --mode sms      # a loud room: the judge calls from our phone, listens on
+                                                        # headphones, and texts the same number instead of speaking
     venv-call/bin/python -m demo.launch --rehearse      # no camera, no pads: session 3's camera log plays when a call
                                                         # connects (a dry run of everything after the camera)
 
@@ -174,7 +176,8 @@ def public_status(url, path='/twiml', timeout=8.0):
 
 # ------------------------------------------------------------------------------------------------ Twilio
 class Twilio:
-    """Points the number's voice webhook at this run's tunnel, then reads it back. opener: injectable for tests."""
+    """Points the number's voice webhook (and in SMS mode its SMS webhook) at this run's tunnel, then reads them back.
+    opener: injectable for tests."""
 
     def __init__(self, sid, token, number, opener=urllib.request.urlopen):
         self.sid, self.number, self.opener = sid, number, opener
@@ -194,16 +197,19 @@ class Twilio:
                 msg = None
             raise RuntimeError(f'Twilio said {e.code}: {msg or e.reason}') from None
 
-    def point_at(self, voice_url):
+    def point_at(self, voice_url, sms_url=None):
         found = self._call(f'{self.base}.json?' + urllib.parse.urlencode({'PhoneNumber': self.number}))
         nums = found.get('incoming_phone_numbers') or []
         if not nums:
             raise RuntimeError(f'{self.number} is not a number on this Twilio account (TWILIO_NUMBER)')
         sid = nums[0]['sid']
-        self._call(f'{self.base}/{sid}.json', {'VoiceUrl': voice_url, 'VoiceMethod': 'POST'})
-        back = self._call(f'{self.base}/{sid}.json').get('voice_url')
-        if back != voice_url:
-            raise RuntimeError(f'Twilio still has {back!r}')
+        want = {'voice_url': voice_url} | ({'sms_url': sms_url} if sms_url else {})
+        self._call(f'{self.base}/{sid}.json', {'VoiceUrl': voice_url, 'VoiceMethod': 'POST'} |
+                   ({'SmsUrl': sms_url, 'SmsMethod': 'POST'} if sms_url else {}))
+        back = self._call(f'{self.base}/{sid}.json')
+        for key, want in want.items():
+            if back.get(key) != want:
+                raise RuntimeError(f'Twilio still has {back.get(key)!r} as {key}')
 
 
 # ------------------------------------------------------------------------------------------------ parts
@@ -415,7 +421,8 @@ class Launcher:
             self.start_call()                   # the network can fail: before the calibration, not after it
             self.start(decoder)
             self.start(Part('Dashboard', self.module('venv-call', 'dashboard.server', '--port', str(self.dash_port),
-                                                     '--number', pretty_number(self.keys.get('TWILIO_NUMBER'))),
+                                                     '--number', pretty_number(self.keys.get('TWILIO_NUMBER')),
+                                                     '--channel', self.args.mode),
                             ('http', f'http://127.0.0.1:{self.dash_port}/', (200,)), 30))
             self.ready_banner()
             self.watch()
@@ -456,7 +463,7 @@ class Launcher:
         self.public_url = TUNNEL_URL.search(tunnel.output()).group(0)
         host = urllib.parse.urlparse(self.public_url).hostname
         self.start(Part('Call', self.module('venv-call', 'call.server'), ('line', r'Sonic websocket open'), 60,
-                        env={'PUBLIC_HOST': host, 'PORT': str(self.call_port)}))
+                        env={'PUBLIC_HOST': host, 'PORT': str(self.call_port), 'CALL_CHANNEL': self.args.mode}))
         say('waiting for the tunnel to reach the call server from outside')
         end = time.monotonic() + 90
         while public_status(self.public_url) not in (200, 405):
@@ -469,7 +476,7 @@ class Launcher:
             return
         try:
             Twilio(self.keys['TWILIO_ACCOUNT_SID'], self.keys['TWILIO_AUTH_TOKEN'], self.keys['TWILIO_NUMBER']).point_at(
-                self.public_url + '/twiml')
+                self.public_url + '/twiml', self.public_url + '/sms' if self.args.mode == 'sms' else None)
         except (urllib.error.URLError, OSError, RuntimeError, ValueError, KeyError) as e:
             raise StartFailed(f'Twilio webhook not updated: {e}') from None
         say(f'Twilio number {pretty_number(self.keys["TWILIO_NUMBER"])} points at this laptop', True)
@@ -482,6 +489,9 @@ class Launcher:
                  f'Running:    {", ".join(p.name for p in self.parts)}',
                  f'Logs:       {self.folder}',
                  'Stop:       Ctrl-C in this window']
+        if self.args.mode == 'sms':
+            lines.insert(3, 'SMS mode:   call the number from our phone (headphones on the judge), then the judge '
+                            'texts it from that phone')
         if self.args.rehearse:
             lines.insert(3, 'Rehearsal:  call the number; session 3 plays once the call connects')
         print('\n' + '=' * 72 + '\n' + '\n'.join('  ' + x for x in lines) + '\n' + '=' * 72 + '\n', flush=True)
@@ -620,6 +630,9 @@ def gpu_ok():
 def main(argv=None):
     ap = argparse.ArgumentParser(description='Start the Silent Voice demo, in order.')
     ap.add_argument('--check', action='store_true', help='pre-flight checks only')
+    ap.add_argument('--mode', choices=('call', 'sms'), default='call',
+                    help="call: the judge speaks on the call (default). sms: a loud room: the judge texts the number "
+                         "from the phone on the call and hears Austin on it")
     ap.add_argument('--no-emg', action='store_true', help='pads off: camera + Claude only')
     ap.add_argument('--no-claude', action='store_true', help='without Claude (fallback)')
     ap.add_argument('--rehearse', action='store_true', help='no camera or pads: session 3 plays when a call connects')

@@ -57,8 +57,9 @@ def _median(xs):
 
 
 class CallState:
-    def __init__(self, number='', benchmark=None):
+    def __init__(self, number='', benchmark=None, channel='call'):
         self.number = number
+        self.channel = channel               # how the judge talks: 'call' (Ink hears them) or 'sms' (they text)
         self.benchmark = benchmark           # word error per reader on a scored session (end screen), or None
         self.seen = {}                       # producer -> last bus.now() a message came from it
         self.emg = [dict(level=0.0, contact=False) for _ in PADS]
@@ -116,6 +117,8 @@ class CallState:
         if msg.get('state') == 'connected':      # call time on our clock: right for a replay at any speed too
             self.reset_call(now)
             self.call.update(call_sid=msg.get('call_sid'), ink=msg.get('ink'))
+            if msg.get('channel') in ('call', 'sms'):       # the call server knows best (a replay carries it too)
+                self.channel = msg['channel']
         elif msg.get('state') == 'ended' and self.call['state'] == 'connected':
             t_end = now
             if self.face_hidden_since is not None:          # close the open interval at the end of the call
@@ -371,7 +374,7 @@ class CallState:
         muscles = self.muscles(now)
         snap = dict(
             mode={'waiting': 'waiting', 'connected': 'live', 'ended': 'end'}[c['state']],
-            number=self.number, elapsed=elapsed,
+            number=self.number, channel=self.channel, elapsed=elapsed,
             metrics=dict(lips_to_voice=_median(self.lat['lips_to_voice']), fixed=len(self.repairs),
                          repeats=len(self.repeats)),
             judge_live=self.judge_live, transcript=self.transcript[-12:],

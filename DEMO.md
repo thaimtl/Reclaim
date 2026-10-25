@@ -15,6 +15,15 @@ One launcher starts everything in order on Austin's laptop and checks each part 
 
 Each start points the Twilio number at the tunnel of that run, so there is nothing to set by hand, and the number stays the same.
 
+## A loud room: SMS mode
+
+When the room is too loud to talk on the phone, start with `"Launch Silent Voice.bat" --mode sms`.
+1. Call the Twilio number from our phone, with **headphones** plugged into it, and hand both to the judge.
+2. The judge **texts the same number from that phone** during the call. Each text is the judge's next line: it shows on the dashboard and goes to Claude, exactly as typed.
+3. Austin mouths his answer. The judge hears his cloned voice on the call, in the headphones.
+
+Our phone must show its number (caller ID not blocked): a text counts only if it comes from the phone on the call, and the call log warns if that phone hides its number. The judge's side comes only from texts sent by the phone on the call: Cartesia Ink stays off, so the room's noise never reaches the captions or Claude. We never text back. Without `--mode sms` (the default, `--mode call`), the judge talks on the call as before.
+
 ## If something is red
 
 | What it says | What to do |
