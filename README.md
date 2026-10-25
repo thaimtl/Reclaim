@@ -9,7 +9,7 @@ We built it at Cal Hacks 13.0.
 
 A laryngectomy removes the voice box, usually after throat cancer.
 People keep their lips, tongue, and jaw, so the words are still there, only the sound is gone.
-Most of them speak through an electrolarynx, a handheld buzzer that sounds robotic and ties up a hand.
+Many of them speak through an electrolarynx, a handheld buzzer that sounds robotic and ties up a hand.
 We think they deserve a voice that sounds like them, keeps up with a real conversation, and works on an ordinary phone call, and that's what we're building.
 
 Our demo speaker is Austin, who's healthy, and no patients take part in the demo.

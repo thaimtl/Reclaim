@@ -22,7 +22,7 @@ Cartesia is the part that gives someone their own voice back, which makes this t
 - Say out loud what each Cartesia part does.
   Sonic speaks, Instant Voice Clone makes it their voice, and Ink hears the partner's question.
 - Speed matters in a conversation.
-  Stream Claude's fixed text into the Sonic WebSocket so speech starts before Claude finishes.
+  Each word streams into the Sonic WebSocket as soon as it locks, so speech starts while Austin is still mouthing.
 - Show Cartesia's part and Claude's part as separate steps in the demo, since other tools are allowed but Cartesia's share must be obvious.
 
 ## Responsibility points to say out loud
@@ -38,8 +38,8 @@ Cartesia is the part that gives someone their own voice back, which makes this t
 
 - Use Sonic 3.6.
 - Set speed, volume, and emotion through `generation_config`, not the old top-level `speed` field.
-- Don't use the Line SDK.
-  Cartesia stops hosting it on December 1, 2026.
+- Don't use the Line SDK, since Cartesia stops hosting Line SDK agents on December 1, 2026.
+  This is about Cartesia's agent framework, not Sonic 3.6, which stays the model to use.
 
 ## Submission checklist
 
