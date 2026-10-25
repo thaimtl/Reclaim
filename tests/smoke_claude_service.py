@@ -59,7 +59,7 @@ def lock(utt, *words):
 
 def unit():
     fake = FakeClient([
-        reply(words=(('Yes', 1.7), ('', 0.5)), predictability=-1),
+        reply(words=(('Burritos', 1.7), ('', 0.5)), predictability=-1),
         reply(edits=[{'index': 2, 'from': 'nerve', 'to': 'nervous'},   # good
                      {'index': 1, 'from': 'little', 'to': 'lot'},      # "lot" is not an alt
                      {'index': 0, 'from': 'b', 'to': 'a'},             # wrong "from"
@@ -78,7 +78,8 @@ def unit():
     out, _ = b.apply(r, target, 0.6)
     check('predict only when nothing is under review', [t for t, _ in out] == ['claude.predict'])
     p = out[0][1]
-    check('predict words cleaned and clipped', p['words'] == [{'w': 'yes', 'weight': 1.0}], p['words'])
+    check('predict words cleaned and clipped, the names after', p['words'][0] == {'w': 'burritos', 'weight': 1.0}
+          and all(w['weight'] == 0.4 for w in p['words'][1:]), p['words'][:3])
     check('predictability clipped', p['predictability'] == 0.0)
     check('predict fields', set(p) == {'words', 'phrases', 'predictability', 'ttl_s', 't'})
     check('predict counts from the request', p['t'] == 0.1 and abs(p['ttl_s'] - (brain_mod.PREDICT_TTL_S - 0.5)) < 1e-9, p)
@@ -134,39 +135,47 @@ def unit():
     check('roles alternate', [m['role'] for m in b.messages] == ['user', 'assistant'] * 2)
 
 
-def early():
-    """While the judge speaks, their partial line starts early predictions (from EARLY_MIN_WORDS words, then every
-    EARLY_STEP_WORDS more, at most every EARLY_EVERY_S); nothing is appended to the conversation; the final line still
-    goes through the conversation lane, and its newer prediction replaces the early one."""
-    b = Brain(FakeClient([reply(words=(('early', 0.9),)), reply(words=(('final', 0.9),))]))
-    b.partner({'text': 'are', 'is_final': False})
-    check('early: not before enough words', b.next_early(0.0) is None)
-    b.partner({'text': 'are you', 'is_final': False})
-    req = b.next_early(0.1)
-    check('early: starts at the minimum words', req is not None and req[1]['lane'] == 'early'
-          and 'are you' in req[0][-1]['content'], req and req[0][-1]['content'])
-    b.partner({'text': 'are you feeling', 'is_final': False})
-    check('early: waits for more words', b.next_early(1.0) is None)
-    b.partner({'text': 'are you feeling nervous', 'is_final': False})
-    check('early: not more often than the interval', b.next_early(0.5) is None)
-    req2 = b.next_early(1.0)
-    check('early: again after more words and time', req2 is not None and 'feeling nervous' in req2[0][-1]['content'])
-    r, log = b.ask(req2[0], lane='early')
-    check('early: the call appends nothing', b.messages == [] and log['lane'] == 'early')
-    out, _ = b.apply(r, req2[1], 3.0)
-    check('early: publishes a prediction', [t for t, _ in out] == ['claude.predict'] and
-          b.predict['words'][0]['w'] == 'early')
-    b.partner({'text': 'are you feeling nervous about the demo', 'is_final': True})
-    check('early: the final line clears the partial and goes to the conversation lane',
-          b.partial == '' and b.next_early(9.0) is None and b.due(9.0, mouthing=False))
+def live_lane():
+    """A prediction is always on its way: a new word in the judge's live line starts a live call (at most every
+    LIVE_JUDGE_EVERY_S, up to MAX_LIVE in flight); otherwise the next starts as soon as the last is back, on the newest
+    context (an unchanged one only after LIVE_IDLE_S). Live calls append nothing; filler never becomes a hint; the
+    demo's names are in every prediction; a newer prediction is never overwritten by an older one."""
+    b = Brain(FakeClient([reply(words=(('pancakes', 0.9), ('the', 0.8), ('yes', 0.7))),
+                          reply(words=(('burritos', 0.9),))]))
+    check('live: nothing before the call starts', b.next_live(0.0) is None)
+    b.partner({'text': 'what did', 'is_final': False})
+    req = b.next_live(0.1)
+    check('live: the judge\'s first words start a call', req is not None and req[1]['lane'] == 'live'
+          and 'what did' in req[0][-1]['content'], req and req[0][-1]['content'])
+    check('live: not again within the interval', b.next_live(0.2, in_flight=1) is None)
+    b.partner({'text': 'what did you', 'is_final': False})
+    check('live: a new judge word starts another while one is in flight',
+          b.next_live(0.5, in_flight=1) is not None)
+    check('live: at most MAX_LIVE in flight', b.next_live(5.0, in_flight=brain_mod.MAX_LIVE) is None)
+    check('live: an unchanged context waits while nothing is in flight', b.next_live(0.9, in_flight=0) is None)
+    b.unlocked = ['i', 'had']
+    req3 = b.next_live(0.9, in_flight=0)
+    check('live: a changed context starts the next one as soon as the last is back',
+          req3 is not None and 'still being read (may change): i had' in req3[0][-1]['content'])
+    check('live: an unchanged context again after the idle time', b.next_live(0.9 + brain_mod.LIVE_IDLE_S) is not None)
+    r, log = b.ask(req3[0], lane='live')
+    check('live: the call appends nothing', b.messages == [] and log['lane'] == 'live')
+    out, _ = b.apply(r, req3[1], 3.0)
+    words = [w['w'] for w in b.predict['words']]
+    check('live: publishes a prediction', [t for t, _ in out] == ['claude.predict'] and words[0] == 'pancakes')
+    check('live: filler never becomes a hint', 'the' not in words and 'yes' not in words, words)
+    check('live: the demo\'s names are in every prediction', {'austin', 'mcgill', 'university', 'laryngectomy'} <= set(words)
+          and 'voice box' in b.predict['phrases'])
+    b.partner({'text': 'what did you have for breakfast', 'is_final': True})
+    check('live: the final line clears the live line and goes to the conversation lane',
+          b.partial == '' and b.due(9.0, mouthing=False) and 'just said' in b.live_context())
     target = b.next_request(9.0)
     r2, _ = b.ask()
-    out2, _ = b.apply(r2, target, 11.0)
-    check('early: the final line\'s prediction replaces it', b.predict['words'][0]['w'] == 'final' and
-          'Judge: are you feeling nervous about the demo' in b.messages[0]['content'])
+    b.apply(r2, target, 11.0)
+    check('live: the newer prediction replaces it', b.predict['words'][0]['w'] == 'burritos')
     late, _ = b.apply(reply(words=(('stale', 0.9),)), {'utt_id': None, 'words': [], 'review': [], 'sent': 1.0,
-                                                       'lane': 'early'}, 12.0)
-    check('early: a late early reply never replaces the final one', late == [] and b.predict['words'][0]['w'] == 'final')
+                                                       'lane': 'live'}, 12.0)
+    check('live: a late reply never replaces a newer one', late == [] and b.predict['words'][0]['w'] == 'burritos')
 
 
 def stale_predict():
@@ -398,6 +407,25 @@ def bus():
 def live():
     import anthropic
     b = Brain(anthropic.Anthropic(timeout=30.0))
+    # content predictions: each judge question on a fresh conversation, through the live lane (the judge mid-line)
+    food = {'eggs', 'toast', 'cereal', 'pancakes', 'burritos', 'burrito', 'coffee', 'bagel', 'oatmeal', 'waffles',
+            'bacon', 'yogurt', 'fruit', 'banana', 'sandwich', 'breakfast', 'pizza', 'muffin', 'croissant', 'smoothie'}
+    for question, want, name in (("what's your name", lambda ws: 'austin' in ws, 'austin'),
+                                 ('what did you have for breakfast', lambda ws: len(ws & food) >= 2, 'food words'),
+                                 ('where do you go to school', lambda ws: {'mcgill', 'university'} <= ws, 'mcgill')):
+        q = Brain(anthropic.Anthropic(timeout=30.0))
+        q.partner({'text': question, 'is_final': False})
+        msgs, tgt = q.next_live(0.0)
+        r, lg = q.ask(msgs, lane='live')
+        if r is None:
+            check(f'live: "{question}" predicts {name}', False, lg.get('error'))
+            continue
+        claude_words = {_w for p in r['predict_words'] for _w in str(p['w']).lower().split()} | \
+            {_w for ph in r['predict_phrases'] for _w in str(ph).lower().split()}
+        filler = [p['w'] for p in r['predict_words'] if str(p['w']).lower() in brain_mod.STOPWORDS]
+        check(f'live: "{question}" predicts {name}', want(claude_words),
+              f"{[p['w'] for p in r['predict_words']][:8]} | {r['predict_phrases'][:3]} | {lg['ms']:.0f} ms")
+        check(f'live: "{question}": few filler words from Claude', len(filler) <= 2, filler)
     b.partner({'text': 'Hi Austin, thanks for calling. Are you feeling nervous about the demo?', 'is_final': True})
     target = b.next_request(0.0)
     r1, log1 = b.ask()
@@ -522,7 +550,7 @@ if __name__ == '__main__':
     args = ap.parse_args()
     unit()
     end_lane()
-    early()
+    live_lane()
     stale_predict()
     late_lock()
     empty_reply()
