@@ -26,7 +26,7 @@ for f in os.listdir(os.path.join(HERE, 'fonts')):
         fm.fontManager.addfont(os.path.join(HERE, 'fonts', f))
 plt.rcParams.update({'font.family': 'Liberation Sans', 'pdf.fonttype': 42})
 
-SURFACE, INK, INK_2, GRID = '#fcfcfb', '#0b0b0b', '#52514e', '#e4e2dc'
+SURFACE, INK, INK_2, GRID = '#ffffff', '#0b0b0b', '#52514e', '#e4e2dc'  # white background
 MODELS = [  # (summary folder, legend label, colour): baselines first, ours last
     ('B1_ours_gpu', "Gaddy & Klein's released model\n(trained on 8 sites)", '#eda100'),
     ('B1T_ours_gpu', 'Gaddy architecture, our retrain\n(trained on 8 sites)', '#1baf7a'),
@@ -95,8 +95,8 @@ def table(data):
     ax.plot([0.8, 154.2], [18.6, 18.6], color=INK, lw=1.2)
     for r, ((folder, _, colour), name, st) in enumerate(zip(MODELS, names, sites)):
         y = 22.3 + r * 5.6
-        if r % 2 == 1:
-            ax.add_patch(plt.Rectangle((0.8, y - 2.8), 153.4, 5.6, color='#f1f0ec', zorder=0, lw=0))
+        if r:  # hairline between rows (the background stays white)
+            ax.plot([0.8, 154.2], [y - 2.8, y - 2.8], color=GRID, lw=0.8, zorder=0)
         ax.add_patch(plt.Rectangle((x_name, y - 1.1), 1.8, 2.2, color=colour, zorder=2, lw=0))
         ax.text(x_name + 2.8, y, name, fontsize=10.5, color=INK, va='center',
                 fontweight='bold' if 'ours' in name else 'normal')
