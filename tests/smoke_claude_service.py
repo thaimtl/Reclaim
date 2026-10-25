@@ -88,7 +88,8 @@ def unit():
     check('a lock waits for its repair call', bool(b.review) and not b.due(0.7, mouthing=False))
     n = len(b.messages)
     msgs, target = b.next_review(0.7)
-    check('repair call: the conversation plus one review', msgs[:-1] == b.messages and 'Review:' in msgs[-1]['content']
+    check('repair call: the conversation plus one review', len(msgs) == len(b.messages) + 1 and msgs[:-2] == b.messages[:-1]
+          and msgs[-2]['role'] == b.messages[-1]['role'] and 'Review:' in msgs[-1]['content']
           and 'nervous' in msgs[-1]['content'] and not b.review)
     b.locked(lock(8, ('hi', [])))  # Austin moves on while Claude thinks
     r, log = b.ask(msgs)
@@ -112,11 +113,24 @@ def unit():
 
     convo = [c for c in fake.calls if 'Review:' not in c['messages'][-1]['content']]
     check('append-only conversation', all(c['messages'] == n['messages'][:len(c['messages'])] for c, n in zip(convo, convo[1:])))
-    check('repair calls read the conversation prefix', all(c['messages'][:-1] == b.messages[:len(c['messages']) - 1]
-                                                           for c in fake.calls if c not in convo))
+    def text(m):    # a message's words, whatever its shape (string, SDK blocks, dicts with a cache breakpoint)
+        c = m['content']
+        return m['role'], c if isinstance(c, str) else [x['text'] if isinstance(x, dict) else x.text for x in c]
+
+    repairs = [c for c in fake.calls if c not in convo]
+    check('repair calls read the conversation prefix', all(
+        [text(m) for m in c['messages'][:-1]] == [text(m) for m in b.messages[:len(c['messages']) - 1]] for c in repairs))
+    check('repair calls mark the end of the conversation for the cache', all(
+        c['messages'][-2]['content'][-1].get('cache_control') == {'type': 'ephemeral'} for c in repairs
+        if len(c['messages']) > 1))
+    check('the conversation itself is never edited', all(
+        not isinstance(x, dict) or 'cache_control' not in x for m in b.messages
+        for x in (m['content'] if isinstance(m['content'], list) else [])))
     check('frozen system, schema, settings', all(c['system'] == SYSTEM and c['output_config']['format']['schema'] == SCHEMA
                                                  and c['output_config']['effort'] == 'low' for c in fake.calls))
-    check('model', all(c['model'] == 'claude-haiku-5-5' for c in fake.calls))
+    check('model: Haiku predicts, Opus repairs', all(c['model'] == ('claude-opus-5-5' if c not in convo and 'Review:' in
+                                                     c['messages'][-1]['content'] else 'claude-haiku-5-5')
+                                                 for c in fake.calls))
     check('roles alternate', [m['role'] for m in b.messages] == ['user', 'assistant'] * 2)
 
 
@@ -378,7 +392,11 @@ def live():
         return
     out, rejected = b.apply(r2, target, 1.0)
     print('  repair:', dict(out)['claude.repair'], 'rejected:', rejected, f"{log2['ms']:.0f} ms")
-    check('live: second call reads the cache', log2['cache_read'] > 0, f"cache_read={log2['cache_read']}")
+    b.locked(lock(1, ('yes', ['jess']), ('a', []), ('little', []), ('nerve', ['nervous', 'nerf']), ('tonight', [])))
+    msgs, target = b.next_review(2.0)
+    r3, log3 = b.ask(msgs)     # a repair after a repair: Opus reads its own cached prefix (Haiku's is another model's)
+    check('live: a second repair reads the cache', r3 is not None and log3['cache_read'] > 0,
+          f"cache_read={log3['cache_read']}, {log3['ms']:.0f} ms, model {log3.get('model')}")
 
 
 def failed_call():

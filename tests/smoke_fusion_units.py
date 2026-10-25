@@ -260,7 +260,7 @@ def main():
         check('a restarted camera reusing seg_id 1 still starts a new sentence',
               any(tp == 'dec.hyp' and m['utt_id'] == 2 for tp, m in out))
 
-        # a repair inside the repair window changes what the voice says
+        # a repair changes the captions only: the voice says what locked, even inside the repair window
         core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
         out = []
         for n in range(8, T + 1, 3):
@@ -275,7 +275,9 @@ def main():
         for k in range(1, 60):
             out += core.step(t + 0.05 * k)
         said = [x for tp, m in out if tp == 'voice.say' for x in m['words']]
-        check('a repair before the voice speaks changes the spoken word', said[idx] == 'what', ' '.join(said))
+        caps = [m for tp, m in out if tp == 'dec.hyp'][-1]['locked']
+        check('a repair, even inside the repair window, changes the captions, never the voice',
+              said[idx] == last and caps[idx] == 'what', f"said {' '.join(said)}; captions {' '.join(caps)}")
 
         # a word below the threshold at the end: Please repeat, and the voice doesn't say it
         lock = LockModel(tau0=0.999, tau_min=0.999, tau_max=0.999, agree_floor=0.0, repeat_floor=0.9999)

@@ -333,7 +333,7 @@ class Fusion:
         words = []
         while u.queue and u.queue[0][0] <= now:
             _, i = u.queue.popleft()
-            words.append(u.locked[i]['w'])
+            words.append(u.locked[i].get('voice', u.locked[i]['w']))
         last = u.state == 'done' and not u.queue
         if words or (last and not u.final_sent):
             out.append(('voice.say', {'utt_id': u.utt_id, 'words': words, 'offset': u.spoken, 'final': last,
@@ -354,7 +354,8 @@ class Fusion:
             words = self.search_words(str(e.get('to', '')))
             frm = self.search_words(str(e.get('from', '')))
             if 0 <= i < len(u.locked) and len(words) == 1 and frm[:1] == [u.locked[i]['w']]:
-                u.locked[i]['w'] = words[0]     # spoken words can't change; captions and later voice can
+                u.locked[i].setdefault('voice', u.locked[i]['w'])
+                u.locked[i]['w'] = words[0]     # the captions only: the voice says what locked, window or not
         if msg.get('please_repeat') and not u.repeat_sent:
             out.append(('dec.repeat', {'utt_id': u.utt_id, 'reason': {
                 'reader': 'Claude', 'words': [dict(index=i, w=x['w'], alts=x['alts']) for i, x in

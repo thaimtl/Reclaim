@@ -24,8 +24,11 @@ Code, not Claude, enforces the guard rails: an edit must swap one word for one o
 decoder sent, so Claude can never add, drop or reword anything.
 
 Warnings for whoever changes ask():
-- claude-haiku-5-5 with thinking off and low effort, for speed: a reply takes about a second instead of the ~6 s
-  claude-opus-5-5 took (it can't turn thinking off). Haiku has no server-side fallback, so no `fallbacks`.
+- Predictions: claude-haiku-5-5 with thinking off and low effort, for speed (about 2 s a call, where claude-opus-5-5
+  takes ~5 s: it can't turn thinking off). Haiku has no server-side fallback, so no `fallbacks`.
+- Repairs: claude-opus-5-5 (with `fallbacks`). A repair never changes the voice, only the captions (fusion/core.py),
+  so speed buys nothing there, and Haiku swapped right words for wrong ones. Its reply is never appended, so no
+  thinking block enters the conversation.
 - Publish only when stop_reason == "end_turn" and there is a text block. content[0] may be thinking.
 - Append only: trimming old turns misses the cache and can 400 on replayed thinking blocks, so the history is
   never trimmed (a call is minutes long, far inside the 1M context).
@@ -37,7 +40,10 @@ requeues its words for review, each until MAX_FAILURES in a row; a refused repai
 import json
 import time
 
-MODEL = "claude-haiku-5-5"
+MODEL = "claude-haiku-5-5"           # predictions (conversation and early lanes): speed
+REPAIR_MODEL = "claude-opus-5-5"     # repairs: accuracy (they only fix the captions, so its ~5 s costs nothing)
+FALLBACK_BETA = "server-side-fallback-2026-07-01"
+REPAIR_MAX_TOKENS = 16000            # Opus always thinks first: room for the thinking and the reply
 MAX_TOKENS = 4000  # thinking is off: the reply is a short JSON object
 PREDICT_EVERY_S = 2.0  # while Austin is mouthing
 PREDICT_TTL_S = 4.0
@@ -139,6 +145,23 @@ def _word(w):
     alts = w.get("alts")
     return {"w": w["w"], "alts": [a for a in alts if isinstance(a, str)] if isinstance(alts, list) else [],
             "conf": _num(w.get("conf")), "cam": _num(w.get("cam")), "emg": _num(w.get("emg")), "t": _num(w.get("t"))}, True
+
+
+def _cached(messages):
+    """The conversation with a cache breakpoint on its last block: repairs run on another model than the
+    conversation lane, so they can't read its cache, and each ends in its own review message, so the top-level
+    breakpoint alone never matches the next one. With this, each repair reads the prefix the one before cached.
+    A copy: the conversation itself is never edited."""
+    if not messages:
+        return []
+    last = dict(messages[-1])
+    blocks = last["content"]
+    if isinstance(blocks, str):
+        blocks = [{"type": "text", "text": blocks}]
+    blocks = [b if isinstance(b, dict) else b.model_dump(exclude_none=True) if hasattr(b, "model_dump") else dict(vars(b))
+              for b in blocks]
+    last["content"] = blocks[:-1] + [dict(blocks[-1], cache_control={"type": "ephemeral"})]
+    return list(messages[:-1]) + [last]
 
 
 class Brain:
@@ -265,7 +288,7 @@ class Brain:
             detail.append(f"{i} {w['w']} conf={_score(w['conf'])} cam={_score(w['cam'])} emg={_score(w['emg'])} "
                           f"alts: {', '.join(w['alts']) or 'none'}")
         content = f"Austin, utterance {utt}, locked so far:\n" + "\n".join(lines) + "\n\nReview:\n" + "\n".join(detail)
-        return list(self.messages) + [{"role": "user", "content": content}], \
+        return _cached(self.messages) + [{"role": "user", "content": content}], \
             {"utt_id": utt, "words": words, "review": review, "sent": now, "lane": "repair"}
 
     def refresh(self, now, mouthing):
@@ -284,15 +307,14 @@ class Brain:
         t0 = time.perf_counter()
         log = {"stage": "claude", "lane": lane, "request": msgs[-1]["content"]}
         try:
-            r = self.client.beta.messages.create(
-                model=MODEL,
-                max_tokens=MAX_TOKENS,
-                thinking={"type": "disabled"},
-                system=SYSTEM,
-                messages=msgs,
-                cache_control={"type": "ephemeral"},
-                output_config={"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}},
-            )
+            common = dict(system=SYSTEM, messages=msgs, cache_control={"type": "ephemeral"},
+                          output_config={"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}})
+            if lane == "repair":    # Opus: Haiku swapped right words on the session 3 replay (0.8 edits a sentence)
+                r = self.client.beta.messages.create(model=REPAIR_MODEL, max_tokens=REPAIR_MAX_TOKENS,
+                                                     betas=[FALLBACK_BETA], fallbacks="default", **common)
+            else:
+                r = self.client.beta.messages.create(model=MODEL, max_tokens=MAX_TOKENS,
+                                                     thinking={"type": "disabled"}, **common)
         except Exception as e:  # network, rate limit, timeout: the captions go on without Claude (see failed)
             log.update(ms=1000 * (time.perf_counter() - t0), error=f"{type(e).__name__}: {e}")
             return None, log
