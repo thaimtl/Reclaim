@@ -58,7 +58,7 @@ The demo is two minutes, live, at our table.
 
 | Part | Tool |
 |---|---|
-| Lip reading | [Auto-AVSR](https://github.com/mpc001/auto_avsr), as is, re-read every 100 ms for real time |
+| Live lip reading | Ours (`lipread/`), built on the open [Auto-AVSR](https://github.com/mpc001/auto_avsr) model. We turned a clip-by-clip reader into a live one that streams word guesses as Austin mouths, knows when he starts and stops, and feeds every guess into one joint search with the EMG model and Claude. |
 | Face, mouth crop, expression | MediaPipe FaceLandmarker |
 | Muscle signals | BioAmp EXG Pill boards and an Arduino Uno, see [HARDWARE.md](HARDWARE.md) |
 | EMG model | SVR-1, ours: PyTorch, pre-trained on Berkeley's silent speech data, fine-tuned on Austin |
