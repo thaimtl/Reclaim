@@ -294,22 +294,22 @@ function roll(el, k) {
 
 
 function renderTones(tones) {
-  const R = 64, C = 2 * Math.PI * R, entries = Object.entries(tones || {}), total = entries.reduce((a, [, c]) => a + c, 0);
+  const R = 56, C = 2 * Math.PI * R, entries = Object.entries(tones || {}), total = entries.reduce((a, [, c]) => a + c, 0);
   let off = 0;
   $('end-donut').innerHTML = total ? entries.map(([t, c]) => {
-    const len = C * c / total, seg = `<circle cx="72" cy="72" r="${R}" class="seg" data-name="${t}" data-n="${c}" ` +
+    const len = C * c / total, seg = `<circle cx="72" cy="72" r="${R}" class="seg" data-name="${t}" ` +
       `style="stroke:var(--tone-${t});stroke-dasharray:${Math.max(0, len - 4).toFixed(1)} ${C.toFixed(1)};stroke-dashoffset:${(-off).toFixed(1)}"/>`;
     off += len; return seg;
   }).join('') : `<circle cx="72" cy="72" r="${R}" class="seg empty"/>`;
   $('end-legend').innerHTML = entries.map(([t, c]) =>
     `<div class="lg" data-name="${t}"><i style="background:var(--tone-${t})"></i><span>${TONES[t] || t}</span><b>${c}</b></div>`).join('');
-  const donut = document.querySelector('#end .donut');
+  const donut = document.querySelector('#end .donut'), legend = $('end-legend');
   const show = name => {
     const seg = name && donut.querySelector(`.seg[data-name="${name}"]`);
     donut.classList.toggle('hot', !!seg);
+    legend.classList.toggle('hot', !!seg);
     donut.querySelectorAll('.seg').forEach(x => x.classList.toggle('on', x === seg));
-    $('end-dn').textContent = seg ? seg.dataset.n : total;
-    $('end-dl').textContent = seg ? (TONES[name] || name).toLowerCase() : total === 1 ? 'sentence' : 'sentences';
+    legend.querySelectorAll('.lg').forEach(x => x.classList.toggle('on', !!seg && x.dataset.name === name));
   };
   document.querySelectorAll('#end .seg, #end .lg').forEach(el => {
     el.addEventListener('mouseenter', () => show(el.dataset.name));
