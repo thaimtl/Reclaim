@@ -56,6 +56,10 @@ You can feel it with two fingers under your chin while saying "ta ta ta", then "
 
 Austin wearing the full 4-channel rig at Cal Hacks 13.0.
 
+<img src="images/rig-setup.jpg" width="520" alt="Austin at our table wearing the pads, with the Arduino Uno and breadboard in front of him, the BioAmp boards by his hand, and the laptop that runs everything">
+
+The whole rig at our table, with the Arduino Uno and the breadboard in front, the 4 BioAmp boards by Austin's hand with their cables running up to his pads, and the laptop that runs everything.
+
 | Front | Right side | Left side |
 |---|---|---|
 | <img src="images/austin-front.jpg" width="260" alt="Austin from the front with pad pairs on the right cheek below the mouth, the left cheek above the mouth, the left chin corner, and under the chin"> | <img src="images/austin-right-side.jpg" width="260" alt="Austin's right side with two REF pads behind the right ear and a pad pair on the right cheek below the mouth"> | <img src="images/austin-left-side.jpg" width="260" alt="Austin's left side with two REF pads behind the left ear and pad pairs on the left cheek above the mouth and the left chin corner"> |
