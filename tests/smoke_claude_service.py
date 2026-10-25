@@ -120,6 +120,41 @@ def unit():
     check('roles alternate', [m['role'] for m in b.messages] == ['user', 'assistant'] * 2)
 
 
+def early():
+    """While the judge speaks, their partial line starts early predictions (from EARLY_MIN_WORDS words, then every
+    EARLY_STEP_WORDS more, at most every EARLY_EVERY_S); nothing is appended to the conversation; the final line still
+    goes through the conversation lane, and its newer prediction replaces the early one."""
+    b = Brain(FakeClient([reply(words=(('early', 0.9),)), reply(words=(('final', 0.9),))]))
+    b.partner({'text': 'are you', 'is_final': False})
+    check('early: not before enough words', b.next_early(0.0) is None)
+    b.partner({'text': 'are you feeling', 'is_final': False})
+    req = b.next_early(0.1)
+    check('early: starts at the minimum words', req is not None and req[1]['lane'] == 'early'
+          and 'are you feeling' in req[0][-1]['content'], req and req[0][-1]['content'])
+    b.partner({'text': 'are you feeling nervous', 'is_final': False})
+    check('early: waits for more words', b.next_early(1.0) is None)
+    b.partner({'text': 'are you feeling nervous about the', 'is_final': False})
+    check('early: not more often than the interval', b.next_early(0.5) is None)
+    req2 = b.next_early(1.0)
+    check('early: again after more words and time', req2 is not None and 'about the' in req2[0][-1]['content'])
+    r, log = b.ask(req2[0], lane='early')
+    check('early: the call appends nothing', b.messages == [] and log['lane'] == 'early')
+    out, _ = b.apply(r, req2[1], 3.0)
+    check('early: publishes a prediction', [t for t, _ in out] == ['claude.predict'] and
+          b.predict['words'][0]['w'] == 'early')
+    b.partner({'text': 'are you feeling nervous about the demo', 'is_final': True})
+    check('early: the final line clears the partial and goes to the conversation lane',
+          b.partial == '' and b.next_early(9.0) is None and b.due(9.0, mouthing=False))
+    target = b.next_request(9.0)
+    r2, _ = b.ask()
+    out2, _ = b.apply(r2, target, 11.0)
+    check('early: the final line\'s prediction replaces it', b.predict['words'][0]['w'] == 'final' and
+          'Judge: are you feeling nervous about the demo' in b.messages[0]['content'])
+    late, _ = b.apply(reply(words=(('stale', 0.9),)), {'utt_id': None, 'words': [], 'review': [], 'sent': 1.0,
+                                                       'lane': 'early'}, 12.0)
+    check('early: a late early reply never replaces the final one', late == [] and b.predict['words'][0]['w'] == 'final')
+
+
 def stale_predict():
     """A prediction from an older request never replaces a newer one; refresh resends the newest while mouthing."""
     b = Brain(FakeClient([]))
@@ -435,6 +470,7 @@ if __name__ == '__main__':
     ap.add_argument('--live', action='store_true')
     args = ap.parse_args()
     unit()
+    early()
     stale_predict()
     late_lock()
     empty_reply()

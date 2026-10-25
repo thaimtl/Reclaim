@@ -5,6 +5,10 @@ Two lanes, one conversation (docs/REALTIME_PIPELINE.md, "Claude"):
   message (judge lines, Austin's locked words, the repairs made since) and Claude's reply to it, so prompt caching
   reuses everything before. It runs on every final judge line and about every PREDICT_EVERY_S while something
   changed.
+- The early lane: while the judge is still speaking, Cartesia Ink's partial transcript starts a prediction call as soon
+  as EARLY_MIN_WORDS words are in, then again every EARLY_STEP_WORDS more (at most every EARLY_EVERY_S, one at a time).
+  Like a repair call it reads the conversation and appends nothing; the final line still goes through the
+  conversation lane, and that newer prediction replaces the early ones. The early call adds no delay to anything.
 - The repair lane: each dec.lock starts its own call at once (up to MAX_REPAIRS in flight), so a repair never waits
   behind another call. A repair call is the conversation so far plus one review message, and its reply is never
   appended: the conversation stays append-only (no thinking block is ever replayed after an edited prefix), and
@@ -38,6 +42,9 @@ PREDICT_EVERY_S = 2.0  # while Austin is mouthing
 PREDICT_TTL_S = 4.0
 MAX_UTTS = 8           # utterances kept for late locks and reviews
 MAX_REPAIRS = 3        # repair calls in flight at once, besides the conversation call
+EARLY_MIN_WORDS = 3    # the judge's partial line starts an early prediction once it has this many words
+EARLY_STEP_WORDS = 2   # ... and another every this many more words
+EARLY_EVERY_S = 0.7    # ... but at most this often
 BACKOFF_S = (1.0, 2.0, 4.0, 8.0)  # wait after 1, 2, 3, 4+ failed calls in a row, from the moment it failed
 MAX_FAILURES = 3       # failed calls in a row after which the failing request's content is dropped
 MAX_PENDING_LINES = 20  # newest judge lines kept while calls fail
@@ -150,10 +157,31 @@ class Brain:
         self.predict_pub = -1e9
         self.failures = 0     # failed calls in a row, either lane (see failed)
         self.retry_at = -1e9  # no new call before this, after a failure (bus.now() seconds)
+        self.partial = ""     # the judge's line so far, while they speak (Ink's partial transcript)
+        self.early_words = 0  # words in the partial line the last early prediction was asked on
+        self.early_at = -1e9
 
     def partner(self, msg):
-        if msg.get("is_final") and msg.get("text", "").strip():
-            self.events.append(msg["text"].strip())
+        text = msg.get("text", "").strip()
+        if msg.get("is_final"):
+            if text:
+                self.events.append(text)
+            self.partial, self.early_words = "", 0   # the line is done: the conversation lane takes it from here
+        elif text:
+            self.partial = text
+
+    def next_early(self, now):
+        """An early-lane call while the judge is still speaking: (messages, target), or None when it isn't time. The
+        messages are the conversation so far plus the partial line; nothing is appended to the conversation."""
+        n = len(self.partial.split())
+        if now < self.retry_at or n < EARLY_MIN_WORDS or n < self.early_words + EARLY_STEP_WORDS \
+                or now - self.early_at < EARLY_EVERY_S:
+            return None
+        self.early_words, self.early_at = n, now
+        content = (f"The judge is still speaking. Their line so far (a live transcript, it may change): {self.partial}\n\n"
+                   "Nothing is under review. Predict what Austin is likely to answer.")
+        return list(self.messages) + [{"role": "user", "content": content}], \
+            {"utt_id": None, "words": [], "review": [], "sent": now, "lane": "early"}
 
     def _touch(self, utt):
         if utt not in self.updated:
@@ -246,10 +274,10 @@ class Brain:
         self.predict_pub = now
         return dict(self.predict, ttl_s=PREDICT_TTL_S, t=now)
 
-    def ask(self, messages=None):
-        """Call Claude. messages=None: the conversation lane (the reply is appended); else a repair-lane call on those
-        messages (nothing appended). Runs off the main thread; returns (reply or None, log)."""
-        lane = "conversation" if messages is None else "repair"
+    def ask(self, messages=None, lane=None):
+        """Call Claude. messages=None: the conversation lane (the reply is appended); else a repair- or early-lane call on
+        those messages (nothing appended). Runs off the main thread; returns (reply or None, log)."""
+        lane = "conversation" if messages is None else (lane or "repair")
         msgs = self.messages if messages is None else messages
         t0 = time.perf_counter()
         log = {"stage": "claude", "lane": lane, "request": msgs[-1]["content"]}

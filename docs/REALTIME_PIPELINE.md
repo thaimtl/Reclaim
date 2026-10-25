@@ -160,7 +160,7 @@ sequenceDiagram
 
 Claude does two jobs:
 
-- **Predict, before Austin mouths.** Whenever the judge finishes speaking, and again every couple of seconds while Austin talks, Claude returns the words and short phrases Austin is likely to use next, and how predictable the next words are. The predicted words get a boost in the joint search, and the predictability sets the locking threshold. This costs no waiting: the prediction is ready before Austin starts.
+- **Predict, before Austin mouths.** While the judge is still speaking, from Cartesia Ink's live transcript of their unfinished line, once more when the line is final (its last words can change the answer: "...nervous or excited?"), and again every couple of seconds while Austin talks, Claude returns the words and short phrases Austin is likely to use next, and how predictable the next words are. The predicted words get a boost in the joint search, and the predictability sets the locking threshold. This costs no waiting: the prediction is ready before Austin starts.
 - **Repair.** As words lock, the joint search sends Claude the last few words with the alternatives it considered and how sure it was. Claude may swap a word only for one of those alternatives or a lip look-alike, never add or reword ideas, and answers "please repeat" when it cannot tell. The reply is a short structured list of edits.
 
 A locked word waits a short repair window before it is spoken, 0.3 s by default, so that a quick repair can still change it. A repair that arrives later fixes the captions only, with the change highlighted. The window is a single setting: 0 gives the fastest voice, a longer window lets Claude catch more before words are spoken.
