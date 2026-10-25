@@ -5,11 +5,12 @@ Two lanes, one conversation (docs/REALTIME_PIPELINE.md, "Claude"):
   message (judge lines, Austin's locked words, the repairs made since) and Claude's reply to it, so prompt caching
   reuses everything before. It runs on every final judge line and about every PREDICT_EVERY_S while something
   changed.
-- The early lane: while the judge is still speaking, Cartesia Ink's partial transcript starts a prediction call as soon
-  as EARLY_MIN_WORDS words are in, then again every EARLY_STEP_WORDS more (at most every EARLY_EVERY_S, up to
-  MAX_EARLY in flight, so a fresher one is always on its way).
-  Like a repair call it reads the conversation and appends nothing; the final line still goes through the
-  conversation lane, and that newer prediction replaces the early ones. The early call adds no delay to anything.
+- The live lane: a prediction is always on its way. Whenever the judge's live transcript (Cartesia Ink's partial
+  line) gains a word, a call starts (at most every LIVE_JUDGE_EVERY_S, up to MAX_LIVE in flight); otherwise, as soon
+  as the last live call is back, the next one starts with the newest context: the judge's line so far, their final
+  lines not yet in the conversation, Austin's current sentence (locked and still being read) and the last repairs.
+  A context that hasn't changed is asked again only after LIVE_IDLE_S. Like a repair call it reads the
+  conversation and appends nothing, so the conversation lane stays append-only and cached. No call adds delay.
 - The repair lane: each dec.lock starts its own call at once (up to MAX_REPAIRS in flight), so a repair never waits
   behind another call. A repair call is the conversation so far plus one review message, and its reply is never
   appended: the conversation stays append-only (no thinking block is ever replayed after an edited prefix), and
@@ -44,7 +45,7 @@ requeues its words for review, each until MAX_FAILURES in a row; a refused repai
 import json
 import time
 
-MODEL = "claude-haiku-5-5"           # predictions (conversation and early lanes): speed
+MODEL = "claude-haiku-5-5"           # predictions (conversation and live lanes): speed
 REPAIR_MODEL = "claude-opus-5-5"     # repairs: accuracy (they only fix the captions, so its ~5 s costs nothing)
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 REPAIR_MAX_TOKENS = 16000            # Opus always thinks first: room for the thinking and the reply
@@ -53,10 +54,10 @@ PREDICT_EVERY_S = 2.0  # while Austin is mouthing
 PREDICT_TTL_S = 4.0
 MAX_UTTS = 8           # utterances kept for late locks and reviews
 MAX_REPAIRS = 3        # repair calls in flight at once, besides the conversation call
-MAX_EARLY = 2          # early prediction calls in flight at once
-EARLY_MIN_WORDS = 2    # the judge's partial line starts an early prediction once it has this many words
-EARLY_STEP_WORDS = 2   # ... and another every this many more words
-EARLY_EVERY_S = 0.7    # ... but at most this often
+MAX_LIVE = 3           # live prediction calls in flight at once
+LIVE_JUDGE_EVERY_S = 0.3  # a new word in the judge's live line starts a live call at most this often
+LIVE_EVERY_S = 0.3     # otherwise the next live call starts this soon after the last one is back
+LIVE_IDLE_S = 3.0      # ... and an unchanged context is asked again only after this long
 BACKOFF_S = (1.0, 2.0, 4.0, 8.0)  # wait after 1, 2, 3, 4+ failed calls in a row, from the moment it failed
 MAX_FAILURES = 3       # failed calls in a row after which the failing request's content is dropped
 MAX_PENDING_LINES = 20  # newest judge lines kept while calls fail
@@ -205,8 +206,9 @@ class Brain:
         self.failures = 0     # failed calls in a row, either lane (see failed)
         self.retry_at = -1e9  # no new call before this, after a failure (bus.now() seconds)
         self.partial = ""     # the judge's line so far, while they speak (Ink's partial transcript)
-        self.early_words = 0  # words in the partial line the last early prediction was asked on
-        self.early_at = -1e9
+        self.live_words = 0   # words in the judge's live line the last live call was asked on
+        self.live_at = -1e9   # when the last live call started
+        self.live_asked = ""  # the context it was asked on
         self.end = None       # the newest dec.pause not yet asked (end lane)
 
     def partner(self, msg):
@@ -214,22 +216,48 @@ class Brain:
         if msg.get("is_final"):
             if text:
                 self.events.append(text)
-            self.partial, self.early_words = "", 0   # the line is done: the conversation lane takes it from here
+            self.partial, self.live_words = "", 0   # the line is done: it is in the next live context and conversation call
         elif text:
             self.partial = text
 
-    def next_early(self, now):
-        """An early-lane call while the judge is still speaking: (messages, target), or None when it isn't time. The
-        messages are the conversation so far plus the partial line; nothing is appended to the conversation."""
-        n = len(self.partial.split())
-        if now < self.retry_at or n < EARLY_MIN_WORDS or n < self.early_words + EARLY_STEP_WORDS \
-                or now - self.early_at < EARLY_EVERY_S:
+    def live_context(self):
+        """What a live call is asked on: the newest context, not yet in the conversation."""
+        parts = []
+        if self.events:
+            parts.append("The judge just said (not in the conversation yet):\n" + "\n".join(self.events))
+        if self.partial:
+            parts.append(f"The judge is speaking now. Their line so far (a live transcript, it may change): {self.partial}")
+        if self.utts:
+            utt = next(reversed(self.utts))
+            locked = " ".join(w["w"] for w in self.utts[utt])
+            parts.append(f"Austin's current sentence, locked so far: {locked or '(nothing yet)'}")
+        if self.unlocked:
+            parts.append("Austin is mouthing, still being read (may change): " + " ".join(self.unlocked))
+        if self.notes:
+            parts.append("Your last repairs:\n" + "\n".join(self.notes[-3:]))
+        return "\n\n".join(parts)
+
+    def next_live(self, now, in_flight=0):
+        """A live-lane call: (messages, target), or None when it isn't time. A new word in the judge's live line starts
+        one at once (at most every LIVE_JUDGE_EVERY_S, up to MAX_LIVE in flight); otherwise one starts as soon as the
+        last is back, on the newest context (an unchanged one only after LIVE_IDLE_S). The messages are the
+        conversation so far plus that context; nothing is appended to the conversation."""
+        if now < self.retry_at or in_flight >= MAX_LIVE:
             return None
-        self.early_words, self.early_at = n, now
-        content = (f"The judge is still speaking. Their line so far (a live transcript, it may change): {self.partial}\n\n"
-                   "Nothing is under review. Predict what Austin is likely to answer.")
+        context = self.live_context()
+        if not context and not self.messages:
+            return None     # the call hasn't started: nothing to predict from
+        n = len(self.partial.split())
+        judge_new = n > self.live_words and now - self.live_at >= LIVE_JUDGE_EVERY_S
+        settled = in_flight == 0 and now - self.live_at >= LIVE_EVERY_S and \
+            (context != self.live_asked or now - self.live_at >= LIVE_IDLE_S)
+        if not (judge_new or settled):
+            return None
+        self.live_words, self.live_at, self.live_asked = n, now, context
+        content = ((context + "\n\n") if context else "") + \
+            "Nothing is under review. Predict what Austin is likely to mouth next."
         return list(self.messages) + [{"role": "user", "content": content}], \
-            {"utt_id": None, "words": [], "review": [], "sent": now, "lane": "early"}
+            {"utt_id": None, "words": [], "review": [], "sent": now, "lane": "live"}
 
     def pause(self, msg):
         """dec.pause: Austin's lips stopped and the decoder holds his sentence. The newest replaces one not yet sent."""
@@ -343,7 +371,7 @@ class Brain:
         return dict(self.predict, ttl_s=PREDICT_TTL_S, t=now)
 
     def ask(self, messages=None, lane=None):
-        """Call Claude. messages=None: the conversation lane (the reply is appended); else a repair- or early-lane call on
+        """Call Claude. messages=None: the conversation lane (the reply is appended); else a repair-, live- or end-lane call on
         those messages (nothing appended). Runs off the main thread; returns (reply or None, log)."""
         lane = "conversation" if messages is None else (lane or "repair")
         msgs = self.messages if messages is None else messages
