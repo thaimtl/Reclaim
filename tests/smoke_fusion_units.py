@@ -142,7 +142,26 @@ def main():
         texts = [' '.join(c.words) for c in cands]
         check('look-alike swaps join the candidates', 'i want waiter' in texts, f'{len(cands)} candidates')
         sc = search.judge_scores(cands, cam, None, {}, True)
-        check('judge scores: one row per candidate, six columns', sc.shape == (len(cands), 6))
+        check('judge scores: one row per candidate, seven columns', sc.shape == (len(cands), 7))
+
+        # the camera dropped a short word: 'i water' -> inserting 'want' isn't short, but 'i want water' -> 'i want the water'
+        drop = CamReading(reading(pieces, ['want', 'water']))
+        cands_d = search.candidates(drop, w, {}, final=True)
+        ins = [c for c in cands_d if c.source == 'insert']
+        check('short words the camera dropped are tried, unseen by the camera',
+              ins and all(c.unseen() == 1 for c in ins) and any(c.words == ('i', 'want', 'water') for c in ins),
+              str([' '.join(c.words) for c in ins][:5]))
+        ph = search.candidates(drop, w, {'i': 0.3}, final=True, phrases=[['i', 'want', 'water']])
+        check("Claude's phrase fills in the dropped word", any(c.source == 'phrase' and c.words == ('i', 'want', 'water')
+                                                              for c in ph))
+        sc_d = search.judge_scores(cands_d, drop, None, {}, True)
+        k = next(j for j, c in enumerate(cands_d) if c.words == ('i', 'want', 'water'))
+        k0 = next(j for j, c in enumerate(cands_d) if c.words == ('want', 'water'))
+        check('an unseen word costs the camera nothing', abs(sc_d[k, 0] - sc_d[k0, 0]) < 1e-6 and sc_d[k, 6] == 1)
+        lk2 = LockModel(repeat_floor=0.5)
+        check('the final pass speaks a sentence unless it is unreadable; short words never count',
+              lk2.settle(['i', 'want', 'water'], [0.1, 0.9, 0.8]) and not lk2.settle(['i', 'want', 'water'],
+                                                                                      [0.9, 0.2, 0.3]))
 
         # EMG settles a look-alike: the camera is unsure between water and waiter, EMG strongly favours waiter
         cam2 = CamReading(reading(pieces, ['i', 'want', 'water'], noise={'water': ('waiter', 0.42)}))
@@ -233,7 +252,7 @@ def main():
         check('a repair before the voice speaks changes the spoken word', said[idx] == 'what', ' '.join(said))
 
         # a word below the threshold at the end: Please repeat, and the voice doesn't say it
-        lock = LockModel(tau0=0.999, tau_min=0.999, tau_max=0.999, agree_floor=0.0)
+        lock = LockModel(tau0=0.999, tau_min=0.999, tau_max=0.999, agree_floor=0.0, repeat_floor=0.9999)
         core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
         out = []
         for n in range(8, T + 1, 3):

@@ -144,6 +144,8 @@ def run_session(session, cam_log, svr_path, gate, lock, use_emg=True, use_lm=Tru
     if no_lock:
         lock.tau0 = lock.tau_min = lock.tau_max = 2.0       # nothing locks: every word on every pass is an example
     search = build_search()
+    if not use_lm:   # camera alone: no LM-ranked short-word insertions either
+        search.inserts = 0
 
     def oracle(u):
         frames_end = float(u.cam.frame_t[-1]) if u.cam is not None else u.seg_start + 1
@@ -259,13 +261,13 @@ def fit_gate(records, iters=300, l2=0.1):
         if not (r['final'] and r.get('truth') is not None and r['clip_ok']):
             continue
         sc = np.asarray(r['scores'], np.float64)
-        sc = sc - sc.max(0, keepdims=True) * np.array([1, 1, 1, 0, 0, 1])   # shift: softmax is unchanged
+        sc = sc - sc.max(0, keepdims=True) * np.array([1, 1, 1, 0, 0, 1, 0])   # shift: softmax is unchanged
         err = np.array([word_errors(c, r['truth']) for c in r['cands']], np.float64) / max(len(r['truth']), 1)
         rows.append((torch.tensor(sc), torch.tensor(err), torch.tensor(np.asarray(r['gate'], np.float64))))
     if not rows:
         raise SystemExit('no final passes with a known sentence')
     K = max(len(sc) for sc, _, _ in rows)
-    SC = torch.zeros(len(rows), K, 6, dtype=torch.float64)
+    SC = torch.zeros(len(rows), K, 7, dtype=torch.float64)
     mask = torch.zeros(len(rows), K, dtype=torch.bool)
     for n, (sc, _, _) in enumerate(rows):
         SC[n, :len(sc)], mask[n, :len(sc)] = sc, True
@@ -278,12 +280,13 @@ def fit_gate(records, iters=300, l2=0.1):
     log_scale = torch.tensor(np.log(1.5), dtype=torch.float64, requires_grad=True)
     gamma = torch.tensor(0.5, dtype=torch.float64, requires_grad=True)
     g_final = torch.tensor(1.0, dtype=torch.float64, requires_grad=True)
+    g_unseen = torch.tensor(-3.0, dtype=torch.float64, requires_grad=True)
     beta = 1.0      # Claude's hints: no offline replay of Claude, so not fitted here
-    opt = torch.optim.Adam([W, b, log_scale, gamma, g_final], lr=0.05)
+    opt = torch.optim.Adam([W, b, log_scale, gamma, g_final, g_unseen], lr=0.05)
     for it in range(iters):
         opt.zero_grad()
         g = log_scale.exp() * torch.softmax(F @ W.T + b, 1)                     # (N, 3)
-        S = (g[:, None, :] * SC[:, :, :3]).sum(2) + gamma * SC[:, :, 4] + g_final * SC[:, :, 5]
+        S = (g[:, None, :] * SC[:, :, :3]).sum(2) + gamma * SC[:, :, 4] + g_final * SC[:, :, 5] + g_unseen * SC[:, :, 6]
         S = S.masked_fill(~mask, -1e9)
         loss = (torch.softmax(S, 1) * ERR).sum(1).mean() + l2 * (W ** 2).sum()
         loss.backward()
@@ -293,7 +296,7 @@ def fit_gate(records, iters=300, l2=0.1):
     t_cam, t_emg = (fit_temperature(SC[:, :, j], ERR, mask) for j in (0, 1))
     print(f'reader-only posteriors: t_cam {t_cam:.3f}, t_emg {t_emg:.4f}', flush=True)
     gate = Gate(W.detach().numpy(), b.detach().numpy(), float(log_scale.detach().exp()), beta, float(gamma.detach()),
-                float(g_final.detach()), t_cam, t_emg)
+                float(g_final.detach()), t_cam, t_emg, float(g_unseen.detach()))
     return gate, rows
 
 
@@ -319,13 +322,17 @@ def gate_wer(rows, gate):
     for sc, err, f in rows:
         g = gate.weights(f.numpy())
         sc = sc.numpy()
-        S = (g[0] * sc[:, 0] + g[1] * sc[:, 1] + g[2] * sc[:, 2] + gate.gamma * sc[:, 4] + gate.final * sc[:, 5])
+        S = (g[0] * sc[:, 0] + g[1] * sc[:, 1] + g[2] * sc[:, 2] + gate.gamma * sc[:, 4] + gate.final * sc[:, 5]
+             + gate.unseen * sc[:, 6])
         errs += float(err.numpy()[int(np.argmax(S))])
     return errs / len(rows)
 
 
 # ------------------------------------------------------------------ lock simulation (for tau0)
-def simulate_locks(records, lock, tau, tau_end=None):
+from fusion.search import SHORT_WORDS  # noqa: E402
+
+
+def simulate_locks(records, lock, tau, tau_end=None, repeat_floor=None):
     """Approximate locking on no-lock passes: word k locks on the first pass where it is the best candidate's word
     at k with p >= tau (and agreement), after word k-1. Returns per-utterance results."""
     from fusion.search import norm_words
@@ -352,6 +359,17 @@ def simulate_locks(records, lock, tau, tau_end=None):
                 times.append((x['i'], r['t']))
         last = recs[-1]
         unlocked = len(last['best']) - len(locked)
+        if repeat_floor is not None and unlocked > 0 and last['final']:   # the final pass speaks the rest, unless unreadable
+            rest = [x for x in last['words'] if x['i'] >= len(locked)]
+            content = [float(lock.prob(x['f'])) for x in rest if x['w'] not in SHORT_WORDS] or \
+                [float(lock.prob(x['f'])) for x in rest]
+            if not rest or np.mean(content) >= repeat_floor:
+                match = align(list(last['best']), ref)
+                for x in rest:
+                    locked.append(x['w'])
+                    wrong += int(match[x['i']] is None)
+                    times.append((x['i'], last['t']))
+                unlocked = 0
         res.append(dict(utt=utt, locked=locked, wrong=wrong, times=times, repeat=unlocked > 0,
                         ends=last.get('truth_ends'), ref=ref, best=last['best']))
     return res
@@ -476,16 +494,30 @@ def cmd_fit_lock(a):
         if (s['locked_words'] - s['wrong_locks']) - a.wrong_cost * s['wrong_locks'] > \
                 (s_end['locked_words'] - s_end['wrong_locks']) - a.wrong_cost * s_end['wrong_locks']:
             t_end, s_end = float(te), s
+    # then the sentence floor for "Please repeat": the highest that keeps it to at most max_repeat of sentences
+    floor, s_floor = 0.0, None
+    for fl in np.round(np.arange(0.0, 0.61, 0.02), 3):
+        res = []
+        for k in folds:
+            res += simulate_locks([r for r in recs if r['fold'] == k], models[k], t0, t_end, float(fl))
+        s = lock_summary(res)
+        print(f"repeat floor {fl:.2f}: wrong locks {100 * s['wrong_lock_rate']:.1f}%  repeat {100 * s['repeat_rate']:.1f}%  "
+              f"WER locked {100 * s['wer_locked']:.1f}%", flush=True)
+        if s['repeat_rate'] <= a.max_repeat:
+            floor, s_floor = float(fl), s
     X, y, _ = word_examples(recs)
     lock = LockModel().fit(X, y)
     lock.tau_end = t_end if t_end < t0 else None
+    lock.repeat_floor = floor
     lock.tau0 = t0
     lock.tau_min, lock.tau_max = max(0.5, t0 - 0.15), min(0.99, t0 + 0.05)
     print(f'tau0 {t0}: {json.dumps(s0)}')
     print(f'tau_end {t_end}: {json.dumps(s_end)}')
+    print(f'repeat floor {floor}: {json.dumps(s_floor)}')
     print('lock', json.dumps(lock.to_dict()))
     save_params(lock=lock, extra={'lock_fit': {'examples': int(len(y)), 'positive_share': float(y.mean()),
                                                'cross_fitted_at_tau0': s0, 'cross_fitted_at_tau_end': s_end,
+                                               'cross_fitted_with_repeat_floor': s_floor, 'max_repeat': a.max_repeat,
                                                'max_wrong': a.max_wrong,
                                                'wrong_cost': a.wrong_cost,
                                                'curve': {f'{t:.2f}': s for t, s in rows},
@@ -541,6 +573,17 @@ def cmd_test(a):
                              delay_p90_s=float(np.percentile(delays, 90)) if delays else None,
                              pass_ms_median=float(np.median(ms)), pass_ms_p95=float(np.percentile(ms, 95)))
         print(name, json.dumps(results[name]), flush=True)
+    # reference: the camera's own final pass (cam.final's best) on the same sentences
+    import buslog
+    nb = {int(m['seg_id']): m['nbest'] for _, _, m in buslog.read(a.cam_log, topics=['cam.final'])}
+    refs, hyps = [], []
+    for utt, rs in by_utt.items():
+        if rs[0]['clip_ok'] and rs[0]['prompt']:
+            refs.append(' '.join(norm_words(rs[0]['prompt'])))
+            h = nb.get(rs[0]['seg_id'])
+            hyps.append(' '.join(norm_words(h[0]['text'])) if h else '')
+    results['camera_final_pass_reference'] = dict(utterances=len(refs), wer=jiwer.wer(refs, hyps))
+    print('camera final pass (reference)', json.dumps(results['camera_final_pass_reference']), flush=True)
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     with open(a.out, 'w') as f:
         json.dump({'session': a.session, 'cam_log': a.cam_log, 'svr': a.svr, 'params': a.params,
@@ -568,6 +611,7 @@ def main(argv=None):
     q.add_argument('passes', nargs='+')
     q.add_argument('--params', default=PARAMS)
     q.add_argument('--max-wrong', type=float, default=0.02)
+    q.add_argument('--max-repeat', type=float, default=0.05, help='share of sentences that may end in Please repeat')
     q.add_argument('--wrong-cost', type=float, default=3.0, help='when max-wrong is out of reach: a wrong lock '
                    'costs this many missing words')
     q.set_defaults(fn=cmd_fit_lock)

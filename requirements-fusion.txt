@@ -1,0 +1,15 @@
+# venv-svr on the laptop: the fusion process (python -m fusion.run), SVR-1 and the rig publisher.
+# Python 3.12. torch from the CUDA 13.0 index first:
+#   uv pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cu130
+#   uv pip install -r requirements-fusion.txt
+# kenlm builds from source: on Windows it needs the Visual Studio C++ Build Tools.
+numpy==2.4.4
+scipy==1.17.1
+soundfile==0.14.0
+unidecode==1.4.0
+sentencepiece==0.2.1
+kenlm==0.3.0
+pyzmq==27.2.0
+msgpack==1.2.3
+jiwer==4.0.0
+pyserial

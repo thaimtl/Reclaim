@@ -65,6 +65,7 @@ class Fusion:
         self.recent = {}               # utt_id -> Utterance, for late Claude repairs
         self.next_id = 1
         self.hints, self.hints_until, self.predictability = {}, -1e18, 0.0
+        self.phrases = []              # Claude's predicted phrases, as word lists
         self.raw = deque(maxlen=500)   # the last 0.5 s of raw EMG, for the pads' quality
         self.emg_quality = 1.0
         self.pace, self.effort = 1.0, 1.0
@@ -98,6 +99,7 @@ class Fusion:
                 for word in self.search_words(str(item.get('w', ''))):
                     h[word] = max(h.get(word, 0.0), float(item.get('weight', 0.0)))
             self.hints = h
+            self.phrases = [self.search_words(str(p)) for p in msg.get('phrases') or []]
             self.hints_until = now + float(msg.get('ttl_s', 10.0))
             self.predictability = float(msg.get('predictability', 0.0))
         elif topic == 'claude.repair':
@@ -154,8 +156,9 @@ class Fusion:
         return out
 
     def _final(self, u, now):
-        """The final pass, with the camera's attention n-best: lock what clears the threshold, repeat the rest."""
-        out = self._pass(u, now, final=True, nbest=u.nbest or ())
+        """The final pass, with the camera's attention n-best: every word left is spoken, unless the sentence as a
+        whole is unreadable (LockModel.settle); then the words left end in "Please repeat"."""
+        out = self._pass(u, now, final=True, nbest=u.nbest or (), settle=True)
         u.state = 'done'
         rest = list(range(len(u.locked), len(u.locked) + len(u.unlocked)))
         if rest and not u.repeat_sent:
@@ -171,9 +174,9 @@ class Fusion:
         g = self.gate.weights(f)
         return f, {'cam': g[0], 'emg': g[1] if emg_read is not None else 0.0, 'lm': g[2] if self.use_lm else 0.0,
                    'beta': self.gate.beta if self.use_hints else 0.0, 'gamma': self.gate.gamma,
-                   'final': self.gate.final}
+                   'final': self.gate.final, 'unseen': self.gate.unseen}
 
-    def _pass(self, u, now, final, nbest=()):
+    def _pass(self, u, now, final, nbest=(), settle=False):
         t_start = time.perf_counter()
         self._quality()
         # SVR-1 re-reads the segment on the GPU while the camera beam runs here; the gate uses the newest EMG read
@@ -182,7 +185,9 @@ class Fusion:
         gf, w = self._weights(u.cam, self.last_emg_read if self.use_emg else None)
         hints = self.hints if (self.use_hints and now < self.hints_until) else {}
         locked = [x['w'] for x in u.locked]
-        cands = self.search.candidates(u.cam, w, hints, locked, [h['text'] for h in nbest], final)
+        cands = self.search.candidates(u.cam, w, hints, locked, [h['text'] for h in nbest], final,
+                                       phrases=self.phrases if hints else (),
+                                       locked_tokens=[x['tokens'] for x in u.locked])
         emg_read = job.result() if job is not None else None
         if emg_read is not None:
             self.last_emg_read = emg_read
@@ -223,20 +228,23 @@ class Fusion:
                                  stable, u.cam.face_ok if u.cam is not None else False, self.emg_quality)
             p = float(self.lock.prob(f))
             alts = [x for x, _ in sorted(d.items(), key=lambda kv: -kv[1]) if x != word][:4]
-            words.append(dict(i=i, w=word, p=p, f=f, alts=alts, cam=mc.get(word, 0.0),
+            words.append(dict(i=i, w=word, p=p, f=f, alts=alts, cam=mc.get(word, 0.0), tokens=best.tokens[i],
                               emg=me.get(word, 0.0) if emg_read is not None else None,
                               cam_top=max(mc, key=mc.get) if mc else word,
                               emg_top=max(me, key=me.get) if (me and emg_read is not None) else None,
                               claude=hints.get(word, 0.0), cands=sorted(d.items(), key=lambda kv: -kv[1])[:3],
                               mc=mc, me=me))
         new = []
-        for x in words:   # left to right: a word locks only after every word before it
-            if not self.lock.may_lock(x['f'], x['p'], tau):
-                break
-            new.append(x)
+        if settle and self.lock.settle([x['w'] for x in words], [x['p'] for x in words]):
+            new = list(words)   # a wrong guess beats "Please repeat"
+        else:
+            for x in words:   # left to right: a word locks only after every word before it
+                if not self.lock.may_lock(x['f'], x['p'], tau):
+                    break
+                new.append(x)
         for x in new:
             u.locked.append(dict(w=x['w'], conf=x['p'], alts=x['alts'], cam=x['cam'], emg=x['emg'], t=now,
-                                 cam_top=x['cam_top'], emg_top=x['emg_top']))
+                                 cam_top=x['cam_top'], emg_top=x['emg_top'], tokens=x['tokens']))
             u.queue.append((now + self.repair_s, len(u.locked) - 1))
         rest = words[len(new):]
         u.unlocked = [x['w'] for x in rest]

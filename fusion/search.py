@@ -35,6 +35,8 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 WORK = os.environ.get('RECLAIM_WORKDIR', ROOT)
 UNITS = os.path.join(WORK, 'third_party', 'lipflow', 'lipflow', 'unigram5000_units.txt')
 SPM = os.path.join(WORK, 'third_party', 'auto_avsr', 'spm', 'unigram', 'unigram5000.model')
+if not os.path.exists(SPM):   # lipread/setup.sh puts the same file here
+    SPM = os.path.join(WORK, 'third_party', 'lipflow', 'models', 'lm', 'unigram5000.model')
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 from svr.text import clean_text  # noqa: E402
@@ -44,6 +46,10 @@ NEG = -1e9
 PRUNE = math.log(1e-4)            # a frame's non-blank piece below this is never a beam extension
 FLOOR_MIN = -30.0                 # log-prob of a piece outside a frame's top 32, at least
 GATE_FEATURES = ('cam_conf', 'face', 'activity', 'speak', 'emg_quality', 'rate')
+# short words the camera often drops (they barely show on the lips): the search may insert them, unseen by the camera,
+# and an unclear one never makes a sentence "Please repeat"
+SHORT_WORDS = ('a', 'an', 'the', 'to', 'of', 'in', 'on', 'at', 'for', 'and', 'is', 'are', 'was', 'it', 'i', 'you',
+               'that', 'me', 'my', 'so', 'be', 'do', 'got', 'had', 'have', 'can', 'will', 'just', 'not', 'with', 'up')
 JUDGES = ('cam', 'emg', 'lm')
 
 
@@ -201,13 +207,15 @@ class Gate:
     """(g_cam, g_emg, g_lm) = scale * softmax(W f + b), plus the hint weight beta, the length bonus gamma and the
     weight of the camera's own final-pass score (cam.final, end of segment only). t_cam and t_emg calibrate the
     camera-only and EMG-only posteriors (softmax(t * judge score)): SVR-1's raw sentence scores are far too sure of
-    themselves to be read as probabilities."""
+    themselves to be read as probabilities. `unseen` is added once per word inserted without camera evidence."""
 
-    def __init__(self, W=None, b=None, scale=1.5, beta=1.0, gamma=0.5, final=1.0, t_cam=1.0, t_emg=0.05):
+    def __init__(self, W=None, b=None, scale=1.5, beta=1.0, gamma=0.5, final=1.0, t_cam=1.0, t_emg=0.05,
+                 unseen=-3.0):
         self.W = np.zeros((3, len(GATE_FEATURES))) if W is None else np.asarray(W, np.float64)
         self.b = np.log([0.6, 0.15, 0.25]) if b is None else np.asarray(b, np.float64)
         self.scale, self.beta, self.gamma, self.final = float(scale), float(beta), float(gamma), float(final)
         self.t_cam, self.t_emg = float(t_cam), float(t_emg)   # reader-only posteriors: softmax(t * that judge)
+        self.unseen = float(unseen)   # per inserted word the camera didn't see
 
     def weights(self, f):
         z = self.W @ np.asarray(f, np.float64) + self.b
@@ -217,12 +225,12 @@ class Gate:
     def to_dict(self):
         return {'W': self.W.tolist(), 'b': self.b.tolist(), 'scale': self.scale, 'beta': self.beta,
                 'gamma': self.gamma, 'final': self.final, 't_cam': self.t_cam, 't_emg': self.t_emg,
-                'features': list(GATE_FEATURES)}
+                'unseen': self.unseen, 'features': list(GATE_FEATURES)}
 
     @classmethod
     def from_dict(cls, d):
         return cls(d['W'], d['b'], d['scale'], d['beta'], d['gamma'], d.get('final', 1.0), d.get('t_cam', 1.0),
-                   d.get('t_emg', 0.05))
+                   d.get('t_emg', 0.05), d.get('unseen', -3.0))
 
 
 def gate_features(cam, emg_read, emg_quality):
@@ -246,16 +254,21 @@ class Cand:
         self.words, self.tokens, self.source = tuple(words), tuple(tuple(t) for t in tokens), source
 
     def flat(self):
+        """The camera's pieces; a word with no pieces was inserted without the camera seeing it."""
         return [t for w in self.tokens for t in w]
+
+    def unseen(self):
+        return sum(not t for t in self.tokens)
 
 
 class JointSearch:
-    def __init__(self, lm, pieces=None, lexicon=None, beam=16, lookalikes=6, swap_top=4, max_cands=64,
-                 max_new=8):
+    def __init__(self, lm, pieces=None, lexicon=None, beam=16, lookalikes=6, swap_top=4, max_cands=80,
+                 max_new=8, inserts=12, phrase_cands=8):
         """lm: fusion.lm.ConversationLM; lexicon: bench.lookalikes.Lexicon (None: no look-alike swaps)."""
         self.lm, self.pieces, self.lexicon = lm, pieces or Pieces(), lexicon
         self.beam, self.n_lookalikes, self.swap_top, self.max_cands, self.max_new = (beam, lookalikes, swap_top,
                                                                                      max_cands, max_new)
+        self.inserts, self.phrase_cands = inserts, phrase_cands
         self._lk = {}
 
     # ------------------------------------------------------------------ language side
@@ -323,12 +336,15 @@ class JointSearch:
             out = self._lk[word] = alts[:self.n_lookalikes]
         return out
 
-    def candidates(self, cam, w, hints, locked=(), extra_texts=(), final=False):
-        """Candidates for this pass: the camera beam, extra texts (cam.final's n-best, SVR-1's greedy reading), then
-        look-alike swaps of the beam's best few and of the first extra. Every candidate starts with the locked words."""
+    def candidates(self, cam, w, hints, locked=(), extra_texts=(), final=False, phrases=(), locked_tokens=None):
+        """Candidates for this pass: the camera beam, extra texts (cam.final's n-best, SVR-1's greedy reading), the
+        beam's best reading with short words from Claude's predicted phrases filled in, then short words inserted
+        where the LM gains most, then look-alike swaps of the beam's best few and of the first extra. Inserted words
+        have no camera pieces (unseen). Every candidate starts with the locked words (locked_tokens: their pieces,
+        () for one that was inserted)."""
         p = self.pieces
         locked = tuple(locked)
-        lock_tok = [p.word_ids(x) for x in locked]
+        lock_tok = list(locked_tokens) if locked_tokens is not None else [p.word_ids(x) for x in locked]
         out, seen = [], set()
 
         def add(words, tokens, source):
@@ -348,6 +364,12 @@ class JointSearch:
             words = norm_words(text)
             if words:
                 add(words, [p.word_ids(x) for x in words], 'extra')
+        base = [c for c in out if c.source == 'camera'][:2]
+        if base:
+            for words, tokens in self.phrase_fill(base[0], phrases, len(locked))[:self.phrase_cands]:
+                add(words, tokens, 'phrase')
+        for words, tokens in self.short_inserts(base, len(locked), final)[:self.inserts]:
+            add(words, tokens, 'insert')
         firsts = [c for c in out if c.source == 'camera'][:self.swap_top]
         firsts += [c for c in out if c.source == 'extra'][:1] if final else []   # cam.final's best
         for c in firsts:
@@ -357,6 +379,57 @@ class JointSearch:
                         c.tokens[:i] + (p.word_ids(alt),) + c.tokens[i + 1:], 'lookalike')
         if not out:
             add(locked, lock_tok, 'locked')
+        return out
+
+    def short_inserts(self, base, start, final):
+        """(words, tokens) of each base reading with one short word inserted (unseen), best LM gain first."""
+        out = []
+        for c in base:
+            ref = self.lm_score(c.words, final)
+            last = len(c.words) if final else len(c.words) - 1   # mid-sentence, never after the unfinished word
+            for g in range(start, last + 1):
+                for sw in SHORT_WORDS:
+                    if (g > 0 and c.words[g - 1] == sw) or (g < len(c.words) and c.words[g] == sw):
+                        continue
+                    words = c.words[:g] + (sw,) + c.words[g:]
+                    out.append((self.lm_score(words, final) - ref, words, c.tokens[:g] + ((),) + c.tokens[g:]))
+        out.sort(key=lambda x: -x[0])
+        return [(words, tokens) for _, words, tokens in out]
+
+    @staticmethod
+    def phrase_fill(c, phrases, start):
+        """Claude predicted a phrase ("a little nervous") and the camera read part of it ("little nervous"): the
+        reading with the phrase's missing short words put back (unseen). At most two words filled per phrase."""
+        out = []
+        words = list(c.words)
+        for ph in phrases:
+            if len(ph) < 2:
+                continue
+            for s0 in range(start, len(words)):
+                if words[s0] not in ph:
+                    continue
+                k0 = ph.index(words[s0])
+                new, toks = words[:s0], list(c.tokens[:s0])
+                fill = [x for x in ph[:k0]]
+                ok = all(x in SHORT_WORDS for x in fill)
+                new += fill
+                toks += [()] * len(fill)
+                i, k = s0, k0
+                while ok and k < len(ph):
+                    if i < len(words) and words[i] == ph[k]:
+                        new.append(words[i])
+                        toks.append(c.tokens[i])
+                        i += 1
+                    elif ph[k] in SHORT_WORDS:
+                        new.append(ph[k])
+                        toks.append(())
+                        fill.append(ph[k])
+                    else:
+                        break
+                    k += 1
+                if ok and 0 < len(fill) <= 2 and k > k0 + 1:
+                    out.append((tuple(new + words[i:]), toks + list(c.tokens[i:])))
+                break
         return out
 
     def extend(self, cands, texts, locked=()):
@@ -381,8 +454,9 @@ class JointSearch:
         return total + (self.lm.end(st) if final and words else 0.0)
 
     def judge_scores(self, cands, cam, emg_fn, hints, final, nbest=()):
-        """(K, 6) array per candidate: cam, emg, lm, hint, number of words, and the camera's final-pass score
-        (cam.final's n-best score, its worst minus 5 for a candidate it doesn't list; 0 before the segment ends).
+        """(K, 7) array per candidate: cam, emg, lm, hint, number of words, the camera's final-pass score
+        (cam.final's n-best score, its worst minus 5 for a candidate it doesn't list; 0 before the segment ends), and
+        the number of words inserted without camera pieces.
         emg_fn(texts) -> S_emg or None; nbest: cam.final's [{'text', 'score'}]."""
         K = len(cands)
         cam_s = ctc_loglik(cam, [c.flat() for c in cands]) if cam is not None else np.zeros(K)
@@ -401,13 +475,14 @@ class JointSearch:
         if listed:
             floor = min(listed.values()) - 5.0
             fin = np.array([listed.get(c.words, floor) for c in cands])
-        return fix_infeasible(np.stack([cam_s, emg_s, lm_s, hint_s, n, fin], 1))
+        unseen = np.array([c.unseen() for c in cands], np.float64)
+        return fix_infeasible(np.stack([cam_s, emg_s, lm_s, hint_s, n, fin, unseen], 1))
 
     @staticmethod
     def combine(scores, w):
         """S per candidate from the judge scores and this pass's weights."""
         return (w['cam'] * scores[:, 0] + w['emg'] * scores[:, 1] + w['lm'] * scores[:, 2] + w['beta'] * scores[:, 3]
-                + w['gamma'] * scores[:, 4] + w.get('final', 0.0) * scores[:, 5])
+                + w['gamma'] * scores[:, 4] + w.get('final', 0.0) * scores[:, 5] + w.get('unseen', 0.0) * scores[:, 6])
 
 
 def fix_infeasible(scores):
