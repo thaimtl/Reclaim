@@ -57,7 +57,7 @@ Everything on the screen is measured on the call, from the bus. The rules:
 | Candidate bars and the lock threshold | `dec.hyp` `cands`, `threshold` (optional, below) |
 | Camera | `cam.preview` (optional, below); without it, the face mesh from `cam.face` |
 | Emotion chip, "Sounds warm" | `cam.tick` `emotion` (the expression model) |
-| Pads | `emg.raw`: level (RMS against a running peak), contact (signal not flat, not on a rail) |
+| Pads | `emg.raw`: level (EMG filtered as rig/filters.py, how far it is above that pad's resting floor: a still face reads 0; `dashboard/emg_level.py`), contact (signal not flat, not on a rail) |
 | Latency | `cam.tick` `timing_ms.total`, `timing.dec` (`lock`, `window`), `timing.claude`, `timing.voice` |
 
 ## Optional fields the screen uses when they arrive

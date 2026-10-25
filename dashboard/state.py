@@ -22,6 +22,8 @@ from collections import deque
 
 import numpy as np
 
+from dashboard.emg_level import PadLevels
+
 PADS = (('A0', 'Tongue'), ('A1', 'Jaw'), ('A2', 'Lower lip'), ('A3', 'Upper lip'))   # HARDWARE.md pad sites
 CHIP = {'neutral': 'Neutral face', 'happy': 'Smiling', 'sad': 'Frowning', 'surprised': 'Surprised',
         'angry': 'Tense'}
@@ -33,9 +35,6 @@ SPEAKING_MAX_S = 8.0        # no 'played' mark this long after the first audio: 
 STALE_S = {'cam': 1.0, 'emg': 1.0, 'claude': 60.0, 'voice': 120.0, 'log': 5.0}
 EMG_RAIL = (8, 1015)        # a pad off the skin pins its channel to a rail of the 10-bit range
 EMG_FLAT = 1.0              # standard deviation below this (raw units): no contact
-LEVEL_DECAY = 0.995         # per message: the running peak a pad's level is scaled against
-MIN_PEAK = 8.0              # raw RMS units: below it a pad shows near zero, not noise blown up
-SMOOTH = 0.35               # level EMA per message (10 ms)
 
 
 def _bare(w):
@@ -51,8 +50,8 @@ class CallState:
         self.number = number
         self.benchmark = benchmark           # word error per reader on a scored session (end screen), or None
         self.seen = {}                       # producer -> last bus.now() a message came from it
-        self.emg = [dict(level=0.0, peak=MIN_PEAK, contact=False) for _ in PADS]
-        self.emg_mean = None
+        self.emg = [dict(level=0.0, contact=False) for _ in PADS]
+        self.levels = PadLevels(len(PADS))   # filtered as rig/filters.py, measured above each pad's own floor
         self.emotion = ('neutral', 0.0)
         self.face_ok, self.face_hidden_since = True, None
         self.face_pts, self.face_size = None, None
@@ -233,14 +232,12 @@ class CallState:
         x = np.asarray(msg.get('samples'), np.float32).reshape(-1, len(PADS))
         if not len(x):
             return
-        self.emg_mean = x.mean(0) if self.emg_mean is None else 0.98 * self.emg_mean + 0.02 * x.mean(0)
-        rms = np.sqrt(((x - self.emg_mean) ** 2).mean(0))
         for i, pad in enumerate(self.emg):
             col = x[:, i]
             pad['contact'] = bool(col.std() >= EMG_FLAT and EMG_RAIL[0] < col.mean() < EMG_RAIL[1])
-            pad['peak'] = max(MIN_PEAK, pad['peak'] * LEVEL_DECAY, float(rms[i]))
-            target = float(rms[i]) / pad['peak'] if pad['contact'] else 0.0
-            pad['level'] += SMOOTH * (target - pad['level'])
+        levels = self.levels.push(x, np.array([p['contact'] for p in self.emg]))
+        for pad, level in zip(self.emg, levels):
+            pad['level'] = float(level)
 
     def _timing(self, topic, msg, now):
         stage, ms = msg.get('stage'), msg.get('ms')
