@@ -255,6 +255,8 @@ CLAUDE_GAIN = 10.0     # a Claude candidate scores the best camera reading + CLA
 CLAUDE_MARGIN = 1.0    # ... minus this
 PHRASE_CLAUDE_WEIGHT = 0.8   # the weight of one of Claude's full predicted sentences (they carry no weight of their own)
 CLAUDE_SWAP_WEIGHT = 0.3     # a predicted word below this weight is never swapped in
+WEAK_WEIGHT = 0.5            # a predicted word below this weight (the always-on names at 0.4) is a weak prediction:
+WEAK_LIP_MIN = 0.6           # ... it carries only on a lip match this close, so free speech isn't pulled towards it
 COMBO_LIP = 0.45             # a swap joins the all-at-once candidate only on a lip match this close
 CARRY_LOCK_LIP = 0.6         # a word Claude carries locks while he mouths only on a lip match this close; a rougher
 #                              match wins the caption at once but locks at the sentence's end (it may still move)
@@ -482,8 +484,9 @@ class JointSearch:
                 # never over a short function word ("had", "the"): the LM's job, and where wild placements come from
                 spots = sorted(((lip_similarity((wd,), (c.words[i],)), i) for i in range(k, len(c.words))
                                 if c.words[i] not in SHORT_WORDS), reverse=True)
+                need = LIP_MIN if x >= WEAK_WEIGHT else WEAK_LIP_MIN
                 for lip, i in spots[:2]:     # its best spot, and a second one nearly as good (the LM picks)
-                    if lip >= LIP_MIN and lip >= spots[0][0] - 0.1:
+                    if lip >= need and lip >= spots[0][0] - 0.1:
                         out.append((c.words[:i] + (wd,) + c.words[i + 1:], lip, x, c.words))
         # every Claude word at once: the best set of swaps on the camera's best reading (each word once, each spot once,
         # good lip matches only), one candidate

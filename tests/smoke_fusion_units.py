@@ -214,6 +214,11 @@ def main():
         check("Claude's predicted sentence carries, cut to the words read so far", b4 == ('i', 'want', 'waiter'), b4)
         b5, _ = best_with(['i', 'want', 'water'], {'waiter': 0.1})
         check('a weakly predicted word does not carry', b5[-1] == 'water', b5)
+        b7, _ = best_with(['hi', 'afraid'], {'frank': 0.4})
+        check('a weak prediction (an always-on name, 0.4) does not carry on a rough lip match (0.40 < 0.6)',
+              b7 == ('hi', 'afraid'), b7)
+        b8, _ = best_with(['i', 'want', 'water'], {'waiter': 0.4})
+        check('a weak prediction carries on a close lip match (water -> waiter, 0.75)', b8 == ('i', 'want', 'waiter'), b8)
         b6, _ = best_with(['hi', 'afraid'], {'frank': 0.9})
         check('the live test\'s case: Claude predicted "frank", the camera read "afraid" (lip %.2f): frank wins'
               % lip_similarity(('afraid',), ('frank',)), b6 == ('hi', 'frank'), b6)

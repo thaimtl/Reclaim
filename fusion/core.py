@@ -42,6 +42,7 @@ from collections import deque
 
 import numpy as np
 
+from claude_service.names import always_words
 from fusion import lock as lockmod
 from fusion.search import (CARRY_LOCK_LIP, SHORT_WORDS, CamReading, claude_override, gate_features, softmax,
                            viterbi_word_ends, word_posteriors)
@@ -144,6 +145,7 @@ class Fusion:
         self.hints, self.hints_until, self.predictability = {}, -1e18, 0.0
         self.phrases = []              # Claude's predicted phrases, as word lists
         self.claude_words = {}         # Claude's predicted words (its own weights), for the search's Claude candidates
+        self.always = always_words() if self.use_hints else {}   # the demo's names, from the first second
         self.predict_at = self.predict_asked = None   # when the newest claude.predict arrived, and when it was asked
         self.judge_at = None           # when the judge's newest final line arrived
         self.judge_began = None        # when their line now being spoken (or the newest) began
@@ -473,12 +475,18 @@ class Fusion:
         job = self._pool.submit(self.svr.read, True, start) if self.use_emg else None
         gf, w = self._weights(u.cam, self.last_emg_read if self.use_emg else None)
         claude_live = self.use_hints and now < self.hints_until
-        hints = self.hints if claude_live else {}
+        hints = dict(self.always)          # the demo's names always; Claude's prediction while it is fresh
+        cwords = dict(self.always)
+        if claude_live:
+            for word, x in self.hints.items():
+                hints[word] = max(hints.get(word, 0.0), x)
+            for word, x in self.claude_words.items():
+                cwords[word] = max(cwords.get(word, 0.0), x)
         locked = [x['w'] for x in u.locked]
         cands = self.search.candidates(u.cam, w, hints, locked, [h['text'] for h in nbest], final,
                                        phrases=self.phrases if claude_live else (),
                                        locked_tokens=[x['tokens'] for x in u.locked],
-                                       claude_words=self.claude_words if claude_live else None,
+                                       claude_words=cwords or None,
                                        claude_phrases=self.phrases if claude_live else ())
         emg_read = job.result() if job is not None else None
         if emg_read is not None:

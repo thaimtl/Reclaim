@@ -78,7 +78,9 @@ def unit():
     out, _ = b.apply(r, target, 0.6)
     check('predict only when nothing is under review', [t for t, _ in out] == ['claude.predict'])
     p = out[0][1]
-    check('predict words cleaned and clipped', p['words'] == [{'w': 'burritos', 'weight': 1.0}], p['words'])
+    check('predict words cleaned and clipped, the demo\'s names after', p['words'][0] == {'w': 'burritos', 'weight': 1.0}
+          and {'austin', 'mcgill', 'laryngectomy'} <= {w['w'] for w in p['words']}
+          and all(w['weight'] == 0.4 for w in p['words'][1:]), p['words'][:3])
     check('predictability clipped', p['predictability'] == 0.0)
     check('predict fields', set(p) == {'words', 'phrases', 'predictability', 'ttl_s', 't'})
     check('predict counts from the request', p['t'] == 0.1 and abs(p['ttl_s'] - (brain_mod.PREDICT_TTL_S - 0.5)) < 1e-9, p)

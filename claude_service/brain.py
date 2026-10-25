@@ -50,6 +50,8 @@ requeues its words for review, each until MAX_FAILURES in a row; a refused repai
 import json
 import time
 
+from claude_service.names import always_words
+
 
 MODEL = "claude-haiku-5-5"           # predictions (conversation and live lanes): speed
 REPAIR_MODEL = "claude-opus-5-5"     # repairs: accuracy (they only fix the captions, so its ~5 s costs nothing)
@@ -84,6 +86,12 @@ Each message tells you what happened since the last one: lines the judge finishe
 utterance as locked so far, one word per line with its index, and the repairs you already made. Some messages \
 list words under "review" with the decoder's confidence (conf), the camera and EMG support (cam, emg, 0 to 1) and \
 the alternatives it considered (alts), including the word's lip look-alikes.
+
+Background: this is Cal Hacks, a student hackathon in San Francisco, and the judge is a hackathon judge evaluating \
+the project, not a court judge. Austin is a student at McGill University; his team (with Frank) built Silent Voice, \
+silent speech for patients who lost their voice box (laryngectomy) or their voice to ALS. Words that often come up: \
+Austin, Frank, Cal Hacks, McGill University, Red Bull, coffee, Meta, Anthropic, Cartesia, ASL, ALS, patients, \
+laryngectomy, voice box. The judge may also make small talk (food, sleep, school, plans).
 
 You have two jobs, and every reply does both.
 
@@ -526,8 +534,15 @@ class Brain:
             return [("claude.caption", {"utt_id": utt, "words": words, "from": before, "changed": words != before,
                                         "t": now})], []
         if sent >= self.predict_sent:
+            words = {}
+            for p in reply["predict_words"]:
+                w = _norm(p["w"])
+                if w:
+                    words[w] = max(words.get(w, 0.0), _clip(p["weight"]))
+            for w, x in always_words().items():   # the demo's names, always (claude_service/names.py)
+                words[w] = max(words.get(w, 0.0), x)
             self.predict = {
-                "words": [{"w": _norm(p["w"]), "weight": _clip(p["weight"])} for p in reply["predict_words"] if _norm(p["w"])],
+                "words": [{"w": w, "weight": x} for w, x in sorted(words.items(), key=lambda kv: -kv[1])],
                 "phrases": [_norm(p) for p in reply["predict_phrases"] if _norm(p)],
                 "predictability": _clip(reply["predictability"]),
                 "ttl_s": max(0.0, PREDICT_TTL_S - (now - sent)),
