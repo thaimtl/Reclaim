@@ -223,11 +223,13 @@ def fit(frame, size):
     return dataclasses.replace(frame, image=img)
 
 
-def crop_thread(source, cropper, q, stop, emotion=None, rebase=False, process_size=None, face_pub=None, face_every=2):
+def crop_thread(source, cropper, q, stop, emotion=None, rebase=False, process_size=None, face_pub=None, face_every=2,
+                preview=None):
     """Frames -> (crop, crop ms of the frame's push) on q, until the source ends or stop is set. This thread owns the
     source and the cropper and closes both itself (cap.release() from another thread while this one is inside
     cap.read() segfaults). Each frame is fit() to process_size first. The last item is End.
-    face_pub(CamFace): every face_every-th frame's face for the dashboard (cam.face), sent without blocking."""
+    face_pub(CamFace): every face_every-th frame's face for the dashboard (cam.face), sent without blocking.
+    preview (lipread.preview.PreviewWorker): every frame and its face handed over for cam.preview; never waits."""
     err, emotion_errors, face_errors, n = None, 0, 0, 0
     try:
         frames = rebased(source.frames()) if rebase else source.frames()
@@ -248,6 +250,8 @@ def crop_thread(source, cropper, q, stop, emotion=None, rebase=False, process_si
                     if emotion_errors == 1:
                         log.exception('emotion submit failed (later failures are only counted)')
             n += 1
+            if preview is not None:
+                preview.submit(frame.t, frame.image, cropper.last_face, getattr(cropper, 'last_z', None))
             if face_pub is not None and n % face_every == 0:
                 try:
                     h, w = frame.image.shape[:2]
@@ -359,6 +363,13 @@ def summary(stats):
             f'conformer {mean["conformer_ms"]:.1f}, ctc {mean["ctc_ms"]:.1f}')
 
 
+def positive(s):
+    v = float(s)
+    if not v > 0:
+        raise argparse.ArgumentTypeError(f'{s}: a number above 0 expected')
+    return v
+
+
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--replay', default=None, help='video file instead of the webcam')
@@ -381,6 +392,8 @@ def parse_args(argv=None):
     ap.add_argument('--quiet', action='store_true')
     ap.add_argument('--no-emotion', action='store_true', help='publish neutral instead of running E5')
     ap.add_argument('--no-face', action='store_true', help='no cam.face (the dashboard\'s face mesh, ~12.5 Hz)')
+    ap.add_argument('--no-preview', action='store_true', help='no cam.preview (the dashboard\'s mirror of the webcam)')
+    ap.add_argument('--preview-hz', type=positive, default=30, help='cam.preview frames per second at most')
     ap.add_argument('--no-pose', action='store_true',
                     help='no head pose in cam.face (+0.02 ms/frame at 1280x720 on the dev box, so on by default)')
     ap.add_argument('--no-final', action='store_true', help='no cam.final (E6 beam + LM at segment end)')
@@ -405,7 +418,7 @@ def main(argv=None):
 
     pub = Publisher(args.pub)
     live_mode = args.replay is None or args.realtime
-    final = emotion = th = logf = None
+    final = emotion = th = logf = preview = None
     runner = Runner(None, pub.send, None)
     stop = threading.Event()
     code = 1
@@ -435,8 +448,12 @@ def main(argv=None):
                         final=final, fe_cache=not args.no_fe_cache)
         q = queue.Queue()
         face_pub = None if args.no_face else (lambda m: pub.send(m, block=False))
+        if not args.no_preview:
+            from lipread.preview import PreviewWorker
+            preview = PreviewWorker(lambda m: pub.send(m, block=False), hz=args.preview_hz)
         th = threading.Thread(target=crop_thread, args=(source, cropper, q, stop, emotion, bool(args.replay),
-                                                        args.process_size, face_pub), name='crop', daemon=True)
+                                                        args.process_size),
+                              kwargs=dict(face_pub=face_pub, preview=preview), name='crop', daemon=True)
         logf = open(args.log, 'w') if args.log else None
 
         def report(stats):
@@ -471,6 +488,8 @@ def main(argv=None):
                 code = code or 1
         if emotion is not None:
             emotion.close()
+        if preview is not None:
+            preview.close()
         if final is not None:
             final.close(timeout=3.0)
             log.info('final pass: %d beams, %d dropped, %d errors', len(final.stats), len(final.dropped),

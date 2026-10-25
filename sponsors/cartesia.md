@@ -2,6 +2,7 @@
 
 Source: https://docs.cartesia.ai/calhacks, read October 23, 2026.
 Prize: Meta glasses for the winning team, up to 4 people.
+Cartesia is the part that gives someone their own voice back, which makes this track the closest fit to what Reclaim is for.
 
 ## How they judge, 25% each
 
@@ -9,40 +10,42 @@ Prize: Meta glasses for the winning team, up to 4 people.
 |---|---|---|
 | Problem and originality | Useful, clearly scoped, thoughtfully designed | Giving people back their voice after a laryngectomy |
 | Use of Cartesia | Core to the experience, responsive, natural voice | Without the voice there is no product |
-| Execution | Main flow works, edge cases handled | Voice streams into a live phone call while the speaker mouths; "Please repeat" instead of guessing when unsure |
+| Execution | Main flow works, edge cases handled | Voice streams into a live phone call while the speaker mouths, and "Please repeat" instead of guessing when unsure |
 | Impact and responsibility | Accessibility, privacy, responsible use | Clone only your own voice, with consent |
 
 ## What to emphasize
 
 - Voice is the product, not a feature added on top.
-The user speaks only through Cartesia.
+  The user speaks only through Cartesia.
 - Their own voice, not a robot.
-Instant Voice Clone means a laryngectomee sounds like themselves again, unlike an electrolarynx.
-- Say out loud what each Cartesia part does: Sonic speaks, Instant Voice Clone makes it their voice, Ink hears the partner's question.
+  Instant Voice Clone means a laryngectomee sounds like themselves again, unlike an electrolarynx.
+- Say out loud what each Cartesia part does.
+  Sonic speaks, Instant Voice Clone makes it their voice, and Ink hears the partner's question.
 - Speed matters in a conversation.
-Stream Claude's fixed text into the Sonic WebSocket so speech starts before Claude finishes.
+  Stream Claude's fixed text into the Sonic WebSocket so speech starts before Claude finishes.
 - Show Cartesia's part and Claude's part as separate steps in the demo, since other tools are allowed but Cartesia's share must be obvious.
 
 ## Responsibility points to say out loud
 
 - A voice clone is someone's identity.
-We clone only the user's own voice, from their own recordings, with their consent.
-- Nothing is spoken until the system is confident in a word, and when it can't tell, it says "Please repeat" instead of guessing. The captions show exactly what was said and what was fixed.
+  We clone only the user's own voice, from their own recordings, with their consent.
+- Nothing is spoken until the system is confident in a word, and when it can't tell, it says "Please repeat" instead of guessing.
+  The captions show exactly what was said and what was fixed.
 - Cartesia API keys stay on the server.
-If the dashboard calls Cartesia from the browser, mint a short-lived token on the server.
+  If the dashboard calls Cartesia from the browser, mint a short-lived token on the server.
 
 ## Build rules from their page
 
 - Use Sonic 3.6.
 - Set speed, volume, and emotion through `generation_config`, not the old top-level `speed` field.
 - Don't use the Line SDK.
-Cartesia stops hosting it on December 1, 2026.
+  Cartesia stops hosting it on December 1, 2026.
 
 ## Submission checklist
 
 - Working demo.
 - Two-minute pitch, demo first: one full user flow, then the problem, then how we built it.
 - README with setup steps, the Cartesia features we used, and known limitations.
-Our README has no setup steps yet.
+  Our README has no setup steps yet.
 - Judges can read the source code.
 - No API keys committed.

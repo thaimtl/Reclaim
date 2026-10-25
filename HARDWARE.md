@@ -29,7 +29,8 @@ The BioAmp is built for 5V boards like the Uno, so its output plugs straight in,
 The 4 sites are the best 4-electrode set from [Gaddy and Klein, 2020](https://aclanthology.org/2020.emnlp-main.445.pdf), so our signals look like the Berkeley data we pre-train on.
 A0 to A3 are the paper's sites 3, 2, 6, and 1, in that order.
 We tried 2 extra sites on the jaw and back of the cheek, but there wasn't room for clean contact on Austin's face, and hair behind the ear kept their REF pads loose.
-In the paper, the best 4 got 76.8% of words wrong on open speech against 68.0% for all 8. A noisy channel hurts more than a missing one, and in our system EMG is one of three readers, next to the camera and Claude.
+In the paper, the best 4 got 76.8% of words wrong on open speech against 68.0% for all 8.
+A noisy channel hurts more than a missing one, and in our system EMG is one of three readers, next to the camera and Claude.
 
 ![Pad placement: four electrode pairs around the chin and mouth, plus two reference pads behind each ear](images/pad-placement.png)
 
@@ -47,7 +48,7 @@ You can feel it with two fingers under your chin while saying "ta ta ta", then "
 - IN+ and IN− go about 2 cm apart on the same muscle, since the amplifier measures the difference between them.
 - REF is the zero point, on bone with no muscle on top, so it picks up only the hum for the amplifier to subtract.
   Each board has its own REF pad on bone, away from hair: A0 and A2 behind the right ear, A1 and A3 behind the left.
-- No pad goes on the throat, since patients lose the voice box.
+- No pad goes on the throat, since the people Reclaim is for have had their voice box removed.
 - Wipe each spot with alcohol, and mark it with a skin marker so pads go back in the same place every session.
 - Run every cable back behind the ears, so the webcam can still see the lips.
 
@@ -55,7 +56,7 @@ You can feel it with two fingers under your chin while saying "ta ta ta", then "
 
 ![Wiring: the Uno's 5V and GND go to the breadboard's left + and − columns, each BioAmp takes VCC and GND from those columns, and each OUT goes to its own analog pin](images/wiring.png)
 
-Only the breadboard's left + and − columns are used, and each column is one connected strip, so any hole in it works.
+We only use the breadboard's left + and − columns, and each column is one connected strip, so any hole in it works.
 
 | From | To | Wire |
 |---|---|---|
@@ -83,12 +84,12 @@ flowchart LR
 
 - `rig/uno/uno.ino` reads A0 to A3 on a fixed 1,000 Hz clock, matching the Berkeley dataset, and sends raw numbers with no filtering.
   Each 9-byte frame starts with a counter, so the reader can spot dropped frames.
-- `rig/reader.py` turns the frames into samples, and saves raw recordings.
+- `rig/reader.py` turns the frames into samples and saves raw recordings.
 - `rig/filters.py` removes the 60 Hz hum, its 120 and 180 Hz echoes, and drift below 20 Hz.
   It adds only a few milliseconds of delay, so it runs live.
 - Training data and the live demo both go through the same filter, run in order, so the model sees the same signal in both.
   Never clean training data with an offline filter like `filtfilt`.
-  That includes the Berkeley data SVR-1 pre-trains on: it is re-filtered with `rig/filters.py` too.
+  That includes the Berkeley data SVR-1 pre-trains on, which is re-filtered with `rig/filters.py` too.
 - The hum comes from the room's wiring, not the laptop.
   It gets through when pad contact is uneven, so firm REF pads still matter, and the filter can't fix a signal that hits 0 or 1023.
 
@@ -96,7 +97,7 @@ flowchart LR
 
 Run this after wiring and every time pads go on, before any real recording.
 It records rest, "pa pa pa", "ta ta ta", and "I'm thirsty" with spoken cues, then gives each channel a verdict.
-It doesn't collect training data, see [RECORDING.md](RECORDING.md) for that.
+It doesn't collect training data, which is what [RECORDING.md](RECORDING.md) covers.
 
 macOS:
 
@@ -117,7 +118,7 @@ rig\.venv\Scripts\python rig\signal_check.py check.npz
 rig\.venv\Scripts\python rig\signal_report.py check.npz
 ```
 
-`rig/signal_check.py` finds the Uno by itself, or takes the port as a second argument: `/dev/cu.usbmodem…` on macOS, `COM3` or similar on Windows.
+`rig/signal_check.py` finds the Uno by itself, or takes the port as a second argument, like `/dev/cu.usbmodem…` on macOS or `COM3` on Windows.
 It speaks the cues with `say` on macOS and the built-in speech engine on Windows.
 Claude sessions follow [.claude/skills/signal-check/SKILL.md](.claude/skills/signal-check/SKILL.md) to run and read it.
 
@@ -128,8 +129,9 @@ The Serial Plotter can't read this firmware, so for the plotter checks below, fl
 ## Safety
 
 - The pads connect Austin's face to his laptop through the Uno, so the laptop stays off its charger whenever pads are on skin.
-  We have no USB isolator, so this rule has no exception: to charge, unplug the Uno first, and charge between sessions.
-- Every latency number is measured on battery, since the GPU is slower on battery and that is how the demo runs.
+  We have no USB isolator, so this rule has no exception.
+  To charge, unplug the Uno first, and charge between sessions.
+- Every latency number is measured on battery, since the GPU is slower on battery and that's how the demo runs.
 - The [BioAmp docs](https://docs.upsidedownlabs.tech/hardware/bioamp/bioamp-exg-pill/index.html) also warn that a charger adds noise.
 - No other cable from wall power touches the laptop while pads are on, like a monitor or a powered hub.
 - Voices are only cloned with the person's permission.
@@ -139,8 +141,10 @@ The Serial Plotter can't read this firmware, so for the plotter checks below, fl
 
 1. **Solder each board:** pin headers, the JST connector, and the EMG solder bridge, following the [official docs](https://docs.upsidedownlabs.tech/hardware/bioamp/bioamp-exg-pill/index.html).
    The boards ship set up for brain and eye signals, and the bridge switches them to muscle.
-2. **Forearm test** with 1 board on A0: clenching the fist should make clear bursts in the serial plotter.
-3. **Chin check** with 1 board on site 3: press the tongue hard against the roof of the mouth, then swallow.
+2. **Forearm test** with 1 board on A0.
+   Clenching the fist should make clear bursts in the serial plotter.
+3. **Chin check** with 1 board on site 3.
+   Press the tongue hard against the roof of the mouth, then swallow.
    No bursts means a soldering or wiring problem, not pad placement.
 4. **Wire all 4 boards**, flash `rig/uno`, and run the [signal check](#signal-check).
    Every channel should say OK.
