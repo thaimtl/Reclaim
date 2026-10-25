@@ -26,7 +26,7 @@ from bus.team import Pub, Sub
 from fusion.offline import PARAMS, WORK, build_search, load_params
 
 DEFAULT_SVR = os.path.join(WORK, 'checkpoints', 'W_s12_svr1_4ch', 'model.pt')
-TOPICS = ['cam.tick', 'cam.final', 'emg.raw', 'claude.predict', 'claude.repair', 'partner.text']
+TOPICS = ['cam.tick', 'cam.final', 'emg.raw', 'claude.predict', 'claude.repair', 'claude.end', 'partner.text']
 STEP_S = 0.02
 
 
@@ -121,9 +121,17 @@ def main():
             for t, m in out:
                 pub.send(t, m)
                 if t == 'dec.lock':
-                    print('locked:', ' '.join(x['w'] for x in m['words']), file=sys.stderr)
+                    print('locked:', ' '.join(x['w'] for x in m['words']), f"[sentence {m['utt_id']}]", file=sys.stderr)
                 elif t == 'dec.repeat':
                     print('please repeat:', m['reason'].get('reader'), file=sys.stderr)
+                elif t == 'dec.sentence':
+                    p = '-' if m['p'] is None else f"{m['p']:.2f}"
+                    print(f"sentence {m['utt_id']} {m['event']}" + (f" ({m['reason']})" if m['reason'] else '')
+                          + f": held {m['held_s']:.1f} s, Claude p {p} ({m['asks']} asks), {m['segments']} segments,"
+                          f" {m['words']} words", file=sys.stderr)
+                elif t == 'dec.pause':
+                    print(f"sentence {m['utt_id']} asks Claude #{m['ask']} after {m['silence_s']:.1f} s still:",
+                          ' '.join(m['words']), file=sys.stderr)
     except KeyboardInterrupt:
         pass
     finally:

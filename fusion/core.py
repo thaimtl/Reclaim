@@ -21,6 +21,18 @@ next with its last 2 s of crops, the next utterance drops those carried frames (
 is read or spoken twice; a word cut in half at the cap may come out wrong. step() never raises: each stage is guarded,
 so a failure loses none of what the others built.
 
+A sentence (Sentence: one utt_id on the bus, so one caption line and one voice context) is every camera segment Austin
+mouths until he has finished, not one segment: a pause makes the camera end its segment, but the sentence only holds.
+On the hold it asks Claude whether he has finished (dec.pause; claude.end answers P(finished)), and asks again as the
+silence grows while the answer is no. It closes when the judge starts talking, when Claude says finished (once the hold
+is HOLD_MIN_S old; the bar falls from END_P to END_P_LATE as the silence grows), when Claude doesn't answer (fail open),
+at a pause once it has MAX_WORDS words, or at the backstop; mouthing again first goes on with it:
+its words are numbered on from the earlier segments' (dec.lock, dec.hyp, voice.say offset, dec.repeat, claude.repair),
+and the voice's final waits for the close. A capped segment's continuation is the same sentence too. The earlier
+segment's final pass runs when the next one joins (without cam.final's n-best if that hasn't come), so its words are
+counted first. Every hold, continuation and close goes on dec.sentence with its reason. Offline fitting
+(sentences=False) keeps one sentence per segment, as before.
+
 EMG alone never writes captions: SVR-1 transcribes about 96% of words wrong on its own (dev, svr/dev_compare.py), so
 speech the muscles detect while the camera has no face ends in "Please repeat" (reader: camera), not in guesses.
 """
@@ -38,6 +50,19 @@ EMG_FLAT = 1.0             # raw-unit standard deviation below this: no contact
 MIN_NEW = 5                # frames (0.2 s, the shortest word) a finished segment's late tick must add to go on,
 STILL_THR = 0.12           # ... with the mouth moving in them (lipread/endpoint.py's STILL_THR)
 PHRASE_WEIGHT = 0.3        # hint weight of a word that only appears in one of Claude's predicted phrases
+# When a sentence ends (Sentence). The hold starts once the camera ended its segment (0.5 s of still lips) and the end
+# pass ran (end_wait_s): LIPS_STILL_S after the lips stopped. Only the backstop and the fallbacks are fixed times.
+LIPS_STILL_S = 0.8
+HOLD_MIN_S = 0.5           # a held sentence never closes sooner (~1.3 s of still lips, Larpy's 1.2 s minimum hold)
+HOLD_BACKSTOP_S = 8.0      # still held: he gave up mid-sentence
+END_P = 0.6                # Claude's P(finished) at which a held sentence closes, as the hold starts; the bar falls
+END_P_LATE = 0.3           # ... to this over END_P_FALL_S, so a long silence and a lukewarm Claude close it (on the
+END_P_FALL_S = 3.0         # live run of 25/10 a constant 0.6 glued Austin's next sentences on: 85 words, 9 segments)
+MAX_WORDS = 30             # a sentence this long closes at its next pause
+END_RECHECK_S = 1.5        # Claude said not finished: ask again, with the longer silence, this often
+END_WAIT_S = 3.0           # no answer from Claude this long after asking: close (fail open: never hold forever)
+NO_CLAUDE_HOLD_S = 1.0     # without Claude (--no-claude, or nothing locked to ask about): hold this long
+JUDGE_WORDS = 2            # the judge's live transcript closes a held sentence once it has this many words
 
 
 class Utterance:
@@ -56,23 +81,60 @@ class Utterance:
         self.final_sent = False
         self.repeat_sent = False
         self.carried_from = None       # the utterance whose segment the camera capped (8 s) to open this one
+        self.sent = None               # its Sentence
+
+
+class Sentence:
+    """Austin's sentence: one utt_id on the bus, made of the camera segments he mouths until he has finished.
+    open (a segment is being read) -> holding (his lips stopped) -> closed."""
+
+    def __init__(self, sid):
+        self.sid = sid
+        self.utts = []                 # its segments' utterances, in order
+        self.state = 'open'
+        self.hold_t = None             # `now` the current hold began
+        self.asked_t = None            # `now` of the last end check sent to Claude
+        self.asks = 0                  # end checks sent this hold
+        self.p = None                  # Claude's newest P(finished) this hold
+        self.answered_t = None
+        self.claude = False            # this hold asks Claude
+        self.reason = None             # why it closed
+
+    def before(self, u):
+        """The locked words of its segments before u's: u's word i is the sentence's word len(before) + i."""
+        out = []
+        for v in self.utts:
+            if v is u:
+                break
+            out += v.locked
+        return out
+
+    def words(self):
+        return [x['w'] for v in self.utts for x in v.locked] + (list(self.utts[-1].unlocked) if self.utts else [])
 
 
 class Fusion:
     def __init__(self, search, gate, lock, svr=None, repair_s=0.3, end_wait_s=0.3, final_wait_s=2.5,
-                 use_emg=True, use_lm=True, use_hints=True, idle_emg=True, record=False, oracle=None):
+                 use_emg=True, use_lm=True, use_hints=True, idle_emg=True, record=False, oracle=None, sentences=True,
+                 claude_end=None):
         """idle_emg: between camera segments, keep reading SVR-1 to catch speech without a face (live only);
         record: keep every pass's judge scores and lock features in self.records (fitting, evaluation);
-        oracle(utterance) -> true sentence or None, scored on the final pass when recording (gate fitting)."""
+        oracle(utterance) -> true sentence or None, scored on the final pass when recording (gate fitting);
+        sentences: a sentence goes on across pauses (module docstring), else one per segment (offline fitting);
+        claude_end: ask Claude whether Austin has finished (default: use_hints)."""
         self.search, self.gate, self.lock, self.svr = search, gate, lock, svr
         self.repair_s, self.end_wait_s, self.final_wait_s = repair_s, end_wait_s, final_wait_s
         self.use_emg, self.use_lm, self.use_hints = use_emg and svr is not None, use_lm, use_hints
         self.records = [] if record else None
         self.oracle = oracle
         self.idle_emg = idle_emg
+        self.hold = sentences
+        self.claude_end = use_hints if claude_end is None else claude_end
         self.utt = None                # the open utterance
         self.closing = []              # utterances still speaking or waiting for cam.final
-        self.recent = {}               # utt_id -> Utterance, for late Claude repairs
+        self.recent = {}               # utt_id -> Utterance (its segment's, internal)
+        self.sent = None               # the newest Sentence
+        self.sentences = {}            # sentence utt_id (on the bus) -> Sentence, for late Claude repairs and answers
         self.next_id = 1
         self.hints, self.hints_until, self.predictability = {}, -1e18, 0.0
         self.phrases = []              # Claude's predicted phrases, as word lists
@@ -118,8 +180,16 @@ class Fusion:
             self.predictability = float(msg.get('predictability', 0.0))
         elif topic == 'claude.repair':
             out += self._repair(msg, now)
-        elif topic == 'partner.text' and msg.get('is_final'):
-            self.search.lm.add_text(str(msg.get('text', '')))
+        elif topic == 'claude.end':
+            s = self.sentences.get(msg.get('utt_id'))
+            if s is not None and s.state == 'holding':
+                s.p, s.answered_t = float(msg.get('p_complete', 0.0)), now
+        elif topic == 'partner.text':
+            text = str(msg.get('text', ''))
+            if msg.get('is_final'):
+                self.search.lm.add_text(text)
+            if len(text.split()) >= JUDGE_WORDS:
+                out += self._close_held('judge spoke', now)
         return out
 
     @staticmethod
@@ -137,9 +207,12 @@ class Fusion:
         for v in list(self.closing):
             if v.state == 'ending' and now >= v.final_deadline:
                 out += self._guard('final pass', self._final, v, now)
+        out += self._guard('sentence end', self._held, now)
         for v in ([self.utt] if self.utt else []) + self.closing:
             out += self._guard('release', self._release, v, now)
-        self.closing = [v for v in self.closing if not (v.state == 'done' and v.final_sent)]
+        # done: its sentence's last segment once it sent the final, an earlier one once its words are out
+        self.closing = [v for v in self.closing if not (v.state == 'done' and (
+            v.final_sent or (not v.queue and v.sent is not None and v.sent.utts[-1] is not v)))]
         if self.utt is None and self.use_emg and self.idle_emg and now - self.idle_read_t >= 0.1:
             out += self._guard('idle EMG read', self._idle_emg, now)
         return out
@@ -169,17 +242,21 @@ class Fusion:
                 self.closing.remove(ended)
                 ended.state, ended.final_deadline = 'open', None
                 self.utt = ended
+                s = ended.sent
+                if s is not None and s.state == 'holding' and s.utts[-1] is ended:
+                    out += self._sentence_event(s, 'continue', now)
+                    s.state, s.hold_t = 'open', None
             elif self._goes_on(msg, ended):
-                self._open(seg, start, carried_from=ended)  # done: only the frames after its reading are new words
+                out += self._open(seg, start, now, carried_from=ended)  # done: only frames after its reading are new
             else:                           # a late last tick's couple of trailing frames hold no word
                 return out
         prev = None
         if self.utt is not None and not (self.utt.seg_id == seg and self.utt.seg_start == start):
             prev = self.utt
-            out += self._end(self.utt, now)
+            out += self._end(self.utt, now, hold=False)     # the next segment opens at once: no hold between
         if self.utt is None:
             capped = prev is not None and prev.cam is not None and start <= prev.cam.frame_t[-1]
-            self._open(seg, start, carried_from=prev if capped else None)   # capped: it carries the last 2 s
+            out += self._open(seg, start, now, carried_from=prev if capped else None)   # capped: carries the last 2 s
         u = self.utt
         cam = self._cam(msg, u)
         if cam is None:                     # only carried frames so far
@@ -199,14 +276,33 @@ class Fusion:
         act = np.asarray(msg.get('activity', np.ones(len(new))), np.float64)[new]
         return int(new.sum()) >= MIN_NEW and bool((act >= STILL_THR).any())
 
-    def _open(self, seg, start, carried_from=None):
-        self.utt = Utterance(self.next_id, seg, start)
-        self.utt.carried_from = carried_from
-        self.recent[self.next_id] = self.utt
-        for k in [k for k in self.recent if k < self.next_id - 20]:
-            del self.recent[k]
+    def _open(self, seg, start, now, carried_from=None):
+        """A new segment's utterance: it goes on with the sentence unless that closed (or sentences are off)."""
+        out = []
+        s = self.sent
+        if self.hold and s is not None and s.state != 'closed':
+            for v in s.utts:        # count the earlier segments' words first: read what still waits for cam.final now
+                if v.state == 'ending':
+                    out += self._final(v, now)      # a "Please repeat" there closes the sentence
+        uid = self.next_id
         self.next_id += 1
+        if not self.hold or s is None or s.state == 'closed':
+            s = self.sent = Sentence(uid)           # its first segment's id: offline, utt_id = segment as before
+            self.sentences[uid] = s
+            for k in [k for k in self.sentences if k < uid - 20]:
+                del self.sentences[k]
+        else:
+            out += self._sentence_event(s, 'continue', now)
+            s.state, s.hold_t = 'open', None
+        self.utt = Utterance(uid, seg, start)
+        self.utt.carried_from = carried_from
+        self.utt.sent = s
+        s.utts.append(self.utt)
+        self.recent[uid] = self.utt
+        for k in [k for k in self.recent if k < uid - 20]:
+            del self.recent[k]
         self.emg_only = None
+        return out
 
     @staticmethod
     def _cam(msg, u):
@@ -229,14 +325,77 @@ class Fusion:
                  if v is not self.utt and v.state != 'open' and v.seg_id == seg and v.seg_start == seg_start]
         return max(found, key=lambda v: v.utt_id) if found else None   # the newest: a stall can split it again
 
-    def _end(self, u, now):
-        """The segment's ticks stopped: read it once more as a finished sentence, then wait for cam.final."""
+    def _end(self, u, now, hold=True):
+        """The segment's ticks stopped: read it once more as a finished sentence, then wait for cam.final; its
+        sentence holds (hold=False: the next segment is already here)."""
         out = self._guard('end pass', self._pass, u, now, True) if u.cam is not None else []
         u.state, u.final_deadline = 'ending', now + self.final_wait_s   # even after a failed pass: never retried
         self.closing.append(u)
         if self.utt is u:
             self.utt = None
+        s = u.sent
+        if s is not None and s.state == 'open' and s.utts[-1] is u:
+            if not self.hold:
+                s.state, s.reason = 'closed', 'segment ended'   # offline: one sentence per segment
+            elif hold:
+                s.state, s.hold_t, s.p, s.answered_t, s.asks = 'holding', now, None, None, 0
+                s.claude = self.claude_end and bool(s.words())
+                out += self._sentence_event(s, 'hold', now)
+                if s.claude:
+                    out += self._ask_end(s, now)
         return out
+
+    # ------------------------------------------------------------------ the end of a sentence
+    def _held(self, now):
+        """A held sentence: close it, ask Claude again, or keep holding (module docstring)."""
+        s = self.sent
+        if s is None or s.state != 'holding':
+            return []
+        held = now - s.hold_t
+        bar = END_P - (END_P - END_P_LATE) * min(1.0, held / END_P_FALL_S)
+        why = None
+        if held >= HOLD_BACKSTOP_S:
+            why = 'backstop'
+        elif held >= HOLD_MIN_S and sum(len(v.locked) for v in s.utts) >= MAX_WORDS:
+            why = 'long sentence'
+        elif not s.claude:
+            if held >= NO_CLAUDE_HOLD_S:
+                why = 'no Claude'
+        elif held >= HOLD_MIN_S:
+            if s.p is not None and s.p >= bar:
+                why = 'Claude: finished'
+            elif s.p is None and now - s.asked_t >= END_WAIT_S:
+                why = 'Claude did not answer'
+        if why:
+            return self._close(s, why, now)
+        if s.claude and s.p is not None and s.p < bar and now - max(s.answered_t, s.asked_t) >= END_RECHECK_S:
+            return self._ask_end(s, now)    # the answer was no: ask again with the longer silence
+        return []
+
+    def _ask_end(self, s, now):
+        s.asks += 1
+        s.asked_t = now
+        words = s.words()
+        return [('dec.pause', {'utt_id': s.sid, 'words': words, 'n_words': len(words), 'ask': s.asks,
+                               'silence_s': round(now - s.hold_t + LIPS_STILL_S, 2)})]
+
+    def _close(self, s, why, now):
+        """Close a sentence: its last segment sends the voice's final once its words are out (_release)."""
+        out = self._sentence_event(s, 'close', now, reason=why)
+        s.state, s.reason = 'closed', why
+        return out
+
+    def _close_held(self, why, now):
+        s = self.sent
+        return self._close(s, why, now) if s is not None and s.state == 'holding' else []
+
+    @staticmethod
+    def _sentence_event(s, event, now, reason=None):
+        """dec.sentence: every hold, continuation and close, with why (the logger keeps them; fusion.run prints)."""
+        held = now - s.hold_t if s.hold_t is not None else 0.0
+        return [('dec.sentence', {'utt_id': s.sid, 'event': event, 'reason': reason, 'held_s': round(held, 2),
+                                  'p': s.p, 'asks': s.asks, 'segments': len(s.utts),
+                                  'words': sum(len(v.locked) for v in s.utts)})]
 
     def _final(self, u, now):
         """The final pass, with the camera's attention n-best: every word left is spoken, unless the sentence as a
@@ -248,6 +407,8 @@ class Fusion:
         if rest and not u.repeat_sent:
             out.append(('dec.repeat', self._repeat_msg(u, rest)))
             u.repeat_sent = True
+            if u.sent is not None and u.sent.state != 'closed':
+                out += self._close(u.sent, 'please repeat', now)   # what follows is a new sentence
         words = ' '.join(w['w'] for w in u.locked)
         if words:
             self.search.lm.add_text(words)      # Austin's own words join the call cache
@@ -319,9 +480,11 @@ class Fusion:
                               emg_top=max(me, key=me.get) if (me and emg_read is not None) else None,
                               claude=hints.get(word, 0.0), cands=sorted(d.items(), key=lambda kv: -kv[1])[:3],
                               mc=mc, me=me))
+        prior = u.sent.before(u) if u.sent is not None else []     # the sentence's earlier segments' words
+        sid = u.sent.sid if u.sent is not None else u.utt_id
         new = []
-        if settle and self.lock.settle(locked + [x['w'] for x in words],
-                                       [x['conf'] for x in u.locked] + [x['p'] for x in words]):
+        if settle and self.lock.settle([x['w'] for x in prior] + locked + [x['w'] for x in words],
+                                       [x['conf'] for x in prior + u.locked] + [x['p'] for x in words]):
             new = list(words)   # a wrong guess beats "Please repeat"
         else:
             for x in words:   # left to right: a word locks only after every word before it
@@ -339,7 +502,7 @@ class Fusion:
         u.last_words = rest
         ms = (time.perf_counter() - t_start) * 1000
         if self.records is not None:
-            rec = dict(utt_id=u.utt_id, seg_id=u.seg_id, seg_start=u.seg_start, t=now, final=final,
+            rec = dict(utt_id=u.utt_id, sentence=sid, seg_id=u.seg_id, seg_start=u.seg_start, t=now, final=final,
                        with_nbest=bool(nbest), nbest=list(nbest), gate=gf, weights=dict(w), scores=scores,
                        cands=[c.words for c in cands], sources=[c.source for c in cands], best=best.words,
                        n_locked_before=len(locked), locked_now=[x['w'] for x in new],
@@ -360,19 +523,19 @@ class Fusion:
             self.records.append(rec)
         out = []
         if new:
-            out.append(('dec.lock', {'utt_id': u.utt_id, 'words': [dict(w=x['w'], conf=x['p'], alts=x['alts'],
-                                                                        cam=x['cam'], emg=x['emg'], t=now,
-                                                                        cam_top=x['cam_top'], emg_top=x['emg_top'])
-                                                                   for x in new]}))
+            out.append(('dec.lock', {'utt_id': sid, 'words': [dict(w=x['w'], conf=x['p'], alts=x['alts'],
+                                                                  cam=x['cam'], emg=x['emg'], t=now,
+                                                                  cam_top=x['cam_top'], emg_top=x['emg_top'])
+                                                             for x in new]}))
         newest = words[-1] if words else None
-        hyp = {'utt_id': u.utt_id, 'locked': [x['w'] for x in u.locked], 'unlocked': u.unlocked,
-               'confidence': [x['conf'] for x in u.locked] + u.unlocked_conf,
-               'source': [self._source(x) for x in u.locked] + u.unlocked_src, 'threshold': tau}
+        hyp = {'utt_id': sid, 'locked': [x['w'] for x in prior + u.locked], 'unlocked': u.unlocked,
+               'confidence': [x['conf'] for x in prior + u.locked] + u.unlocked_conf,
+               'source': [self._source(x) for x in prior + u.locked] + u.unlocked_src, 'threshold': tau}
         if newest is not None:
             hyp['cands'] = [dict(w=c, cam=newest['mc'].get(c, 0.0), emg=newest['me'].get(c, 0.0) if
                                  emg_read is not None else 0.0, claude=hints.get(c, 0.0)) for c, _ in newest['cands']]
         out.append(('dec.hyp', hyp))
-        out.append(('timing.dec', {'stage': 'lock', 'ms': ms, 'utt_id': u.utt_id, 'final': final,
+        out.append(('timing.dec', {'stage': 'lock', 'ms': ms, 'utt_id': sid, 'final': final,
                                    'candidates': len(cands)}))
         return out
 
@@ -407,48 +570,58 @@ class Fusion:
         while u.queue and u.queue[0][0] <= now:
             _, i = u.queue.popleft()
             words.append(u.locked[i].get('voice', u.locked[i]['w']))
-        last = u.state == 'done' and not u.queue
+        s = u.sent
+        # the voice's final: the sentence closed and this, its last segment, has said everything
+        last = u.state == 'done' and not u.queue and (s is None or (s.state == 'closed' and s.utts[-1] is u))
+        sid, base = (s.sid, len(s.before(u))) if s is not None else (u.utt_id, 0)
         if words or (last and not u.final_sent):
-            out.append(('voice.say', {'utt_id': u.utt_id, 'words': words, 'offset': u.spoken, 'final': last,
+            out.append(('voice.say', {'utt_id': sid, 'words': words, 'offset': base + u.spoken, 'final': last,
                                       'pace': float(self.pace), 'effort': float(self.effort)}))
             if words:
-                out.append(('timing.dec', {'stage': 'window', 'ms': self.repair_s * 1000, 'utt_id': u.utt_id}))
+                out.append(('timing.dec', {'stage': 'window', 'ms': self.repair_s * 1000, 'utt_id': sid}))
             u.spoken += len(words)
             u.final_sent = u.final_sent or last
         return out
 
     def _repair(self, msg, now):
-        u = self.recent.get(msg.get('utt_id'))
+        """Claude's repairs and please-repeats, by the sentence's word index (its segments' words numbered on)."""
+        s = self.sentences.get(msg.get('utt_id'))
         out = []
-        if u is None:
+        if s is None:
             return out
+        at = [(v, j) for v in s.utts for j in range(len(v.locked))]     # sentence index -> (segment, its index)
         for e in msg.get('edits') or []:
             i = int(e.get('index', -1))
             words = self.search_words(str(e.get('to', '')))
             frm = self.search_words(str(e.get('from', '')))
-            if 0 <= i < len(u.locked) and len(words) == 1 and frm[:1] == [u.locked[i]['w']]:
-                u.locked[i].setdefault('voice', u.locked[i]['w'])
-                u.locked[i]['w'] = words[0]     # the captions only: the voice says what locked, window or not
-        if msg.get('please_repeat') and not u.repeat_sent:
-            out.append(('dec.repeat', {'utt_id': u.utt_id, 'reason': {
-                'reader': 'Claude', 'words': [dict(index=i, w=x['w'], alts=x['alts']) for i, x in
-                                              enumerate(u.locked) if i >= u.spoken]}}))
-            u.repeat_sent = True
+            if 0 <= i < len(at) and len(words) == 1:
+                v, j = at[i]
+                if frm[:1] == [v.locked[j]['w']]:
+                    v.locked[j].setdefault('voice', v.locked[j]['w'])
+                    v.locked[j]['w'] = words[0]     # the captions only: the voice says what locked, window or not
+        if msg.get('please_repeat') and not any(v.repeat_sent for v in s.utts):
+            out.append(('dec.repeat', {'utt_id': s.sid, 'reason': {
+                'reader': 'Claude', 'words': [dict(index=i, w=v.locked[j]['w'], alts=v.locked[j]['alts'])
+                                              for i, (v, j) in enumerate(at) if j >= v.spoken]}}))
+            for v in s.utts:
+                v.repeat_sent = True
         return out
 
     def _repeat_msg(self, u, indices):
         rest = {x['i']: x for x in getattr(u, 'last_words', [])}
+        base = len(u.sent.before(u)) if u.sent is not None else 0
         words, cam_low = [], 0
         for i in indices:
             x = rest.get(i)
             if x is None:
                 continue
-            words.append(dict(index=i, w=x['w'], alts=x['alts'], p=x['p'], cam=x['cam'], emg=x['emg']))
+            words.append(dict(index=base + i, w=x['w'], alts=x['alts'], p=x['p'], cam=x['cam'], emg=x['emg']))
             cam_low += (x['emg'] is not None and x['cam'] < x['emg'])
         face = u.cam.face_ok if u.cam is not None else False
         has_emg = any(x['emg'] is not None for x in words)
         reader = 'camera' if (not face or not has_emg or cam_low * 2 > len(words)) else 'EMG'
-        return {'utt_id': u.utt_id, 'reason': {'reader': reader, 'words': words, 'threshold': self.lock.threshold(
+        sid = u.sent.sid if u.sent is not None else u.utt_id
+        return {'utt_id': sid, 'reason': {'reader': reader, 'words': words, 'threshold': self.lock.threshold(
             self.predictability)}}
 
     def _quality(self):

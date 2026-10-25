@@ -217,7 +217,18 @@ def main():
             if k == 12:
                 out2 += core.feed('cam.final', {'seg_id': 1, 'nbest': [{'text': 'I WANT WATER', 'score': 0.0}]},
                                   t + 0.05 * k)
+            for tp, m in list(out2):
+                if tp == 'dec.pause' and not m.get('answered'):     # as the Claude service would answer it
+                    m['answered'] = True
+                    out2 += core.feed('claude.end', {'utt_id': m['utt_id'], 'p_complete': 0.95}, t + 0.05 * k)
         out += out2
+        pauses = [m for tp, m in out if tp == 'dec.pause']
+        check('the lips stop: the sentence holds and asks Claude whether he finished',
+              len(pauses) == 1 and pauses[0]['words'][:2] == ['i', 'want'], str([m['words'] for m in pauses]))
+        closes = [m for tp, m in out if tp == 'dec.sentence' and m['event'] == 'close']
+        check("Claude's 'finished' closes it, no sooner than the minimum hold",
+              len(closes) == 1 and closes[0]['reason'] == 'Claude: finished' and closes[0]['held_s'] >= 0.5,
+              str(closes))
         locks = [x['w'] for tp, m in out if tp == 'dec.lock' for x in m['words']]
         said = [x for tp, m in out if tp == 'voice.say' for x in m['words']]
         finals = [m for tp, m in out if tp == 'voice.say' and m['final']]
@@ -237,7 +248,7 @@ def main():
         # the camera's last tick of a segment comes ~0.55 s after the one before it (every sentence of session 3),
         # after end_wait_s has ended the sentence: it is still that sentence, so the voice never says it twice
         for late_at in (12, 30):                    # while waiting for cam.final, and after it
-            core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+            core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3, sentences=False)
             out = []
             for n in range(8, T - 2, 3):
                 msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
@@ -258,7 +269,7 @@ def main():
             check(f'a late last tick (step {late_at}) is not a new sentence', said == ['i', 'want', 'water'] and
                   utts == {1}, f"{' '.join(said)}; utt_ids {sorted(utts)}")
         # a cam.final that beats end_wait_s (a short reply's beam) ends the sentence at once, with its n-best
-        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3, sentences=False)
         out = []
         for n in range(8, T + 1, 3):
             msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
@@ -281,7 +292,7 @@ def main():
         seg1 = {k: (v[:cut] if isinstance(v, np.ndarray) else v) for k, v in long.items()}
         seg2 = {k: (v[cut - carry:] if isinstance(v, np.ndarray) else v) for k, v in long.items()}
         seg2.update(seg_id=2, seg_start=float(ft[cut - carry]))
-        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3, sentences=False)
         out = []
         for part in (seg1, seg2):
             n_all = len(part['frame_t'])
@@ -301,7 +312,7 @@ def main():
 
         # a failing end or final pass never stops fusion, and step() never raises: the sentence closes, its locked
         # words are said, and the next one is read
-        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3, sentences=False)
         real = core.search.candidates
 
         def flaky(*a, **kw):     # every end and final pass fails (a CUDA error, say)
@@ -333,7 +344,7 @@ def main():
               f'raised {raised}; locked {locked}; said {said}')
 
         # the idle EMG read fails (it runs once no sentence is open, as the last words are released): nothing is lost
-        core = Fusion(search, Gate(), lock, svr=None, repair_s=2.0)    # a long window: words still wait
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=2.0, sentences=False)    # a long window: words still wait
 
         def broken(now):
             raise RuntimeError('CUDA error in svr.read (test)')
@@ -354,7 +365,7 @@ def main():
               any(tp == 'voice.say' and m['final'] for tp, m in out), f'said {said}')
 
         # the camera stalls 0.4 s mid-sentence (end_wait_s ends it): it reopens, every word is said once
-        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3, sentences=False)
         out = []
         ns = list(range(8, T + 1, 3))
         half = len(ns) // 2
@@ -381,7 +392,7 @@ def main():
 
         # a stall long enough that the sentence already finished, then Austin goes on mouthing in the same segment:
         # only the new frames are read, every word said once
-        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3, sentences=False)
         out = []
         for n in range(4, cut + 1, 3):
             msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in long.items()}
@@ -402,7 +413,7 @@ def main():
         check('words after a finished stall are read from the new frames only, said once',
               said == ['i', 'want', 'water', 'i', 'want'], ' '.join(said))
 
-        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3, sentences=False)
         core.feed('cam.tick', reading(pieces, ['i', 'want', 'water'], seg_id=1, t0=100.0), 101.0)
         for k in range(1, 80):
             core.step(101.0 + 0.05 * k)
@@ -427,7 +438,7 @@ def main():
               sum(1 for tp, m in out if tp == 'voice.say' and m['final']) == 1, ' '.join(said))
 
         # a repair changes the captions only: the voice says what locked, even inside the repair window
-        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3, sentences=False)
         out = []
         for n in range(8, T + 1, 3):
             msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
@@ -447,7 +458,7 @@ def main():
 
         # a word below the threshold at the end: Please repeat, and the voice doesn't say it
         lock = LockModel(tau0=0.999, tau_min=0.999, tau_max=0.999, agree_floor=0.0, repeat_floor=0.9999)
-        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3, sentences=False)
         out = []
         for n in range(8, T + 1, 3):
             msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
@@ -460,6 +471,99 @@ def main():
               str(rep[0]['reason'] if rep else None))
         check('the final voice.say still closes the sentence',
               any(tp == 'voice.say' and m['final'] for tp, m in out))
+
+        # sentences (live): a pause ends the camera's segment but only holds the sentence; Claude says whether
+        # Austin finished; the judge talking, Claude's silence (fail open) and the backstop close it too
+        lock = LockModel(tau0=0.5, tau_min=0.5, tau_max=0.5, agree_floor=0.0)
+
+        def mouth(core, words, seg, t0, out):
+            full = reading(pieces, words, seg_id=seg, t0=t0)
+            t = t0
+            for n in range(8, len(full['frame_t']) + 1, 3):
+                msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
+                t = float(msg['frame_t'][-1]) + 0.05
+                out += core.feed('cam.tick', msg, t)
+                out += core.step(t)
+            return t
+
+        def wait(core, t, secs, out, answer=None, judge_at=None):
+            """secs of still lips; answer: the P(finished) Claude gives each dec.pause; judge_at: the judge speaks."""
+            for k in range(1, int(round(secs / 0.05)) + 1):
+                now = t + 0.05 * k
+                out += core.step(now)
+                for tp, m in list(out):
+                    if answer is not None and tp == 'dec.pause' and not m.get('answered'):
+                        m['answered'] = True
+                        out += core.feed('claude.end', {'utt_id': m['utt_id'], 'p_complete': answer}, now)
+                if judge_at is not None and k == int(round(judge_at / 0.05)):
+                    out += core.feed('partner.text', {'text': 'so what did you build', 'is_final': False}, now)
+            return t + secs
+
+        def events(out):
+            return [(m['event'], m['reason']) for tp, m in out if tp == 'dec.sentence']
+
+        core = Fusion(search, Gate(), lock, svr=None, use_hints=True, repair_s=0.3)
+        out = []
+        t = mouth(core, ['i', 'want'], 1, 100.0, out)
+        t = wait(core, t, 1.0, out, answer=0.1)             # a pause; Claude: not finished
+        t = mouth(core, ['water'], 2, t + 0.2, out)
+        t = wait(core, t, 3.0, out, answer=0.9)             # Claude: finished
+        ids = {m['utt_id'] for tp, m in out if tp in ('dec.hyp', 'dec.lock', 'voice.say')}
+        hyps = [m for tp, m in out if tp == 'dec.hyp']
+        said = [(m['offset'], m['words']) for tp, m in out if tp == 'voice.say' and m['words']]
+        flat = [w for _, ws in said for w in ws]
+        offsets_ok = all(off == sum(len(ws) for _, ws in said[:k]) for k, (off, ws) in enumerate(said))
+        finals = [m for tp, m in out if tp == 'voice.say' and m['final']]
+        check('a pause, then more words: one sentence, one utt_id on the bus', ids == {1}, str(sorted(ids)))
+        check('its captions and voice go on from the first segment',
+              hyps[-1]['locked'] == ['i', 'want', 'water'] and flat == ['i', 'want', 'water'] and offsets_ok,
+              f"captions {hyps[-1]['locked']}; voice {said}")
+        check('one final, after Claude said finished', len(finals) == 1 and events(out)[-1] ==
+              ('close', 'Claude: finished'), str(events(out)))
+        check('every hold and continuation is logged', [e for e, _ in events(out)] ==
+              ['hold', 'continue', 'hold', 'close'], str(events(out)))
+        out += core.feed('claude.repair', {'utt_id': 1, 'edits': [{'index': 2, 'from': 'water', 'to': 'waiter'}],
+                                           'please_repeat': False}, t)
+        check("Claude's repair finds the word by the sentence's index",
+              core.sentences[1].utts[1].locked[0]['w'] == 'waiter')
+
+        core = Fusion(search, Gate(), lock, svr=None, use_hints=True, repair_s=0.3)
+        out = []
+        t = mouth(core, ['i', 'want', 'water'], 1, 100.0, out)
+        t = wait(core, t, 2.0, out, judge_at=0.6)           # no answer yet; the judge starts talking
+        t = mouth(core, ['water'], 2, t + 0.5, out)
+        t = wait(core, t, 4.0, out)                         # Claude never answers
+        ev = events(out)
+        check('the judge talking closes the held sentence', ('close', 'judge spoke') in ev, str(ev))
+        check('the next words are a new sentence', {m['utt_id'] for tp, m in out if tp == 'dec.hyp'} == {1, 2})
+        check('no answer from Claude: it closes anyway (fail open)', ev[-1] == ('close', 'Claude did not answer'),
+              str(ev))
+
+        core = Fusion(search, Gate(), lock, svr=None, use_hints=True, repair_s=0.3)
+        out = []
+        t = mouth(core, ['i', 'want'], 1, 100.0, out)
+        t = wait(core, t, 9.0, out, answer=0.1)             # Claude keeps saying not finished
+        pauses = [m for tp, m in out if tp == 'dec.pause']
+        check("'not finished' holds and asks again as the silence grows, up to the backstop",
+              len(pauses) >= 3 and pauses[-1]['silence_s'] > pauses[0]['silence_s'] and
+              events(out)[-1] == ('close', 'backstop'), f"{len(pauses)} asks; {events(out)}")
+
+        core = Fusion(search, Gate(), lock, svr=None, use_hints=False, repair_s=0.3)
+        out = []
+        t = mouth(core, ['i', 'want', 'water'], 1, 100.0, out)
+        t = wait(core, t, 2.0, out)
+        check('without Claude: a short hold, then it closes', events(out)[-1] == ('close', 'no Claude') and
+              not any(tp == 'dec.pause' for tp, _ in out), str(events(out)))
+
+        core = Fusion(search, Gate(), lock, svr=None, use_hints=False, repair_s=0.3, sentences=False)
+        out = []
+        t = mouth(core, ['i', 'want'], 1, 100.0, out)
+        t = wait(core, t, 0.5, out)
+        t = mouth(core, ['water'], 2, t + 0.2, out)
+        t = wait(core, t, 3.0, out)
+        check('offline (sentences off): one utt_id per segment, as before',
+              {m['utt_id'] for tp, m in out if tp == 'dec.hyp'} == {1, 2} and
+              len([m for tp, m in out if tp == 'voice.say' and m['final']]) == 2)
     from fusion.run import drain
 
     class Q:

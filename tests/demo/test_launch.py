@@ -3,6 +3,7 @@
     venv-call/bin/python -m pytest tests/demo -q
 """
 import io
+import os
 import json
 import socket
 import sys
@@ -74,7 +75,7 @@ def test_ready_on_the_bus(tmp_path):
     code = (f'import time, zmq; s = zmq.Context().socket(zmq.PUB); s.bind("tcp://127.0.0.1:{port}")\n'
             'while True:\n    s.send_multipart([b"emg.raw", b"x"]); time.sleep(0.05)')
     p = Part('EMG', py(code), ('bus', f'tcp://127.0.0.1:{port}', 'emg.raw'), 10)
-    p.start(tmp_path, {})
+    p.start(tmp_path, dict(os.environ))   # on Windows a process without SYSTEMROOT can't open a socket
     try:
         assert p.wait_ready()
     finally:
@@ -192,7 +193,7 @@ def test_run_part_runs_the_module_with_its_arguments(tmp_path):
     mod = tmp_path / 'fake_part.py'
     mod.write_text('import sys\nprint("args", sys.argv[1:])\n')
     r = subprocess.run([sys.executable, '-m', 'demo.run_part', 'fake_part', '--port', '9'], capture_output=True,
-                       text=True, cwd=launch.REPO, env={'PYTHONPATH': f'{tmp_path}:{launch.REPO}'}, timeout=30)
+                       text=True, cwd=launch.REPO, env={'PYTHONPATH': f'{tmp_path}{os.pathsep}{launch.REPO}'}, timeout=30)
     assert r.returncode == 0 and "args ['--port', '9']" in r.stdout, r.stderr
 
 

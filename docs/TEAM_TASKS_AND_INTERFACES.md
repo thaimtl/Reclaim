@@ -107,12 +107,17 @@ flowchart TD
 | `dec.repeat` | Austin → dashboard | at sentence end | `utt_id`, `reason` (which reader disagreed, confidences); the dashboard reads `reason` as {`reader` (camera / EMG / Claude), `words` [{`index`, `w`, `alts`}]} |
 | `claude.predict` | Claude → Austin | while the judge speaks, on their final line, ~2 s while Austin mouths | `words` [{`w`, `weight`}], `phrases`, `predictability` (0 to 1), `ttl_s` |
 | `claude.repair` | Claude → Austin, dashboard | on reply | `utt_id`, `edits` [{`index`, `from`, `to`}], `please_repeat` |
+| `dec.pause` | Austin → Claude | when Austin's lips stop, and again while the answer is no | `utt_id`, `words` (the sentence so far), `n_words`, `silence_s`, `ask` |
+| `claude.end` | Claude → Austin | on reply | `utt_id`, `p_complete` (0 to 1: has he finished?), `ask` |
+| `dec.sentence` | Austin → logger | on each hold, continuation and close | `utt_id`, `event` (`hold` / `continue` / `close`), `reason` (judge spoke, Claude: finished, Claude did not answer, backstop, no Claude, please repeat), `held_s`, `p`, `asks`, `segments`, `words` |
 | `voice.say` | Austin → Frank | words leaving the repair window | `utt_id`, `words` (only the new ones), `offset` (index of `words[0]` in the sentence, optional), `final`, `pace`, `effort` (both relative, 1.0 = Austin's normal; below) |
 | `partner.text` | Frank → Claude, dashboard | streaming | `text`, `is_final`, `t` |
 | `call.state` | Frank → dashboard | on change | `state` (`connected` / `ended`), `t`, plus `call_sid` and `ink` on connect |
 | `timing.*` | everyone → logger | every event | the stage and its duration in ms (the camera's ride in `cam.tick.timing_ms`); the dashboard's latency strip reads `timing.dec` {`stage`: `lock` (lock decision) or `window` (repair window), `ms`}, `timing.voice` {`stage`: `sonic_first_audio` or `played_to_judge`, `utt_id`, `ms`} and `timing.claude` {`ms`, `error`} |
 
 Austin applies Claude's repairs before forwarding words on `voice.say`, so the voice never needs to know about Claude. The logger subscribes to every topic.
+
+One `utt_id` is one sentence of Austin's, not one camera segment: a pause makes the camera end its segment, but the decoder holds the sentence and asks Claude whether he has finished (`dec.pause`, `claude.end`). Mouthing again before it closes goes on with the same `utt_id`, its words numbered on, so the captions stay on one line and the voice in one context. It closes when the judge starts talking, when Claude says finished, when Claude doesn't answer in time, or after 8 s (`fusion/core.py`, `Sentence`).
 
 `voice.say` units, from SVR-1 ([SVR1_SPEC.md](SVR1_SPEC.md#3-outputs)):
 - `pace`: speaking rate relative to Austin's normal, `exp(0.37 × the rate head's z-score)` divided by its median over the calibration minute. 1.0 is normal, 0.5 half speed.
