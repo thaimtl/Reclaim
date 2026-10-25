@@ -241,7 +241,7 @@ def test_fit_head_survives_a_fold_without_a_label():
     X = rng.normal(size=(60, N_FEATURES))
     y = np.array(['neutral'] * 30 + ['happy'] * 30)
     X[30:, 0] += 4
-    h = emotion_fit.fit_head(X, y)
+    h = emotion_fit.fit_head(X, y, C=1.0, cols=tuple(range(N_FEATURES)))
     p = h.predict(X)
     assert h.labels == emotion_fit.LABELS and p[:, 2].max() < 1e-6 and p[:, 3].max() < 1e-6
     assert (p[30:, 1] > p[30:, 0]).mean() > 0.9 and (p[:30, 0] > p[:30, 1]).mean() > 0.9
@@ -310,8 +310,120 @@ def test_binary_fold_matches_sklearn_probabilities():
     X = rng.normal(size=(80, N_FEATURES))
     y = np.array(['neutral'] * 40 + ['happy'] * 40)
     X[40:, 3] += 2
-    h = emotion_fit.fit_head(X, y)
+    h = emotion_fit.fit_head(X, y, C=1.0, cols=tuple(range(N_FEATURES)))
     sc = StandardScaler().fit(X)
     m = LogisticRegression(C=1.0, max_iter=3000, class_weight='balanced').fit(sc.transform(X), y)
     want = m.predict_proba(sc.transform(X))[:, list(m.classes_).index('happy')]
     assert np.allclose(h.predict(X)[:, 1], want, atol=1e-4)
+
+
+# --- the running baseline and the logits-only head (what carries across sessions) -------------------------------
+def feats_of(expr, offset=0.0):
+    """60 features: the FakeNet logits for expr (an AffectNet class), plus a constant offset (light, posture)."""
+    z = np.zeros(N_FEATURES, np.float32)
+    z[CLASSES.index(expr)] = 6.0
+    return z + offset
+
+
+def test_an_expression_at_the_start_is_not_taken_for_neutral():
+    """Session 2 opened on raised brows; the first seconds alone made that "neutral" for the whole call."""
+    from lipread.emotion import RunningBaseline
+    rb, t, base = RunningBaseline(), 0.0, None
+    for _ in range(int(6 * 25)):                       # the call opens on a 6 s smile
+        base = rb.push(t, feats_of('Happiness'))
+        t += 0.04
+    assert base is None and not rb.buf                 # the network alone reads it as a smile: kept out
+    for _ in range(int(4 * 25)):                       # then a neutral face
+        base = rb.push(t, feats_of('Neutral'))
+        t += 0.04
+    assert np.array_equal(base, feats_of('Neutral'))   # the median is the neutral face, not the smile
+
+
+def test_running_baseline_follows_a_slow_change():
+    from lipread.emotion import RunningBaseline
+    rb, t = RunningBaseline(), 0.0
+    for offset in (0.0, 1.0):                          # light changes: the whole face shifts
+        for _ in range(int(70 * 25)):
+            base = rb.push(t, feats_of('Neutral', offset))
+            t += 0.04
+        assert base[20] == offset
+
+
+def test_running_baseline_after_a_long_gap_waits_for_new_frames():
+    from lipread.emotion import RunningBaseline
+    rb, t = RunningBaseline(), 0.0
+    for _ in range(100):
+        old = rb.push(t, feats_of('Neutral'))
+        t += 0.04
+    t += 200.0                                         # gone for longer than the 60 s window
+    for _ in range(25):                                # 1 s back: one frame is not a baseline yet
+        b = rb.push(t, feats_of('Neutral', 2.0))
+        t += 0.04
+    assert np.array_equal(b, old)
+    for _ in range(3 * 25):
+        b = rb.push(t, feats_of('Neutral', 2.0))
+        t += 0.04
+    assert np.isfinite(b).all() and b[20] == 2.0
+    t += 200.0
+    for _ in range(5 * 25):                            # back on a smile: it never replaces the neutral face
+        b = rb.push(t, feats_of('Happiness'))
+        t += 0.04
+    assert b[20] == 2.0 and not rb.buf
+
+
+def test_net_tagger_opening_on_a_smile_then_reads_neutral_and_the_next_smile():
+    net = FakeNet()
+    tg = NetTagger(net, toy_head())
+    out = run(tg, net, [(6.0, 'Happiness'), (8.0, 'Neutral'), (3.0, 'Happiness'), (3.0, 'Neutral')])
+    assert {e.label for ti, e in out if 7.0 <= ti < 14.0} == {'neutral'}
+    assert 'happy' in labels_after([(ti, e) for ti, e in out if ti < 17.0], 14.0)
+    assert tg.base is tg.baseline.base is not None
+
+
+def test_running_baseline_ignores_no_face_frames_and_resets():
+    from lipread.emotion import RunningBaseline
+    rb = RunningBaseline()
+    assert rb.push(0.0, None) is None and rb.push(5.0, None) is None
+    for k in range(100):
+        rb.push(10.0 + k * 0.04, np.ones(N_FEATURES, np.float32))
+    rb.reset()
+    assert rb.base is None and not rb.buf
+
+
+def test_head_reads_only_its_columns_and_saves_them(tmp_path):
+    from lipread.expression import LOGITS
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(80, N_FEATURES))
+    y = np.array(['neutral', 'happy', 'sad', 'surprised'] * 20)
+    X[y == 'happy', 4] += 3
+    h = emotion_fit.fit_head(X, y)                     # defaults: the 8 logits, C 0.01
+    assert list(h.cols) == list(LOGITS) and h.coef.shape == (4, 8)
+    noisy = X.copy()
+    noisy[:, 8:] = rng.normal(size=(80, N_FEATURES - 8)) * 100      # blendshapes are ignored
+    assert np.allclose(h.predict(X), h.predict(noisy))
+    h.save(tmp_path / 'h.npz')
+    g = Head.load(tmp_path / 'h.npz')
+    assert list(g.cols) == list(LOGITS) and np.allclose(g.predict(X), h.predict(X))
+
+
+def test_head_rejects_a_mean_or_scale_that_does_not_match_its_columns():
+    with pytest.raises(ValueError):
+        Head(('neutral', 'happy'), np.zeros(N_FEATURES), np.ones(8), np.zeros((2, 8)), np.zeros(2), 0.5, 0.5, 0.3,
+             cols=range(8))
+
+
+def test_an_old_head_file_without_columns_reads_all_features(tmp_path, caplog):
+    np.savez(tmp_path / 'old.npz', labels=np.array(['neutral', 'happy']), mean=np.zeros(N_FEATURES),
+             scale=np.ones(N_FEATURES), coef=np.zeros((2, N_FEATURES)), intercept=np.zeros(2),
+             smoothing=np.array([0.5, 0.5, 0.3]), info=np.array(''))
+    assert len(Head.load(tmp_path / 'old.npz').cols) == N_FEATURES
+    assert 'refit' in caplog.text
+
+
+def test_session_median_without_neutral_frames_is_none():
+    smile = np.tile(feats_of('Happiness'), (10, 1))
+    clip = ('c', 'happy', False, np.arange(10) * 0.04, smile)
+    assert emotion_fit.session_median([clip]) is None
+    calm = np.tile(feats_of('Neutral', 1.0), (10, 1))
+    assert np.array_equal(emotion_fit.session_median([clip, ('d', 'neutral', False, np.arange(10) * 0.04, calm)]),
+                          feats_of('Neutral', 1.0))
