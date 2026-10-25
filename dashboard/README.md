@@ -63,6 +63,17 @@ These are in docs/TEAM_TASKS_AND_INTERFACES.md; the screen works without them an
   bars (decoder).
 - `timing.dec` `{stage: 'lock' | 'window', ms}` (decoder).
 
+## End screen
+
+When the call ends, the screen shows `CallState.summary()`: the story line, four stats, two charts, the latency strip and the call as a chat.
+
+- **Words wrong** is word error per reader on a scored recording, read at start from `$RECLAIM_WORKDIR/results/wer_session3.json` (or `--benchmark PATH`).
+  The file is `{"session": "session_03", "lips": 22.0, "lips_muscles": 14.0, "claude": 4.0}`, in percent.
+  Without it the chart shows the design's sample values in brackets with a "placeholder" tag: the one exception to "nothing is made up", and it says so on screen.
+- **How he sounded** counts Austin's sentences by the tone they were spoken with (`cam.tick` `emotion`).
+- **The call** is the transcript as a chat; a long call keeps the newest messages that fit and counts the rest.
+- **Logos:** Cartesia's are from [cartesia.ai/brand](https://www.cartesia.ai/brand), unaltered as their guidelines require; Claude's mark is from Simple Icons.
+
 ## Test
 
 ```bash
