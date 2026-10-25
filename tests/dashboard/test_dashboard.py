@@ -168,7 +168,7 @@ def test_server_decodes_skips_bad_frames_and_keeps_the_newest_preview():
     d.handle(encode('partner.text', {'text': 'hello', 'is_final': True, 't': 1.0}))
     d.handle([b'partner.text', b'\xc1 not msgpack'])
     d.handle(encode('cam.preview', {'t': 1.0, 'w': 640, 'h': 360, 'jpeg': b'\xff\xd8jpeg'}))
-    assert d.state.transcript[-1]['text'] == 'hello' and d.preview == b'\xff\xd8jpeg' and d.preview_seq == 1
+    assert d.state.transcript[-1]['text'] == 'hello' and d.frame.endswith(b'\xff\xd8jpeg')
 
 
 async def test_websocket_sends_snapshots_and_the_camera_mirror(aiohttp_client):
@@ -185,7 +185,8 @@ async def test_websocket_sends_snapshots_and_the_camera_mirror(aiohttp_client):
         got.append(m.data)
         if isinstance(m.data, bytes):
             break
-    assert b'\xff\xd8frame' in got
+    frame = next(g for g in got if isinstance(g, bytes))
+    assert frame.startswith(b'RCF1') and frame.endswith(b'\xff\xd8frame')
     page = await client.get('/')
     assert page.status == 200 and 'app.js' in await page.text()
     css = await client.get('/static/style.css')
@@ -273,6 +274,46 @@ def test_end_summary_is_built_once():
     st = fed(('call.state', {'state': 'connected'}), ('call.state', {'state': 'ended'}))
     first = st.snapshot(10.0)['summary']
     assert st.snapshot(20.0)['summary'] is first
+
+
+def unpack(frame):
+    import struct
+    n = struct.unpack('>I', frame[4:8])[0]
+    return json.loads(frame[8:8 + n]), frame[8 + n:]
+
+
+def test_each_preview_frame_carries_the_face_points_of_that_frame():
+    from dashboard.server import Dashboard
+    d = Dashboard(endpoints={'none': 'inproc://dashboard-test-none'})
+    a = [[0.1, 0.2]] * 478
+    b = [[0.3, 0.4]] * 478
+    d.handle(encode('cam.face', {'t': 10.00, 'w': 640, 'h': 360, 'face_ok': True, 'pts': a}))
+    d.handle(encode('cam.face', {'t': 10.08, 'w': 640, 'h': 360, 'face_ok': True, 'pts': b}))
+    d.handle(encode('cam.preview', {'t': 10.07, 'w': 640, 'h': 360, 'jpeg': b'\xff\xd8x'}))
+    head, jpeg = unpack(d.frame)
+    assert head['pts'][0] == [0.3, 0.4] and head['t'] == 10.07 and jpeg == b'\xff\xd8x'
+    d.handle(encode('cam.preview', {'t': 10.50, 'w': 640, 'h': 360, 'jpeg': b'\xff\xd8y'}))
+    assert unpack(d.frame)[0]['pts'] is None                     # no face from that moment
+    own = [[0.5, 0.6]] * 478
+    d.handle(encode('cam.preview', {'t': 10.51, 'w': 640, 'h': 360, 'jpeg': b'\xff\xd8z', 'pts': own}))
+    assert unpack(d.frame)[0]['pts'][0] == [0.5, 0.6]            # the frame's own points win
+
+
+def test_bad_face_points_never_stop_the_dashboard():
+    from dashboard.server import Dashboard
+    d = Dashboard(endpoints={'none': 'inproc://dashboard-test-none'})
+    d.handle(encode('cam.face', {'t': 5.0, 'w': 640, 'h': 360, 'face_ok': True, 'pts': [[0.1, 0.2], [0.3]]}))
+    d.handle(encode('cam.preview', {'t': 5.0, 'w': 640, 'h': 360, 'jpeg': b'\xff\xd8a', 'pts': [1, 2, 3]}))
+    head, jpeg = unpack(d.frame)
+    assert head['pts'] is None and jpeg == b'\xff\xd8a'        # the picture still goes out
+
+
+def test_a_preview_with_x_y_z_points_keeps_them():
+    from dashboard.server import Dashboard
+    d = Dashboard(endpoints={'none': 'inproc://dashboard-test-none'})
+    own = [[0.5, 0.6, -0.02]] * 478
+    d.handle(encode('cam.preview', {'t': 1.0, 'w': 640, 'h': 360, 'jpeg': b'\xff\xd8z', 'pts': own}))
+    assert unpack(d.frame)[0]['pts'][0] == [0.5, 0.6, -0.02]
 
 
 def test_end_summary_counts_austins_tones_in_order(shots):

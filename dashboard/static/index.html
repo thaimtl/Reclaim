@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Reclaim live call</title>
+<title>Silent Voice live call</title>
 <link rel="stylesheet" href="/static/fonts/fonts.css">
 <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -43,7 +43,6 @@
       </footer>
     </section>
     <section id="right">
-      <img id="cam" alt="" class="hidden">
       <canvas id="mesh" width="760" height="1080"></canvas>
       <div id="cam-empty">Connecting to the camera</div>
       <img id="mouth-ring" src="/static/icons/mouth-ring.svg" alt="" class="hidden">
@@ -51,6 +50,7 @@
       <div class="chip" id="chip"><i></i><span>Neutral face</span></div>
       <div class="lips-off hidden" id="lips-off">Lips out of view<small>The muscle sensors are carrying the caption</small></div>
       <div id="pads"></div>
+      <div class="calib hidden" id="calib" role="status"></div>
       <div class="heard">
         <div class="row"><span>Heard on the call, in Austin's voice</span><span id="tone"></span></div>
         <div class="quote" id="heard"></div>
@@ -66,7 +66,7 @@
     <section id="end-main">
       <div class="call" id="end-call"></div>
       <h1 id="end-head"></h1>
-      <p class="why">Reclaim gives people who lost their voice box their own voice back, on every call.</p>
+      <p class="why">Silent Voice gives people who lost their voice box their own voice back, on every call.</p>
       <div class="stats" id="end-stats"></div>
       <div class="charts">
         <div class="chart"><h3>Words wrong <span class="ph-tag" id="end-ph">placeholder</span></h3><p id="end-wer-sub"></p>
