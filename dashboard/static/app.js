@@ -1,19 +1,28 @@
 // Reclaim live dashboard: draws each snapshot from dashboard/server.py (dashboard/state.py) as Thai's Figma v5.
-// Text frames are snapshots (JSON); binary frames are the lip reader's camera mirror (cam.preview JPEG).
+// Text frames are snapshots (JSON); binary frames are the lip reader's camera mirror (cam.preview JPEG) with the
+// face points of that same video frame (dashboard/server.py pack_frame).
 'use strict';
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const SRC = { camera: 'camera', emg: 'emg', claude: 'claude', lips: 'camera', muscles: 'emg' };
 const TONE_COLOR = { happy: '--warm', sad: '--concerned', neutral: '--calm', surprised: '--surprised', angry: '--firm' };
-// MediaPipe landmark each pad sits on (HARDWARE.md: A0 under the chin, A1 left chin corner, A2 right cheek below
-// the mouth, A3 left cheek above the mouth; "left" is Austin's left, the image's right), and which way its label goes.
-const PAD_AT = { A0: { lm: 152, dy: 0.035, flip: false }, A1: { lm: 400, dy: 0, flip: false },
-                 A2: { lm: 202, dy: 0, flip: true }, A3: { lm: 425, dy: 0, flip: false } };
+// Where each pad sits (HARDWARE.md: A0 under the chin, A1 left chin corner, A2 right cheek below the mouth, A3 left
+// cheek above the mouth; "left" is Austin's left, the image's right): a MediaPipe landmark plus a and b times his
+// face's own axes (down: nose bridge to chin, across: cheek to cheek), so it scales and turns with his head. If the
+// pads went on somewhere else this session, press C on the dashboard and click them (saved in this browser).
+// measured on Austin's session-2 video at his electrode pairs' centres (they land within a few px on other clips)
+const PAD_DEFAULT = {
+  A0: { lm: 152, a: 0.1092, b: -0.0342, left: false }, A1: { lm: 379, a: -0.0212, b: -0.0043, left: false },
+  A2: { lm: 150, a: -0.0298, b: 0.021, left: true }, A3: { lm: 411, a: 0.0126, b: -0.0134, left: false },
+};
+const AXIS = { top: 168, chin: 152, left: 234, right: 454 };
+const PAD_ORDER = ['A0', 'A1', 'A2', 'A3'];
 const MOUTH = { left: 61, right: 291, top: 13, bottom: 14 };
 const W = 760, H = 1080, PREVIEW_STALE_MS = 2000;
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
 let snap = null, lastPreview = -Infinity, speaking = false, toneLabel = 'neutral';
+let frame = null, framePending = false, lastFace = null;    // the newest video frame and the face it was drawn with
 
 // ---- the 1920 x 1080 stage, scaled to the window -------------------------------------------------------
 function fit() {
@@ -25,12 +34,10 @@ addEventListener('resize', fit); fit();
 // ---- connection ------------------------------------------------------------------------------------------
 function connect() {
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
-  ws.binaryType = 'blob';
+  ws.binaryType = 'arraybuffer';
   ws.onmessage = e => {
     if (typeof e.data === 'string') { snap = JSON.parse(e.data); render(snap); return; }
-    const img = $('cam'), old = img.src;
-    img.src = URL.createObjectURL(e.data); lastPreview = performance.now();
-    if (old.startsWith('blob:')) URL.revokeObjectURL(old);
+    onFrame(e.data);
   };
   ws.onclose = () => setTimeout(connect, 1000);
 }
@@ -142,15 +149,143 @@ function coverMap(size) {           // processed-frame normalized coords -> 760 
   return (x, y) => [ox + x * fw * k, oy + y * fh * k];
 }
 
+// ---- face filter: the picture and the pads on it, drawn in the same animation frame -------------------------
+// A frame is decoded off the main thread (createImageBitmap) and drawn at the next screen refresh together with
+// the pads placed on that frame's own face points, so the pads can't trail the video. No smoothing on top: MediaPipe's
+// video mode already steadies its points (measured on his session-2 videos: 0.44 px of frame-to-frame jitter on this
+// 760 px panel), and a One Euro filter on top only left the pads up to 6 px behind his face when he moved.
+let frameSeq = 0;
+async function onFrame(buf) {
+  const seq = ++frameSeq;
+  try {
+    const dv = new DataView(buf);
+    if (dv.getUint32(0) !== 0x52434631) return;           // 'RCF1'
+    const n = dv.getUint32(4), head = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 8, n)));
+    const bitmap = await createImageBitmap(new Blob([new Uint8Array(buf, 8 + n)], { type: 'image/jpeg' }));
+    if (frame && frame.seq > seq) { bitmap.close(); return; }   // a newer frame finished decoding first
+    if (frame) frame.bitmap.close();
+    frame = { bitmap, seq, ...head };
+    lastPreview = performance.now();
+    if (!framePending) { framePending = true; requestAnimationFrame(drawFrame); }
+  } catch (err) { /* a bad frame is skipped; the next one replaces it */ }
+}
+
+function drawFrame() {
+  framePending = false;
+  if (!frame) return;
+  const f = frame, size = [f.w || f.bitmap.width, f.h || f.bitmap.height];
+  const k = Math.max(W / size[0], H / size[1]);
+  const g = $('mesh').getContext('2d');
+  g.drawImage(f.bitmap, (W - size[0] * k) / 2, (H - size[1] * k) / 2, size[0] * k, size[1] * k);
+  if (f.pts) lastFace = { pts: f.pts, size };
+  placeOverlays(lastFace);
+}
+
+// the face's points on the panel, and its own axes there
+function faceOnPanel(face) {
+  const map = coverMap(face.size), P = face.pts.map(([x, y]) => map(x, y));
+  const U = [P[AXIS.chin][0] - P[AXIS.top][0], P[AXIS.chin][1] - P[AXIS.top][1]];
+  const V = [P[AXIS.right][0] - P[AXIS.left][0], P[AXIS.right][1] - P[AXIS.left][1]];
+  return { P, U, V };
+}
+
+function placeOverlays(face) {
+  const ring = $('mouth-ring'), pads = [...$('pads').children];
+  if (!face || !snap || !snap.face_ok) {          // no face: the pads wait at their usual places
+    ring.classList.add('hidden');
+    layoutCallouts(pads, PAD_ORDER.map(pin => PAD_FALLBACK[pin]), 270, 490);
+    return;
+  }
+  const { P, U, V } = faceOnPanel(face);
+  const [lx, ly] = P[MOUTH.left], [rx, ry] = P[MOUTH.right], [, ty] = P[MOUTH.top], [, by] = P[MOUTH.bottom];
+  const cx = (lx + rx) / 2, cy = (ty + by) / 2, w = Math.hypot(rx - lx, ry - ly) * 1.9, h = w * 82 / 183;
+  Object.assign(ring.style, { width: w + 'px', height: h + 'px', left: cx - w / 2 + 'px', top: cy - h / 2 + 'px',
+                              transform: `rotate(${Math.atan2(ry - ly, rx - lx)}rad)` });
+  ring.classList.remove('hidden');
+  const dots = PAD_ORDER.map(pin => {
+    const at = padAt[pin], p = P[at.lm] || P[0];
+    return [p[0] + at.a * U[0] + at.b * V[0], p[1] + at.a * U[1] + at.b * V[1]];
+  });
+  layoutCallouts(pads, dots, Math.min(P[AXIS.left][0], P[AXIS.right][0]), Math.max(P[AXIS.left][0], P[AXIS.right][0]));
+}
+
+const PAD_FALLBACK = { A0: [378, 672], A1: [489, 616], A2: [270, 616], A3: [489, 516] };   // no face yet
+
+// Callouts: each dot sits on its electrode; its label sits in a column beside his face (each pad has its side, set
+// where it was clicked), in the dots' order top to bottom, joined to it by a line. Labels never overlap each other
+// or jump sides; on a close-up with no room beside his face, they keep to the panel's edges.
+const GAP = 28, ROW = 40, LABEL_MAX_Y = 820;          // label rows stay clear of "Heard on the call"
+function layoutCallouts(pads, dots, faceLeft, faceRight) {
+  for (const left of [true, false]) {
+    const idx = dots.map((d, i) => i).filter(i => pads[i] && (padAt[PAD_ORDER[i]].left !== false) === left)
+      .sort((a, b) => dots[a][1] - dots[b][1]);
+    let prev = -Infinity;
+    const ys = idx.map(i => (prev = Math.max(dots[i][1], prev + ROW)));
+    const over = ys.length ? Math.max(0, ys[ys.length - 1] - LABEL_MAX_Y) : 0;   // too low: the column moves up
+    idx.forEach((i, j) => {
+      const el = pads[i], pill = el.querySelector('.pill'), [x, y] = dots[i], ly = ys[j] - over;
+      const w = pill.offsetWidth || 300;
+      const lx = left ? Math.max(8, faceLeft - GAP - w) : Math.min(W - 8 - w, faceRight + GAP);
+      Object.assign(el.querySelector('.pdot').style, { left: `${x - 12}px`, top: `${y - 12}px` });
+      Object.assign(pill.style, { left: `${lx}px`, top: `${ly - 15.5}px` });
+      const ex = left ? lx + w : lx, line = el.querySelector('line');
+      line.setAttribute('x1', x); line.setAttribute('y1', y); line.setAttribute('x2', ex); line.setAttribute('y2', ly);
+    });
+  }
+}
+
+// ---- pad calibration: press C, then click A0, A1, A2, A3 where they are on his face -------------------------
+let padAt = loadPads(), calib = null;
+function loadPads() {
+  try { return { ...PAD_DEFAULT, ...JSON.parse(localStorage.getItem('reclaim.pads') || '{}') }; }
+  catch { return { ...PAD_DEFAULT }; }
+}
+function savePads() {
+  try { localStorage.setItem('reclaim.pads', JSON.stringify(padAt)); } catch { /* this session keeps them */ }
+}
+const PAD_PLACE = { A0: 'under his chin', A1: 'his left chin corner', A2: 'his right cheek below the mouth',
+                    A3: 'his left cheek above the mouth' };
+
+function calibHint() {
+  const el = $('calib');
+  el.classList.toggle('hidden', !calib);
+  if (calib) el.textContent = `Click pad ${PAD_ORDER[calib.i]} (${PAD_PLACE[PAD_ORDER[calib.i]]}). Esc cancels.`;
+}
+addEventListener('keydown', e => {
+  if (e.key === 'c' || e.key === 'C') {
+    if (e.shiftKey) { padAt = { ...PAD_DEFAULT }; savePads(); calib = null; }
+    else calib = lastFace ? { i: 0, next: { ...padAt } } : null;
+    calibHint();
+  } else if (e.key === 'Escape' && calib) { calib = null; calibHint(); }
+});
+$('right').addEventListener('click', e => {
+  if (!calib || !lastFace) return;
+  const r = $('right').getBoundingClientRect(), k = r.width / W;
+  const cx = (e.clientX - r.left) / k, cy = (e.clientY - r.top) / k;
+  const { P, U, V } = faceOnPanel(lastFace);
+  let lm = 0;
+  P.forEach((p, i) => { if (Math.hypot(p[0] - cx, p[1] - cy) < Math.hypot(P[lm][0] - cx, P[lm][1] - cy)) lm = i; });
+  const dx = cx - P[lm][0], dy = cy - P[lm][1], det = U[0] * V[1] - U[1] * V[0];     // dx,dy = a U + b V
+  if (Math.abs(det) < 1e-6) return;
+  const mid = (P[AXIS.left][0] + P[AXIS.right][0]) / 2;
+  calib.next[PAD_ORDER[calib.i]] = { lm, a: (dx * V[1] - dy * V[0]) / det, b: (U[0] * dy - U[1] * dx) / det,
+                                     left: cx < mid };
+  if (++calib.i === PAD_ORDER.length) { padAt = calib.next; savePads(); calib = null; }
+  calibHint();
+});
+
 function renderCamera(s) {
   const previewOn = performance.now() - lastPreview < PREVIEW_STALE_MS;
-  $('cam').classList.toggle('hidden', !previewOn);
-  const face = s.face, map = coverMap(face && face.size);
+  const face = s.face;
   const mesh = $('mesh'), g = mesh.getContext('2d');
-  g.clearRect(0, 0, W, H);
-  if (!previewOn && face) {          // no mirrored video yet: the face mesh from cam.face
-    g.fillStyle = 'rgba(201,209,217,.55)';
-    for (const [x, y] of face.pts) { const [px, py] = map(x, y); g.fillRect(px - 1, py - 1, 2, 2); }
+  if (!previewOn) {                  // no mirrored video: the face mesh from cam.face, and the pads on it
+    g.clearRect(0, 0, W, H);
+    if (face) {
+      const map = coverMap(face.size);
+      g.fillStyle = 'rgba(201,209,217,.55)';
+      for (const [x, y] of face.pts) { const [px, py] = map(x, y); g.fillRect(px - 1, py - 1, 2, 2); }
+      lastFace = face;
+    }
   }
   $('cam-empty').classList.toggle('hidden', previewOn || !!face);
   $('cam-empty').textContent = s.status.text.startsWith('Camera') ? 'Camera: no signal' : 'Waiting for the camera';
@@ -161,32 +296,20 @@ function renderCamera(s) {
   chip.querySelector('i').style.background = !s.face_ok || !s.muscles ? '#8b95a1' : css(TONE_COLOR[s.emotion.label] || '--calm');
   $('lips-off').classList.toggle('hidden', s.face_ok);
 
-  const ring = $('mouth-ring');
-  if (face && s.face_ok) {
-    const p = i => map(face.pts[i][0], face.pts[i][1]);
-    const [lx, ly] = p(MOUTH.left), [rx, ry] = p(MOUTH.right), [, ty] = p(MOUTH.top), [, by] = p(MOUTH.bottom);
-    const w = Math.abs(rx - lx) * 1.9, h = w * 82 / 183;
-    Object.assign(ring.style, { width: w + 'px', height: h + 'px', left: (lx + rx) / 2 - w / 2 + 'px', top: (ty + by) / 2 - h / 2 + 'px' });
-    ring.classList.remove('hidden');
-  } else ring.classList.add('hidden');
-
-  const placed = [];                 // label rows already taken: a pad that would overlap one moves up a row
-  $('pads').innerHTML = s.pads.map(p => {
-    const at = PAD_AT[p.pin];
-    let x, y;
-    if (face) { [x, y] = map(face.pts[at.lm][0], face.pts[at.lm][1] + at.dy); }
-    else { [x, y] = { A0: [378, 672], A1: [489, 616], A2: [270, 616], A3: [489, 516] }[p.pin]; }
-    y = Math.min(y, 820);              // clear of "Heard on the call"
-    const flip = at.flip ? x - 300 > 0 : x + 300 > W;      // the label goes to whichever side has room
-    const span = flip ? [x - 300, x + 12] : [x - 12, x + 300];
-    while (placed.some(q => Math.abs(q.y - y) < 38 && q.span[0] < span[1] && span[0] < q.span[1])) y -= 40;
-    placed.push({ y, span });
-    const lit = Math.round(p.level * 20), on = s.muscles && p.contact;
-    const segs = Array.from({ length: 20 }, (_, i) => `<i class="${on && i < lit ? 'lit' : ''}"></i>`).join('');
-    const cls = `pad${flip ? ' flip' : ''}${on ? (p.level > 0.15 ? ' on' : '') : ' off'}`;
-    const style = flip ? `right:${W - x - 12}px;top:${y - 15}px` : `left:${x - 12}px;top:${y - 15}px`;
-    return `<div class="${cls}" style="${style}"><span class="pdot"></span><span class="pill">${esc(p.name)}<span class="segs">${segs}</span></span></div>`;
-  }).join('');
+  const box = $('pads');             // the pads' content per snapshot; where they sit is set per video frame
+  if (box.children.length !== s.pads.length) {
+    box.innerHTML = s.pads.map(() => `<div class="pad"><svg width="${W}" height="${H}"><line/></svg>` +
+      '<span class="pdot"></span><span class="pill"><span class="pn"></span>' +
+      `<span class="segs">${'<i></i>'.repeat(20)}</span></span></div>`).join('');
+  }
+  s.pads.forEach((p, i) => {
+    const el = box.children[i], on = s.muscles && p.contact, lit = Math.round(p.level * 20);
+    el.classList.toggle('on', on && p.level > 0.15);
+    el.classList.toggle('off', !on);
+    el.querySelector('.pn').textContent = p.name;
+    [...el.querySelectorAll('.segs i')].forEach((seg, j) => seg.classList.toggle('lit', on && j < lit));
+  });
+  if (!previewOn) placeOverlays(face && s.face_ok ? face : lastFace);
 
   const a = s.austin;
   const heard = a && a.spoken ? a.spoken : '';

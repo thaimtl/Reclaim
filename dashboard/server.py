@@ -5,17 +5,23 @@
     python -m dashboard.demo_feed; the dashboard can't tell them from a live call.
 
 It only listens (SUB to every endpoint in bus/team.py), so it can start and stop at any time without touching
-the call. Snapshots go out SNAPSHOT_HZ times a second as JSON text frames; cam.preview JPEGs (the lip reader's
-mirror of the webcam) go out as binary frames, the newest one at most PREVIEW_HZ times a second, so a slow browser
-gets fewer frames, never a backlog.
+the call. Snapshots go out SNAPSHOT_HZ times a second as JSON text frames. Each cam.preview JPEG (the lip reader's
+mirror of the webcam) goes out the moment it arrives, as one binary frame with the face points of that same video
+frame (FRAME_MAGIC, header length, JSON header {t, w, h, pts}, JPEG), so the page draws the picture and the pads on
+it in the same paint: the pads stay on his face like a camera filter, never a frame behind. Points come from the
+preview message itself if the camera reader puts them there, else from the cam.face nearest in time. A browser
+that is slower than the camera gets the newest frame, never a backlog.
 """
 import argparse
 import asyncio
 import json
 import logging
 import os
+import struct
 import time
+from collections import deque
 
+import numpy as np
 import zmq
 import zmq.asyncio
 from aiohttp import WSMsgType, web
@@ -31,7 +37,8 @@ STATIC = os.path.join(HERE, 'static')
 TOPICS = ('call.state', 'partner.text', 'dec.', 'claude.repair', 'voice.say', 'cam.tick', 'cam.face',
           'cam.preview', 'emg.raw', 'timing.')
 SNAPSHOT_HZ = 15
-PREVIEW_HZ = 15
+FRAME_MAGIC = b'RCF1'   # binary frame: magic, 4-byte big-endian header length, JSON header, JPEG
+FACE_MATCH_S = 0.06     # a cam.face this close in time is the preview frame's own (the camera runs at ~12.5 Hz)
 LOG_FRESH_S = 5.0   # the logger flushes every 0.2 s: older than this, it isn't running
 
 
@@ -41,8 +48,9 @@ class Dashboard:
         self.endpoints = dict(endpoints or ENDPOINTS)
         self.ctx = ctx or zmq.asyncio.Context.instance()
         self.clients = set()
-        self.preview = None              # newest cam.preview JPEG bytes, sent once to each client
-        self.preview_seq = 0
+        self.frame = None                # newest binary frame for the page: the JPEG and its face points
+        self.viewers = {}                # websocket -> [newest frame not sent yet, asyncio.Event]: one sender each
+        self.faces = deque(maxlen=40)    # recent cam.face (t, pts): each preview frame takes its own
         self.tasks = []
 
     def subscribe(self):
@@ -63,12 +71,35 @@ class Dashboard:
         if topic == 'cam.preview':
             jpeg = msg.get('jpeg')
             if isinstance(jpeg, (bytes, bytearray)) and jpeg:
-                self.preview, self.preview_seq = bytes(jpeg), self.preview_seq + 1
+                try:
+                    self.frame = pack_frame(msg, self.face_for(msg))
+                except (TypeError, ValueError):         # malformed points: the picture alone
+                    self.frame = pack_frame(msg, None)
+                for slot in self.viewers.values():
+                    slot[0] = self.frame
+                    slot[1].set()
             return
+        if topic == 'cam.face' and msg.get('face_ok') and msg.get('pts') is not None:
+            try:
+                self.faces.append((float(msg['t']), points(msg['pts'])))
+            except (KeyError, TypeError, ValueError):   # malformed: not kept
+                pass
         try:
             self.state.feed(topic, msg, bus.now())
         except Exception:  # noqa: BLE001  one odd message must not stop the screen
             log.exception('bad %s message', topic)
+
+    def face_for(self, msg):
+        """The face points of a preview frame: its own (if the camera reader sends them), else the cam.face closest
+        in time within FACE_MATCH_S, else None (the page then keeps its last placement)."""
+        if msg.get('pts') is not None:
+            return points(msg['pts'])
+        try:
+            t = float(msg['t'])
+        except (KeyError, TypeError, ValueError):
+            return None
+        best = min(self.faces, key=lambda f: abs(f[0] - t), default=None)
+        return best[1] if best is not None and abs(best[0] - t) <= FACE_MATCH_S else None
 
     async def bus_loop(self):
         sock = self.subscribe()
@@ -88,8 +119,18 @@ class Dashboard:
         if time.time() - newest < LOG_FRESH_S:
             self.state.logging(bus.now())
 
+    async def send_frames(self, ws, slot):
+        """One page's sender: the newest frame, as soon as there is one, so a slow page skips frames and never holds up
+        another page."""
+        while True:
+            await slot[1].wait()
+            slot[1].clear()
+            frame, slot[0] = slot[0], None
+            if frame is not None:
+                await ws.send_bytes(frame)
+
     async def push_loop(self):
-        sent_preview, period, k = 0, 1.0 / SNAPSHOT_HZ, 0
+        period, k = 1.0 / SNAPSHOT_HZ, 0
         while True:
             await asyncio.sleep(period)
             k += 1
@@ -102,28 +143,28 @@ class Dashboard:
             except Exception:  # noqa: BLE001  a bad state skips one frame; the screen keeps updating
                 log.exception('snapshot failed')
                 continue
-            preview = self.preview if self.preview_seq != sent_preview and k % max(1, SNAPSHOT_HZ // PREVIEW_HZ) == 0 \
-                else None
-            if preview is not None:
-                sent_preview = self.preview_seq
             for ws in list(self.clients):
                 try:
                     await ws.send_str(text)
-                    if preview is not None:
-                        await ws.send_bytes(preview)
                 except (ConnectionError, RuntimeError):
                     self.clients.discard(ws)
 
     async def websocket(self, request):
-        ws = web.WebSocketResponse(heartbeat=10)
+        ws = web.WebSocketResponse(heartbeat=10, compress=False)     # JPEGs are compressed already
         await ws.prepare(request)
         self.clients.add(ws)
+        slot = self.viewers[ws] = [self.frame, asyncio.Event()]
+        if self.frame is not None:
+            slot[1].set()
+        sender = asyncio.create_task(self.send_frames(ws, slot))
         try:
             async for m in ws:
                 if m.type == WSMsgType.ERROR:
                     break
         finally:
+            sender.cancel()
             self.clients.discard(ws)
+            self.viewers.pop(ws, None)
         return ws
 
     async def index(self, request):
@@ -146,6 +187,19 @@ class Dashboard:
         app.on_startup.append(start)
         app.on_cleanup.append(stop)
         return app
+
+
+def points(pts):
+    """Face points as (N, 2) floats; ValueError if they aren't."""
+    return np.asarray(pts, np.float64).reshape(-1, 2)
+
+
+def pack_frame(msg, pts):
+    """A preview frame for the page: FRAME_MAGIC, header length, JSON header (t, w, h, pts rounded), JPEG."""
+    head = json.dumps({'t': msg.get('t'), 'w': msg.get('w'), 'h': msg.get('h'),
+                       'pts': None if pts is None else np.round(points(pts), 4).tolist()},
+                      separators=(',', ':')).encode()
+    return FRAME_MAGIC + struct.pack('>I', len(head)) + head + bytes(msg['jpeg'])
 
 
 def main():
