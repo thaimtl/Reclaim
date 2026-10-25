@@ -81,7 +81,7 @@ All code lives in this repo; datasets, checkpoints, results and Python environme
 | `claude_service/` | The Claude service: predicts Austin's next words and repairs look-alikes (`brain.py`), on the bus (`service.py`) |
 | `demo/dashboard/` | Captions dashboard prototype, sample data ([demo/dashboard/README.md](demo/dashboard/README.md)) |
 | `call/` | The phone call: Twilio, Austin's cloned voice (Cartesia Sonic) and the judge's captions (Cartesia Ink) ([call/README.md](call/README.md)) |
-| `figures/` | The SVR-1 architecture figure and the script that draws it |
+| `figures/` | The SVR-1 architecture figure, the SVR-1 vs Gaddy & Klein results (`svr1_vs_gaddy_4ch*`), and the scripts that draw them |
 | `tests/` | Smoke and unit tests |
 | `docs/` | Plans and specs, Markdown with PDF copies |
 
