@@ -40,6 +40,13 @@ def test_a_still_face_reads_zero_despite_hum_and_drift():
     assert (lv[100:] > 0.15).mean() < 0.02                   # hum and drift are filtered out, noise is the floor
 
 
+def test_a_held_contraction_stays_lit():
+    pl = PadLevels(4)
+    feed(pl, raw(4.0))
+    lv = feed(pl, raw(8.0, burst=2))
+    assert lv[-1][2] > 0.6
+
+
 def test_a_muscle_burst_fills_its_own_pad_only():
     pl = PadLevels(4)
     feed(pl, raw(4.0))                                        # rest first: each pad learns its floor
