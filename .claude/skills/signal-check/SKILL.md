@@ -1,6 +1,6 @@
 ---
 name: signal-check
-description: Run and read the pre-recording signal check on the Reclaim pad rig, on macOS or Windows. Use when someone wants to test channels, check pad contact or hum, or asks whether the signal looks good. It is QA before data collection, not data collection.
+description: Run and read the pre-recording signal check on the Silent Voice pad rig, on macOS or Windows. Use when someone wants to test channels, check pad contact or hum, or asks whether the signal looks good. It is QA before data collection, not data collection.
 ---
 
 # Signal check

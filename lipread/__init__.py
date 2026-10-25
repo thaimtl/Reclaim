@@ -1,4 +1,4 @@
-"""Live lip-reading engine for Reclaim free speech (plan: docs/EVAN_REALTIME_LIP_READING.md, docs/REALTIME_PIPELINE.md).
+"""Live lip-reading engine for Silent Voice free speech (plan: docs/EVAN_REALTIME_LIP_READING.md, docs/REALTIME_PIPELINE.md).
 
 Webcam -> mouth crops -> Auto-AVSR encoder re-reads the current segment every 100 ms -> cam.tick / cam.final on the
 team bus (ZeroMQ + msgpack, bus/__init__.py, bus/schema.md).

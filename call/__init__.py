@@ -1,4 +1,4 @@
-"""Reclaim call service (Frank): the Twilio phone call, Austin's voice (Cartesia Sonic) and the judge's words (Ink).
+"""Silent Voice call service (Frank): the Twilio phone call, Austin's voice (Cartesia Sonic) and the judge's words (Ink).
 How it flows (Mermaid): call/README.md.
 
 Interfaces: docs/TEAM_TASKS_AND_INTERFACES.md (topics voice.say, partner.text, cam.tick); how it fits the system:

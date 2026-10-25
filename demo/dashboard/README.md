@@ -1,4 +1,4 @@
-# Reclaim dashboard (design prototype)
+# Silent Voice dashboard (design prototype)
 
 Run with the live webcam:
 

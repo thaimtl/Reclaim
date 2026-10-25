@@ -1,6 +1,6 @@
-# Reclaim's real-time pipeline
+# Silent Voice's real-time pipeline
 
-Reclaim turns silently mouthed speech into live captions and a live voice. In the demo, Austin calls a judge on the phone (through Twilio). The judge talks normally; Austin only mouths, mouth open, no sound. His words appear on screen as he mouths them and play into the call in his own cloned voice, with the emotion on his face, while he is still mouthing. The judge's words, transcribed from the call, appear in the same captions. Everything runs on one laptop (RTX 5060, 115 W), and the goal at every step is the lowest possible delay.
+Silent Voice turns silently mouthed speech into live captions and a live voice. In the demo, Austin calls a judge on the phone (through Twilio). The judge talks normally; Austin only mouths, mouth open, no sound. His words appear on screen as he mouths them and play into the call in his own cloned voice, with the emotion on his face, while he is still mouthing. The judge's words, transcribed from the call, appear in the same captions. Everything runs on one laptop (RTX 5060, 115 W), and the goal at every step is the lowest possible delay.
 
 Three readers work together, because each one sees something the others cannot. The camera reads the lips. The EMG model reads the muscles under the skin. Claude reads the conversation. Every 100 ms, one joint search in the middle combines them, and each word is locked in as soon as the three together are confident enough.
 
@@ -169,7 +169,7 @@ Claude runs through the Claude API, as `claude-opus-5-5` at low effort. The rule
 
 ## The voice and the call
 
-The voice is Frank's part. It is Cartesia Sonic 3.6 with an Instant Voice Clone of Austin, made from his own recordings with his consent. For each sentence the system opens one streaming context on Cartesia's WebSocket and sends words as they lock and clear the repair window, marking each input as "more to come" so that the prosody flows across the pieces. Speed, volume and emotion are set per sentence through `generation_config` and changed within a sentence through inline `<speed>`, `<volume>` and `<emotion>` tags: speed and volume from SVR-1's pace and effort, which arrive with every word as numbers relative to Austin's normal (1.0), and emotion from the camera's facial expression.
+The voice is Frank's part. It is Cartesia Sonic 3.6 with an Instant Voice Clone of Austin, made from his own recordings with his consent. For each sentence the system opens one streaming context on Cartesia's WebSocket and sends the words that lock and clear the repair window as natural phrases, marking each as "more to come" so that the prosody flows across the pieces: a phrase goes when Austin pauses (his decoder shows no word being mouthed) or after about four words. A word sent alone would be said like a one-word sentence; phrases sound like a person talking, at his pauses, about a second behind his lips, which on a phone call sounds like ordinary speech. Speed, volume and emotion are set per sentence through `generation_config` and changed within a sentence through inline `<speed>`, `<volume>` and `<emotion>` tags: speed and volume from SVR-1's pace and effort, which arrive with every word as numbers relative to Austin's normal (1.0), and emotion from the camera's facial expression.
 
 The audio goes straight into the Twilio call, so the judge hears Austin's voice on the phone. The call's incoming audio, the judge's voice, goes to Cartesia Ink, whose transcript feeds the captions and Claude. The phone network adds its usual delay in both directions, like any phone call; the dashboard shows the captions with the delay the system actually achieves.
 
@@ -203,7 +203,7 @@ These are design estimates for the RTX 5060; every one gets measured on the lapt
 | Repair window before speaking | 0.3 s (adjustable, 0 for fastest) |
 | First audio from Cartesia | a few tenths of a second |
 
-A sentence-at-a-time lip reader only starts speaking after the whole sentence is done, plus one or two seconds of decoding. Reclaim speaks while the sentence is still being mouthed, like a simultaneous interpreter.
+A sentence-at-a-time lip reader only starts speaking after the whole sentence is done, plus one or two seconds of decoding. Silent Voice speaks while the sentence is still being mouthed, like a simultaneous interpreter.
 
 ## What we train, and what we don't
 
