@@ -16,31 +16,14 @@ He mouths without a sound, and the only thing the judge ever hears on the phone 
 | 8 kHz `pcm_s16le` output | It's already phone rate, so nothing gets resampled, and we trim Sonic's padding as the audio streams. |
 | Ink (ink-2) with turn detection | It turns the judge's side of the call into live captions and into Claude's context, and Claude starts predicting before the judge even finishes. |
 
-One call, end to end, with every Cartesia step in it.
+One call, end to end.
 
 ```mermaid
-sequenceDiagram
-    participant J as Judge's phone
-    participant T as Twilio
-    participant C as Our call service
-    participant I as Cartesia Ink
-    participant D as Silent Voice decoder
-    participant S as Cartesia Sonic 3.6
-    J->>T: the judge talks
-    T->>C: 8 kHz call audio
-    C->>C: noise gate keeps only the caller's level
-    C->>I: gated audio and our keyterms
-    I-->>D: the judge's words, for captions and Claude
-    Note over D: Austin mouths his answer without a sound
-    D->>C: locked words, his pace, effort and face
-    C->>S: first phrase, emotion, speed and volume in generation_config
-    S-->>C: Austin's cloned voice, padding trimmed as it streams
-    C->>T: 8 kHz audio
-    T->>J: the judge hears him 0.6 s after he starts
-    D->>C: more locked words
-    C->>S: next phrase in the same context, emotion tag inline if his face changes
-    S-->>C: the rest of the sentence
-    C->>T: done 1.0 s after he stops
+flowchart LR
+    J["Judge on the phone"] --> I["Cartesia Ink<br/>hears the judge"]
+    I --> D["Silent Voice<br/>reads Austin's silent words"]
+    D --> S["Cartesia Sonic<br/>speaks in Austin's voice"]
+    S -- "the judge hears Austin" --> J
 ```
 
 The code is in `call/`, and [call/README.md](../call/README.md) has the setup and the full message flow.

@@ -25,22 +25,11 @@ Claude is the one part of Silent Voice that knows what the conversation is about
 One turn of the conversation, from Claude's side.
 
 ```mermaid
-sequenceDiagram
-    participant I as Cartesia Ink
-    participant C as Claude Haiku 5.5
-    participant J as Joint search
-    participant A as Austin
-    I->>C: the judge's line so far, from 2 words in
-    C-->>J: likely next words and how predictable they are
-    Note over C: two predictions in flight, a fresh one every 0.8 s
-    I->>C: the judge's full line
-    C-->>J: updated prediction, in about 2 s
-    A->>J: mouths silently, read by camera and EMG
-    J->>J: boost the predicted words and set the lock threshold
-    J->>C: an uncertain word and its look-alikes, bills or pills or mills
-    C-->>J: picks one look-alike or keeps the word
-    J->>J: locks only when camera, EMG and Claude agree
-    Note over J: Claude alone never locks a word, and unsure means Please repeat
+flowchart LR
+    I["Judge's words<br/>from Cartesia Ink"] --> C["Claude<br/>predicts the next words"]
+    C --> J["Joint search<br/>camera + EMG + Claude"]
+    J -- "unsure word" --> C
+    J --> V["Locked word<br/>captions and voice"]
 ```
 
 We started on Opus 5.5 and it was too slow for a phone call, so we timed every option on live calls and moved to Haiku 5.5 with thinking off.
@@ -62,19 +51,9 @@ Thai is an Anthropic Claude Builder Campus Ambassador and runs the Claude Builde
 
 ```mermaid
 flowchart LR
-    subgraph H["Thai's Claude Code setup"]
-        direction TB
-        MD["CLAUDE.md<br/>every team decision"]
-        SK["Skills<br/>PR format, review, signal check"]
-        PL["Plugins and loops<br/>long runs, parallel reviewers"]
-    end
-    MD & SK & PL --> CC["Claude Code<br/>all 4 teammates"]
-    CC --> HW["Hardware<br/>breadboard, pad map"]
-    CC --> FW["Firmware<br/>1 kHz Arduino, serial reader"]
-    CC --> SP["Signals<br/>hum filter, signal check"]
-    CC --> SW["Software<br/>SVR-1, Claude, Cartesia, dashboard"]
-    CC --> TS["271 tests"]
-    HW & FW & SP & SW & TS --> PR["A PR for every change<br/>main is locked"]
+    S["Thai's setup<br/>CLAUDE.md, skills, loops"] --> C["Claude Code<br/>all 4 teammates"]
+    C --> B["Hardware, firmware,<br/>signals, software, tests"]
+    B --> P["A PR for<br/>every change"]
 ```
 
 Claude didn't stop at software either.
