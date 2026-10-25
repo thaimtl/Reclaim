@@ -111,8 +111,11 @@ def main():
                         print(f'fusion: {t}: {type(e).__name__}: {e}', file=sys.stderr)
             now = bus.now()
             if now >= next_step:
-                out += core.step(now)
                 next_step = now + STEP_S
+                try:
+                    out += core.step(now)
+                except Exception as e:  # noqa: BLE001  a failed end, final or EMG pass never stops the captions
+                    print(f'fusion: step: {type(e).__name__}: {e}', file=sys.stderr)
             for t, m in out:
                 pub.send(t, m)
                 if t == 'dec.lock':

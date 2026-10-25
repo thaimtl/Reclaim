@@ -255,6 +255,77 @@ def main():
             utts = {m['utt_id'] for tp, m in out if tp in ('voice.say', 'dec.hyp')}
             check(f'a late last tick (step {late_at}) is not a new sentence', said == ['i', 'want', 'water'] and
                   utts == {1}, f"{' '.join(said)}; utt_ids {sorted(utts)}")
+        # a cam.final that beats end_wait_s (a short reply's beam) ends the sentence at once, with its n-best
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+        out = []
+        for n in range(8, T + 1, 3):
+            msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
+            t = float(msg['frame_t'][-1]) + 0.05
+            out += core.feed('cam.tick', msg, t)
+        out += core.feed('cam.final', {'seg_id': 1, 'nbest': [{'text': 'I WANT WATER', 'score': 0.0}]}, t + 0.1)
+        for k in range(1, 12):              # the repair window, well inside end_wait_s + final_wait_s
+            out += core.step(t + 0.1 + 0.05 * k)
+        check('an early cam.final is used, and ends the sentence at once',
+              any(tp == 'voice.say' and m['final'] for tp, m in out) and core.utt is None and
+              all(v.state == 'done' for v in core.recent.values()))
+
+        # the camera caps a segment at 8 s and opens the next with its last 2 s of crops: those words are said once
+        long = reading(pieces, ['i', 'want', 'water', 'i', 'want'])
+        ft = long['frame_t']
+        npc = [len(pieces.word_ids(x)) for x in ['i', 'want', 'water']]
+        hot = lambda k: 3 + k * 4           # noqa: E731  reading(): gap 3, a piece every 4 frames
+        cut = hot(sum(npc) - 1) + 3         # just after "water"'s last piece
+        carry = cut - hot(sum(npc[:2])) + 2  # the carried frames start just before "water"'s first piece
+        seg1 = {k: (v[:cut] if isinstance(v, np.ndarray) else v) for k, v in long.items()}
+        seg2 = {k: (v[cut - carry:] if isinstance(v, np.ndarray) else v) for k, v in long.items()}
+        seg2.update(seg_id=2, seg_start=float(ft[cut - carry]))
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+        out = []
+        for part in (seg1, seg2):
+            n_all = len(part['frame_t'])
+            for n in range(4, n_all + 1, 3):
+                msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in part.items()}
+                t = float(msg['frame_t'][-1]) + 0.05
+                out += core.feed('cam.tick', msg, t)
+                out += core.step(t)
+        for k in range(1, 80):
+            out += core.step(t + 0.05 * k)
+            if k == 10:
+                out += core.feed('cam.final', {'seg_id': 2, 'nbest': [{'text': 'WATER I WANT', 'score': 0.0}]},
+                                  t + 0.05 * k)
+        said = [x for tp, m in out if tp == 'voice.say' for x in m['words']]
+        check('words carried over a capped segment are said once', said == ['i', 'want', 'water', 'i', 'want'],
+              ' '.join(said))
+
+        # an exception in an end pass never stops fusion: the sentence closes and the next one works
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+        real, calls = core.search.candidates, []
+
+        def flaky(*a, **kw):     # every end and final pass fails (a CUDA error, say)
+            if kw.get('final') or (len(a) > 5 and a[5]):
+                calls.append(1)
+                raise RuntimeError('CUDA error (test)')
+            return real(*a, **kw)
+        core.search.candidates = flaky
+        out = []
+        for n in range(8, T + 1, 3):
+            msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
+            t = float(msg['frame_t'][-1]) + 0.05
+            out += core.feed('cam.tick', msg, t)
+        raised = 0
+        for k in range(1, 80):              # past end_wait_s and final_wait_s
+            try:
+                out += core.step(t + 0.05 * k)
+            except RuntimeError:
+                raised += 1
+        core.search.candidates = real
+        nxt2 = reading(pieces, ['i', 'want', 'water'], seg_id=2, t0=300.0)
+        for n in range(8, T + 1, 3):
+            msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in nxt2.items()}
+            out += core.feed('cam.tick', msg, float(msg['frame_t'][-1]) + 0.05)
+        check('failed end and final passes raise once each, close the sentence, and the next one is read',
+              raised == 2 and core.utt is not None and core.utt.utt_id == 2 and
+              any(tp == 'voice.say' and m['final'] and m['utt_id'] == 1 for tp, m in out), f'raised {raised}')
         nxt = reading(pieces, ['i', 'want', 'water'], seg_id=1, t0=500.0)
         out = core.feed('cam.tick', nxt, 500.0)
         check('a restarted camera reusing seg_id 1 still starts a new sentence',
