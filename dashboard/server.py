@@ -25,17 +25,19 @@ from aiohttp import ClientError, ClientSession, ClientTimeout, WSMsgType, web
 import bus
 from bus.team import ENDPOINTS, decode
 from buslog import log_root
+from dashboard.review import review, review_input
 from dashboard.state import CallState
 
 log = logging.getLogger('dashboard')
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, 'static')
-TOPICS = ('call.state', 'partner.text', 'dec.', 'claude.repair', 'voice.say', 'cam.tick', 'cam.face',
+TOPICS = ('call.state', 'partner.text', 'dec.', 'claude.repair', 'voice.say', 'voice.text', 'cam.tick', 'cam.face',
           'cam.preview', 'emg.raw', 'timing.')
 SNAPSHOT_HZ = 15
 FRAME_MAGIC = b'RCF1'   # binary frame: magic, 4-byte big-endian header length, JSON header, JPEG
 FACE_MATCH_S = 0.06     # max gap between a preview and its cam.face
 LOG_FRESH_S = 5.0   # the logger flushes every 0.2 s: older than this, it isn't running
+REVIEW_S = 240.0        # the end-of-call review gives up after this long
 CONTROL_EVERY_S = 3.0   # how often the page's mode switch re-reads the call server's mode
 
 
@@ -65,9 +67,11 @@ def load_benchmark(path=None):
 
 
 class Dashboard:
-    def __init__(self, number='', endpoints=None, ctx=None, benchmark=None, channel='call', control=None):
+    def __init__(self, number='', endpoints=None, ctx=None, benchmark=None, channel='call', control=None,
+                 reviewer=None):
         self.state = CallState(number, benchmark, channel)
         self.control = control.rstrip('/') if control else None     # the call server's mode switch (loopback)
+        self.reviewer = reviewer        # review(data) -> the end screen's word review (dashboard/review.py), or None
         self.http = None
         self.endpoints = dict(endpoints or ENDPOINTS)
         self.ctx = ctx or zmq.asyncio.Context.instance()
@@ -144,6 +148,18 @@ class Dashboard:
         if time.time() - newest < LOG_FRESH_S:
             self.state.logging(bus.now())
 
+    async def review_call(self):
+        """Claude Opus 5.5 reads the finished call (off the event loop: the page keeps updating meanwhile). The result
+        lands only on the call it was made for: a new call clears it."""
+        call = self.state.call
+        try:
+            result = await asyncio.wait_for(asyncio.to_thread(self.reviewer, review_input(self.state)), REVIEW_S)
+        except Exception as e:  # noqa: BLE001  no key, no network, a refusal: the end screen goes on without it
+            log.warning('call review failed: %s: %s', type(e).__name__, e)
+            result = {'status': 'failed'}
+        if self.state.call is call:
+            self.state.review = result
+
     async def send_frames(self, ws, slot):
         """Sends each page the newest frame only, so a slow page skips frames."""
         while True:
@@ -160,6 +176,9 @@ class Dashboard:
             k += 1
             if k % SNAPSHOT_HZ == 0:
                 self.check_logging()
+            if self.reviewer and self.state.call['state'] == 'ended' and self.state.review is None:
+                self.state.review = {'status': 'pending'}
+                self.tasks.append(asyncio.create_task(self.review_call()))
             if not self.clients:
                 continue
             try:
@@ -281,13 +300,17 @@ def main():
                     help="how the judge talks: on the call (Ink) or by text (SMS mode); call.state confirms it")
     ap.add_argument('--control', help="the call server's mode switch, e.g. http://127.0.0.1:8788 (the launcher sets it); "
                                       'without it the page has no Call / Text switch')
+    ap.add_argument('--no-review', action='store_true',
+                    help="don't ask Claude Opus 5.5 to review the call's words at its end (the end screen then shows "
+                         'the benchmark)')
     ap.add_argument('--benchmark', help='scored word error JSON (default: $RECLAIM_WORKDIR/results/wer_session3.json)')
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(message)s')
     print(f'dashboard: http://{args.host}:{args.port}')
     benchmark = load_benchmark(args.benchmark)
     print('end screen word error:', f"from {benchmark['session'] or 'the benchmark file'}" if benchmark else 'placeholder')
-    web.run_app(Dashboard(args.number, benchmark=benchmark, channel=args.channel, control=args.control).app(), host=args.host, port=args.port, print=None,
+    web.run_app(Dashboard(args.number, benchmark=benchmark, channel=args.channel, control=args.control,
+                          reviewer=None if args.no_review else review).app(), host=args.host, port=args.port, print=None,
                 access_log=None)
 
 

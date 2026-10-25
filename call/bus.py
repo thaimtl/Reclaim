@@ -15,6 +15,7 @@ import zmq.asyncio
 VERSION = 2      # the team bus envelope (bus/__init__.py): plain msgpack maps are the same in v1 and v2
 PARTNER_TEXT, TIMING_VOICE, CALL_STATE = 'partner.text', 'timing.voice', 'call.state'
 VOICE_SAY, CAM_TICK, DEC_HYP = 'voice.say', 'cam.tick', 'dec.hyp'
+VOICE_TEXT = 'voice.text'     # what the voice said, as sent to Sonic: punctuated
 
 
 def encode(topic, body, seq):

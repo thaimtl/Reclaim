@@ -17,6 +17,7 @@ What each part of the screen comes from (docs/TEAM_TASKS_AND_INTERFACES.md):
     end of call      everything above, kept per sentence; reader disagreement from dec.lock `cam_top` / `emg_top`
                      (each reader's own pick, when the decoder sends it), never a made-up error rate
 """
+import re
 import statistics
 from collections import deque
 
@@ -31,6 +32,8 @@ TONE = {'neutral': 'Sounds calm', 'happy': 'Sounds warm', 'sad': 'Sounds concern
         'angry': 'Sounds firm'}
 TONE_ORDER = ('warm', 'concerned', 'calm', 'surprised', 'firm')    # the end screen's donut, in this colour order
 REUSE_S = 10.0              # a finished sentence's utt_id seen again after this long: the decoder restarted
+MOUTHING_S = 0.5            # the decoder spoke this recently: he is mouthing (dec.hyp comes every 100 ms)
+TONE_GAP_S = 0.5            # a longer gap between camera ticks counts as this long (a stall isn't a mood)
 SPEAKING_MAX_S = 8.0        # no 'played' mark this long after the first audio: the voice has stopped anyway
 STALE_S = {'cam': 1.0, 'emg': 1.0, 'claude': 60.0, 'voice': 120.0, 'log': 5.0}
 EMG_RAIL = (8, 1015)        # a pad off the skin pins its channel to a rail of the 10-bit range
@@ -46,6 +49,15 @@ def pretty(words, first=True):
             w = 'I' + w[1:]
         out.append(w[:1].upper() + w[1:] if first and i == 0 else w)
     return ' '.join(out)
+
+
+SSML_TAG = re.compile(r'<[^>]*>')            # the voice's volume tags (a clenched word): never shown
+PUNCT = re.compile(r'^(.*?)([,.!?;:]*)$')   # a spoken token: the word, then its punctuation
+
+
+def _marked(words, marks):
+    """Words with the voice's punctuation after each one it marked."""
+    return ' '.join(w + marks.get(i, '') for i, w in enumerate(words))
 
 
 def _bare(w):
@@ -89,6 +101,9 @@ class CallState:
         self.face_hidden_s = 0.0
         self._summary = None
         self.emg_words = 0                   # words locked while the face was hidden (muscles carried them)
+        self.tone_s = {}                     # tone -> seconds his face showed it while he mouthed (end screen)
+        self.tone_t = None                   # the last cam.tick's time, for the seconds between ticks
+        self.review = None                   # the end-of-call review (dashboard/review.py), once the call ended
 
     def _utt(self, utt_id, t, current=False):
         """Austin's sentence utt_id. Only the decoder's messages (current=True) make it the live one, so a late
@@ -99,7 +114,7 @@ class CallState:
             self.utts[('old', utt_id, old['t'])] = self.utts.pop(utt_id)
         if utt_id not in self.utts:
             self.utts[utt_id] = dict(utt_id=utt_id, t=t, locked=[], unlocked=[], source=[], conf=[], repaired={},
-                                     spoken=[], said=[], final=False, t_final=None, emotion=None, lock_t=[],
+                                     spoken=[], said=[], marks={}, n_voiced=0, final=False, t_final=None, emotion=None, lock_t=[],
                                      cam_top=[],
                                      emg_top=[], cands=None, threshold=None, repeat=None, face_hidden=False,
                                      speaking=None, voiced=False)
@@ -209,7 +224,7 @@ class CallState:
 
     def _say(self, topic, msg, now):
         u = self._utt(msg['utt_id'], now)
-        words = [str(w) for w in msg.get('words') or []]
+        words = [str(w) for w in msg.get('words') or [] if w]     # as the voice counts them (call/voice.py new_words)
         off = msg.get('offset')
         if off is not None:
             words = words[max(0, len(u['spoken']) - int(off)):]
@@ -221,8 +236,23 @@ class CallState:
 
     @staticmethod
     def _said(u):
-        """What the call heard: the voice's own phrases once reported, else the words sent to it."""
-        return ' '.join(u['said']) if u['said'] else pretty(u['spoken'])
+        """What the call heard: the voice's own phrases once reported, else the words sent to it, with the voice's
+        punctuation either way."""
+        if u['said']:
+            return ' '.join(SSML_TAG.sub(' ', ' '.join(u['said'])).split())
+        return _marked(pretty(u['spoken']).split(), u['marks'])
+
+    def _voice_text(self, topic, msg, now):
+        """voice.text: each chunk as sent to the voice, punctuated (call/voice.py: a comma where he paused, '!' for an
+        excited face, '?' for a question, the sentence's end mark). Its marks go onto the caption's words."""
+        self.seen['voice'] = now
+        u = self._utt(msg['utt_id'], now)
+        for tok in str(msg.get('text', '')).split():
+            word, mark = PUNCT.match(tok).groups()
+            if word:
+                u['n_voiced'] += 1
+            if mark and u['n_voiced']:
+                u['marks'][u['n_voiced'] - 1] = mark
 
     def _close(self, u, t):
         if u['final']:
@@ -251,6 +281,11 @@ class CallState:
         e = msg.get('emotion') or {}
         if e.get('label'):
             self.emotion = (str(e['label']), float(e.get('confidence', 0)))
+        if self.tone_t is not None and self.call['state'] == 'connected' and self.mouthing(now) and self.face_ok:
+            tone = TONE.get(self.emotion[0], '').replace('Sounds ', '')     # the whole call, every tick he mouthed
+            if tone:
+                self.tone_s[tone] = self.tone_s.get(tone, 0.0) + min(TONE_GAP_S, max(0.0, now - self.tone_t))
+        self.tone_t = now
         ft = msg.get('frame_t')
         if ft is not None and len(ft) > 1:
             self.cam_frames.append(float(np.median(np.diff(np.asarray(ft, np.float64)))))
@@ -373,13 +408,14 @@ class CallState:
         if u is None:
             return None
         words = []
+        marks = u['marks']
         for i, w in enumerate(u['locked']):
             src = u['source'][i] if i < len(u['source']) else 'camera'
             rep = u['repaired'].get(i)
             if rep and _bare(w) == rep[0]:     # the decoder hasn't applied the repair yet: show it, punctuation kept
                 w = rep[1] + w[len(w.rstrip('.,!?;:')):]
             conf = u['conf'][i] if i < len(u['conf']) else None
-            words.append(dict(w=pretty([w], i == 0), src='claude' if rep else src, locked=True,
+            words.append(dict(w=pretty([w], i == 0) + marks.get(i, ''), src='claude' if rep else src, locked=True,
                               was=pretty([rep[0]], i == 0) if rep else None, conf=conf))
         n = len(u['locked'])
         words += [dict(w=pretty([w], n + j == 0), src=None, locked=False, was=None,
@@ -419,6 +455,7 @@ class CallState:
             if self._summary is None:       # the call is over: nothing changes, so build it once
                 self._summary = self.summary(elapsed, self.face_hidden_s)
             snap['summary'] = self._summary
+            snap['review'] = self.review
         return snap
 
     def _recent(self, n=12, most=40):
@@ -429,6 +466,11 @@ class CallState:
         if judge is not None and judge < start:     # the judge's line, then at most `most` of Austin's after it
             return [self.transcript[judge]] + self.transcript[max(judge + 1, len(self.transcript) - most):]
         return self.transcript[start:]
+
+    def mouthing(self, now):
+        """Austin is in a sentence now: the decoder spoke lately and the current sentence is still open."""
+        u = self.utts.get(self.cur_utt)
+        return u is not None and not u['final'] and now - self.seen.get('dec', -1e9) < MOUTHING_S
 
     def muscles(self, now):
         """The muscle sensors are on: emg.raw is arriving and at least one pad touches the skin."""
@@ -451,8 +493,11 @@ class CallState:
         lat = {k: _median(self.lat[k]) for k in ('read', 'lock', 'sonic', 'lips_to_voice')}
         claude = self.claude_stage()
         lat['claude'], lat['claude_label'] = claude['ms'], claude['label']
-        said = [TONE.get(s.get('emotion'), '').replace('Sounds ', '') for s in austin]
-        tones = {t: said.count(t) for t in TONE_ORDER if said.count(t)}
+        if self.tone_s:         # his face over the whole call, in seconds (not one label per sentence)
+            tones = {t: round(self.tone_s[t], 1) for t in TONE_ORDER if self.tone_s.get(t, 0) >= 0.05}
+        else:                   # no camera ticks while he mouthed (a replay without them): each sentence's tone
+            said = [TONE.get(s.get('emotion'), '').replace('Sounds ', '') for s in austin]
+            tones = {t: said.count(t) for t in TONE_ORDER if said.count(t)}
         return dict(seconds=elapsed, words=n_words, tones=tones, benchmark=self.benchmark,
                     wpm=round(n_words / (elapsed / 60)) if elapsed >= 10 else None,
                     repairs=self.repairs[:], repeats=self.repeats[:], face_hidden_s=round(hidden, 1),
@@ -463,5 +508,6 @@ HANDLERS = {
     'call.state': CallState._call_state, 'partner.text': CallState._partner,
     'dec.hyp': CallState._hyp, 'dec.lock': CallState._lock, 'dec.repeat': CallState._repeat,
     'claude.repair': CallState._repair, 'claude.caption': CallState._caption, 'voice.say': CallState._say,
+    'voice.text': CallState._voice_text,
     'cam.tick': CallState._tick, 'cam.face': CallState._face_msg, 'emg.raw': CallState._emg,
 }

@@ -7,7 +7,8 @@
     GET  /media/<token>       Twilio Media Streams websocket (only Twilio learns the token, from our TwiML)
     GET  /health              ok
 
-Bus: reads voice.say (Austin's decoder) and cam.tick (emotion); publishes partner.text, timing.voice, call.state.
+Bus: reads voice.say (Austin's decoder) and cam.tick (emotion); publishes partner.text, voice.text (what the voice
+said, punctuated), timing.voice, call.state.
 
 Two channels for the judge's side (CALL_CHANNEL at start, switchable any time, even mid-call): 'call' (default) they
 speak and Cartesia Ink transcribes them; 'sms' (a loud room) they text our number from the phone on the call and hear
@@ -78,7 +79,8 @@ class Service:
         self.control_runner = None
         self.pub = pub or bus.Publisher(cfg.call_pub)
         self.sub = sub or bus.Subscriber([cfg.dec_pub, cfg.cam_pub], [bus.VOICE_SAY, bus.CAM_TICK, bus.DEC_HYP])
-        self.voice = voice or Voice(cfg, self._audio, on_timing=self._timing, on_done=self._voice_done)
+        self.voice = voice or Voice(cfg, self._audio, on_timing=self._timing, on_done=self._voice_done,
+                                    on_text=self._spoken)
         self.ink_factory = ink_factory or (lambda on_text: Ink(cfg, on_text, gate=cfg.noise_gate,
                                                                  record=cfg.record_inbound))
         self.call = None
@@ -98,6 +100,9 @@ class Service:
     async def _partner(self, text, is_final, t, source='ink'):
         await self.pub.send(bus.PARTNER_TEXT, {'text': text, 'is_final': bool(is_final), 't': float(t),
                                                'source': source})
+
+    async def _spoken(self, utt_id, text, end):
+        await self.pub.send(bus.VOICE_TEXT, {'utt_id': utt_id, 'text': text, 'end': bool(end), 't': time.perf_counter()})
 
     async def _voice_done(self, utt_id, t_first_text):
         """Sonic finished an utterance: queue a mark behind its audio; Twilio echoes it once the judge heard it all."""

@@ -135,6 +135,19 @@ def test_each_line_has_its_own_number_and_the_judges_last_line_stays_in_view():
     lines = st.snapshot(80.0)['transcript']
     assert lines[0]['who'] == 'judge' and len(lines) == 41 and lines[-1]['text'] == 'more 39'
 
+
+def test_the_captions_carry_the_voices_punctuation():
+    st = fed(('call.state', {'state': 'connected', 't': 0.0}),
+             ('dec.hyp', {'utt_id': 1, 'locked': ['WELL', 'WE', 'WON'], 'unlocked': []}),
+             ('voice.text', {'utt_id': 1, 'text': 'Well,', 'end': False}),       # he paused after "well"
+             ('voice.text', {'utt_id': 1, 'text': 'we won', 'end': False}),
+             ('voice.text', {'utt_id': 1, 'text': '!', 'end': True}))            # the end mark alone: on "won"
+    words = [w['w'] for w in st.snapshot(1.0)['austin']['words']]
+    assert words == ['Well,', 'we', 'won!']
+    st.feed('timing.voice', {'stage': 'voice_phrase', 'utt_id': 1,
+                             'text': ' <volume ratio="1.40"/> we <volume ratio="1.00"/> won!'}, 2.0)
+    assert '<' not in st.snapshot(2.0)['austin']['spoken']        # a clenched word's volume tag never shows
+
 def test_voice_offset_skips_resent_words_and_keeps_real_repeats():
     st = fed(('voice.say', {'utt_id': 1, 'words': ['no'], 'offset': 0}),
              ('voice.say', {'utt_id': 1, 'words': ['no', 'no', 'way'], 'offset': 0}),
@@ -414,8 +427,21 @@ def test_a_preview_with_x_y_z_points_keeps_them():
 
 
 def test_end_summary_counts_austins_tones_in_order(shots):
-    assert shots['end']['summary']['tones'] == {'warm': 3, 'concerned': 1, 'calm': 1}
-    assert list(shots['end']['summary']['tones']) == ['warm', 'concerned', 'calm']
+    tones = shots['end']['summary']['tones']          # seconds his face showed each, while he mouthed
+    assert list(tones) == ['warm', 'concerned', 'calm'] and max(tones, key=tones.get) == 'warm'
+    assert all(isinstance(v, float) and v > 0 for v in tones.values())
+
+
+def test_tones_count_the_whole_call_not_one_label_per_sentence():
+    st = fed(('call.state', {'state': 'connected', 't': 0.0}), now=0.0)
+    st.feed('dec.hyp', {'utt_id': 1, 'locked': ['HI'], 'unlocked': ['THERE']}, 0.0)
+    for k in range(1, 31):                  # 3 s mouthing: smiling for 2 s, then neutral for 1 s
+        t = k * 0.1
+        st.feed('dec.hyp', {'utt_id': 1, 'locked': ['HI'], 'unlocked': ['THERE']}, t)
+        st.feed('cam.tick', {'emotion': {'label': 'happy' if t <= 2.0 else 'neutral', 'confidence': 0.9}}, t)
+    st.feed('call.state', {'state': 'ended'}, 3.1)
+    tones = st.snapshot(3.1)['summary']['tones']
+    assert tones == {'warm': 1.9, 'calm': 1.0}         # the first tick only starts the clock
 
 
 def test_end_summary_benchmark_is_none_until_a_session_is_scored(shots):

@@ -606,10 +606,11 @@ const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const use = (id, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><use href="#${id}"/></svg>`;
 const liveIcon = k => document.querySelector(`.stage[data-k="${k}"] .ib svg`)?.outerHTML || '';
 const ARCHIE = '<img src="/static/icons/cartesia-archie.svg" alt="">';
-let endKey = null;
+let endKey = null, wordsKey = null;
 
 function renderEnd(s) {
   const m = s.summary, key = JSON.stringify(m);
+  renderWords(s);                             // the review lands after the end screen is up: its own update
   if (key === endKey) return;                 // the summary never changes once the call is over: build once
   endKey = key;
   const L = m.latency, num = v => v == null ? '--' : v;
@@ -634,22 +635,6 @@ function renderEnd(s) {
     `<div class="top"><span class="ic">${icon}</span><span class="k">${label}</span></div>` +
     `<b class="num">${esc(value)}${unit && value !== '--' ? `<small>${unit}</small>` : ''}</b></div>`).join('');
 
-  const b = m.benchmark, wer = b || PLACEHOLDER_WER;
-  const lab = (b && b.labels) || {};
-  const rows = [[lab.lips || 'Lips alone', wer.lips, '--camera'], [lab.lips_muscles || '+ muscles', wer.lips_muscles, '--emg'],
-    [lab.claude || '+ Claude', wer.claude, '--claude']];
-  const max = Math.max(...rows.map(x => x[1]), 1) * 1.14;
-  $('end-ph').classList.toggle('hidden', !!b);
-  $('end-wer-sub').textContent = `${b && b.session ? b.session : 'Session 3'}, scored against the script he mouthed.`;
-  $('end-steps').classList.toggle('placeholder', !b);
-  $('end-steps').innerHTML = rows.map(([name, v, col], i) => {
-    const drop = i ? Math.round(rows[i - 1][1] - v) : 0, shown = b ? `${+v.toFixed(1)}%` : `[${v}%]`;
-    return `<div class="step-row"><span class="sn">${name}</span><div class="st"><i style="--w:${(100 * v / max).toFixed(1)}%;` +
-      `background:var(${col})"></i></div><b>${shown}</b><span class="drop">${drop > 0 ? drop + ' fewer' : ''}</span></div>`;
-  }).join('');
-  const pct = v => v == null ? '--' : v + '%';
-  $('end-call-line').textContent = `This call: lips alone disagreed ${pct(m.disagree.lips)} of the time, muscles ${pct(m.disagree.muscles)}.`;
-
   renderTones(m.tones);
   $('end-latency').innerHTML = [['read', liveIcon('read'), 'Lips and muscles', L.read], ['lock', liveIcon('lock'), 'Locking', L.lock],
     ['claude', use('claude-mark'), L.claude_label, L.claude], ['sonic', ARCHIE, 'Cartesia Sonic', L.sonic]].map(([k, icon, label, ms]) =>
@@ -659,7 +644,46 @@ function renderEnd(s) {
   renderThread(m.transcript);
   document.fonts.ready.then(() => { if (endKey === key) renderThread(m.transcript); });   // re-trim with final font metrics
   document.querySelectorAll('#end .num').forEach((el, k) => roll(el, k));
-  setTimeout(() => document.querySelectorAll('#end .st i').forEach(x => x.classList.add('go')), reduceMotion ? 0 : 700);
+}
+
+// "Words wrong": this call's own numbers once Claude Opus 5.5 has read it for what Austin meant (dashboard/review.py),
+// "reviewing" while it reads, and the scored benchmark only if there is no review (no key, no network)
+function renderWords(s) {
+  const m = s.summary, r = s.review || null, key = JSON.stringify([r, m.benchmark, m.disagree]);
+  if (key === wordsKey) return;
+  wordsKey = key;
+  const done = r && r.status === 'done' && r.wer && r.wer.claude != null, pending = r && r.status === 'pending';
+  const b = m.benchmark, wer = done ? r.wer : b || PLACEHOLDER_WER, lab = (!done && b && b.labels) || {};
+  const rows = [[lab.lips || 'Lips alone', wer.lips, '--camera'], [lab.lips_muscles || '+ muscles', wer.lips_muscles, '--emg'],
+    [lab.claude || '+ Claude', wer.claude, '--claude']];
+  const max = Math.max(...rows.map(x => x[1] || 0), 1) * 1.14;
+  const tag = $('end-ph');
+  tag.textContent = done ? 'this call' : pending ? 'reviewing' : 'placeholder';
+  tag.classList.toggle('hidden', !done && !pending && !!b);
+  tag.classList.toggle('live', !!(done || pending));
+  tag.classList.toggle('pulse', !!pending);
+  $('end-wer-sub').textContent = done ? `This call, ${r.words} words, against what Austin meant: Claude Opus 5.5 read the whole conversation.`
+    : pending ? 'Claude Opus 5.5 is reading the whole call for what Austin meant…'
+    : `${b && b.session ? b.session : 'Session 3'}, scored against the script he mouthed.`;
+  const steps = $('end-steps');
+  steps.classList.toggle('placeholder', !done && !b);
+  steps.classList.toggle('pending', !!pending);
+  steps.innerHTML = rows.map(([name, v, col], i) => {
+    const drop = i && !pending ? Math.round(rows[i - 1][1] - v) : 0;
+    const shown = pending ? '…' : done || b ? `${+v.toFixed(1)}%` : `[${v}%]`;
+    return `<div class="step-row"><span class="sn">${name}</span><div class="st"><i style="--w:${pending ? 0 : (100 * v / max).toFixed(1)}%;` +
+      `background:var(${col})"></i></div><b>${shown}</b><span class="drop">${drop > 0 ? drop + ' fewer' : ''}</span></div>`;
+  }).join('');
+  const pct = v => v == null ? '--' : v + '%';
+  let line = `This call: lips alone disagreed ${pct(m.disagree.lips)} of the time, muscles ${pct(m.disagree.muscles)}.`;
+  if (done) {
+    const subs = (r.wrong || []).filter(x => x.op === 'sub').slice(0, 3).map(x => `“${x.got}” for “${x.meant}”`);
+    line = !r.n_wrong ? 'After Claude, every word matched what he meant.'
+      : `Still wrong after Claude: ${r.n_wrong} word${r.n_wrong === 1 ? '' : 's'}${subs.length ? `, like ${subs.join(', ')}` : ''}.`;
+    if (r.unclear) line += ` ${r.unclear} sentence${r.unclear === 1 ? ' was' : 's were'} too unclear to judge.`;
+  }
+  $('end-call-line').textContent = line;
+  if (!pending) setTimeout(() => steps.querySelectorAll('.st i').forEach(x => x.classList.add('go')), reduceMotion ? 0 : 700);
 }
 
 // numbers roll up from 0 like an odometer; each lower digit spins one more loop before it lands
@@ -693,7 +717,7 @@ function renderTones(tones) {
     off += len; return seg;
   }).join('') : `<circle cx="72" cy="72" r="${R}" class="seg empty"/>`;
   $('end-legend').innerHTML = total ? entries.map(([t, c]) =>
-    `<div class="lg" data-name="${t}"><i style="background:var(--tone-${t})"></i><span>${TONES[t] || t}</span><b>${c}</b></div>`).join('')
+    `<div class="lg" data-name="${t}"><i style="background:var(--tone-${t})"></i><span>${TONES[t] || t}</span><b>${Math.round(100 * c / total)}%</b></div>`).join('')
     : '<p class="lg-empty">No tone data on this call.</p>';
   const donut = document.querySelector('#end .donut'), legend = $('end-legend');
   const show = name => {

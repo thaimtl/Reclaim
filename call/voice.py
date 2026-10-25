@@ -47,6 +47,8 @@ PCM = {'container': 'raw', 'encoding': 'pcm_s16le', 'sample_rate': RATE}     # p
 # "happy" is weak in Sonic; "excited" carries
 EMOTION = {'neutral': 'neutral', 'happy': 'excited', 'sad': 'sad', 'angry': 'angry', 'surprised': 'surprised'}
 EXCLAIM = {'excited', 'surprised', 'angry'}    # Sonic emotions whose sentences end in '!'
+SSML_TAG = re.compile(r'<[^>]*>')
+PART_END = re.compile(r'[.!]$')     # a part's end mark (a face change mid-sentence), shown as the pause it is    # the volume tags around a clenched word: not shown in the captions
 MIN_CONFIDENCE = 0.5        # below this the face label is a guess: speak neutral
 FACE_HOLD_S = 0.8           # a new face must hold this long to split a sentence into a fresh recording
 SPEED_BIAS = 1.1            # speech plays about as fast as Austin mouths; 10% faster keeps the voice up with him
@@ -200,8 +202,9 @@ class Utterance:
 class Voice:
     """Owns the Sonic websocket. say() is called per voice.say message; audio goes to `sink(bytes)` in order."""
 
-    def __init__(self, cfg, sink, on_timing=None, client=None, on_done=None):
+    def __init__(self, cfg, sink, on_timing=None, client=None, on_done=None, on_text=None):
         self.cfg, self.sink, self.on_timing, self.on_done = cfg, sink, on_timing, on_done
+        self.on_text = on_text      # async (utt_id, text, end): each chunk as spoken, punctuation and all
         self.client = client
         self.conn = self._cm = None
         self.utts = {}              # utt_id -> Utterance
@@ -375,6 +378,14 @@ class Voice:
             text += ','                     # his pause: a comma, so the voice breathes where he did
         if not text or (not words and u.ctx is None):   # only the end mark, and no context left to close
             return
+        if self.on_text is not None:    # the captions show what the voice says: its commas, '!' and '?' too
+            shown = ' '.join(SSML_TAG.sub(' ', text).split())
+            if end and u.continued:     # a part closed by a face change: the sentence goes on, so a pause, not an end
+                shown = PART_END.sub(',', shown)
+            try:
+                await self.on_text(u.utt_id, shown, end and not u.continued)
+            except Exception:  # noqa: BLE001  the captions never stop the voice
+                log.exception('publishing the spoken text failed')
         if u.broken:                # streaming already failed twice: the rest goes to the fallback, in order
             u.lost += words
             u.pending, u.pending_gen, u.spoken = u.pending[n:], u.pending_gen[n:], u.spoken + len(words)

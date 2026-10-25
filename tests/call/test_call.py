@@ -146,6 +146,20 @@ async def test_voice_streams_words_then_closes_context():
     await v.close()
 
 
+async def test_the_spoken_text_goes_to_the_captions_punctuated_without_tags():
+    shown = []
+
+    async def on_text(utt_id, text, end):
+        shown.append((utt_id, text, end))
+    v, conn = await make_voice(lambda b: asyncio.sleep(0))
+    v.on_text = on_text
+    v.set_emotion('happy', 0.9)
+    await v.say(3, ['WE', 'WON'], final=True)
+    await asyncio.sleep(0.05)
+    assert shown == [(3, 'We won!', True)]          # exactly what Sonic got, '!' from the smile
+    await v.close()
+
+
 async def test_voice_two_utterances_two_contexts():
     async def sink(b):
         pass

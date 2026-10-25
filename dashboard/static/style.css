@@ -232,7 +232,13 @@ body { font-family: var(--font); font-variant-numeric: tabular-nums; color: var(
 #end .st i { display: block; height: 12px; width: 0; border-radius: var(--r-sm); transition: width 1.3s cubic-bezier(.2, .7, .2, 1); }
 #end .st i.go { width: var(--w); }
 #end .step-row b { text-align: right; font-weight: 800; font-size: 22px; }
-#end .steps.placeholder b { color: var(--text-muted); }
+#end .steps.placeholder b, #end .steps.pending b { color: var(--text-muted); }
+#end .ph-tag.live { border: 0; background: var(--claude); color: #fff; }
+#end .ph-tag.pulse { animation: ph-pulse 1.4s ease-in-out infinite; }
+@keyframes ph-pulse { 50% { opacity: .45; } }
+#end .steps.pending .st { background: linear-gradient(90deg, var(--bg-track) 0%, var(--bg-sunken) 50%, var(--bg-track) 100%);
+  background-size: 200% 100%; animation: shimmer 1.6s linear infinite; border-radius: var(--r-sm); }
+@keyframes shimmer { to { background-position: -200% 0; } }
 #end .drop { font-size: 18px; color: var(--text-muted); white-space: nowrap; }
 #end .call-line { margin-top: 12px; }
 #end .donutwrap { display: flex; align-items: center; gap: 32px; margin-top: 16px; }
@@ -280,4 +286,5 @@ body { font-family: var(--font); font-variant-numeric: tabular-nums; color: var(
 #end .cartesia-logo { height: 22px; width: auto; display: block; }
 #end .claude-lockup { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 22px; color: var(--text-primary); }
 #end .cmark { width: 24px; height: 24px; color: var(--claude-brand); }
-@media (prefers-reduced-motion: reduce) { #end h1, #end .why { animation: none; opacity: 1; transform: none; } #end .st i { transition: none; } }
+@media (prefers-reduced-motion: reduce) { #end h1, #end .why { animation: none; opacity: 1; transform: none; } #end .st i { transition: none; }
+  #end .ph-tag.pulse, #end .steps.pending .st { animation: none; } }
