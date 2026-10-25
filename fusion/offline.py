@@ -238,8 +238,20 @@ def word_examples(records):
 
 
 # ------------------------------------------------------------------ gate fitting
+def word_errors(hyp, ref):
+    """Word-level edit distance."""
+    d = list(range(len(ref) + 1))
+    for i, h in enumerate(hyp, 1):
+        prev, d[0] = d[0], i
+        for j, r in enumerate(ref, 1):
+            prev, d[j] = d[j], min(d[j] + 1, d[j - 1] + 1, prev + (h != r))
+    return d[-1]
+
+
 def fit_gate(records, iters=300, l2=0.1):
-    """Make the true sentence win among each final pass's candidates: max log softmax(S)[truth]."""
+    """Fit the gate on the final passes by minimum expected word errors: minimise sum_c softmax(S)_c * errors(c) over
+    each pass's own candidates (errors against the true sentence, per word of it), so the weights are judged by the
+    words they get right, on the candidates the search really has."""
     import torch
     from fusion.search import GATE_FEATURES, Gate
     rows = []
@@ -247,51 +259,69 @@ def fit_gate(records, iters=300, l2=0.1):
         if not (r['final'] and r.get('truth') is not None and r['clip_ok']):
             continue
         sc = np.asarray(r['scores'], np.float64)
-        cands = list(r['cands'])
-        if r['truth'] in cands:
-            idx = cands.index(r['truth'])
-        else:
-            sc = np.vstack([sc, r['truth_scores']])
-            idx = len(sc) - 1
-        sc = sc - sc.max(0, keepdims=True) * np.array([1, 1, 1, 0, 0])   # shift: softmax is unchanged
-        rows.append((torch.tensor(sc), idx, torch.tensor(np.asarray(r['gate'], np.float64))))
+        sc = sc - sc.max(0, keepdims=True) * np.array([1, 1, 1, 0, 0, 1])   # shift: softmax is unchanged
+        err = np.array([word_errors(c, r['truth']) for c in r['cands']], np.float64) / max(len(r['truth']), 1)
+        rows.append((torch.tensor(sc), torch.tensor(err), torch.tensor(np.asarray(r['gate'], np.float64))))
     if not rows:
         raise SystemExit('no final passes with a known sentence')
     K = max(len(sc) for sc, _, _ in rows)
-    SC = torch.zeros(len(rows), K, 5, dtype=torch.float64)
+    SC = torch.zeros(len(rows), K, 6, dtype=torch.float64)
     mask = torch.zeros(len(rows), K, dtype=torch.bool)
     for n, (sc, _, _) in enumerate(rows):
         SC[n, :len(sc)], mask[n, :len(sc)] = sc, True
-    idx = torch.tensor([i for _, i, _ in rows])
+    ERR = torch.zeros(len(rows), K, dtype=torch.float64)
+    for n, (_, err, _) in enumerate(rows):
+        ERR[n, :len(err)] = err
     F = torch.stack([f for _, _, f in rows])
     W = torch.zeros(3, len(GATE_FEATURES), dtype=torch.float64, requires_grad=True)
     b = torch.tensor(np.log([0.6, 0.15, 0.25]), dtype=torch.float64, requires_grad=True)
     log_scale = torch.tensor(np.log(1.5), dtype=torch.float64, requires_grad=True)
     gamma = torch.tensor(0.5, dtype=torch.float64, requires_grad=True)
+    g_final = torch.tensor(1.0, dtype=torch.float64, requires_grad=True)
     beta = 1.0      # Claude's hints: no offline replay of Claude, so not fitted here
-    opt = torch.optim.Adam([W, b, log_scale, gamma], lr=0.05)
+    opt = torch.optim.Adam([W, b, log_scale, gamma, g_final], lr=0.05)
     for it in range(iters):
         opt.zero_grad()
         g = log_scale.exp() * torch.softmax(F @ W.T + b, 1)                     # (N, 3)
-        S = (g[:, None, :] * SC[:, :, :3]).sum(2) + gamma * SC[:, :, 4]
+        S = (g[:, None, :] * SC[:, :, :3]).sum(2) + gamma * SC[:, :, 4] + g_final * SC[:, :, 5]
         S = S.masked_fill(~mask, -1e9)
-        loss = -torch.log_softmax(S, 1).gather(1, idx[:, None]).mean() + l2 * (W ** 2).sum()
+        loss = (torch.softmax(S, 1) * ERR).sum(1).mean() + l2 * (W ** 2).sum()
         loss.backward()
         opt.step()
-        if it % 50 == 0 or it == iters - 1:
-            print(f'gate fit {it}: loss {loss.item():.4f}', flush=True)
-    gate = Gate(W.detach().numpy(), b.detach().numpy(), float(log_scale.exp()), beta, float(gamma))
+        if it % 100 == 0 or it == iters - 1:
+            print(f'gate fit {it}: expected word errors {loss.item():.4f}', flush=True)
+    t_cam, t_emg = (fit_temperature(SC[:, :, j], ERR, mask) for j in (0, 1))
+    print(f'reader-only posteriors: t_cam {t_cam:.3f}, t_emg {t_emg:.4f}', flush=True)
+    gate = Gate(W.detach().numpy(), b.detach().numpy(), float(log_scale.detach().exp()), beta, float(gamma.detach()),
+                float(g_final.detach()), t_cam, t_emg)
     return gate, rows
 
 
-def truth_rank_report(rows, gate):
-    """How often the truth is the top candidate on the final passes, with these weights."""
-    wins = 0
-    for sc, idx, f in rows:
+def fit_temperature(score, err, mask, iters=200):
+    """t such that softmax(t * score) puts its mass on each pass's best candidates (fewest word errors): one
+    reader's scores read as a calibrated posterior."""
+    import torch
+    best = (err <= err.masked_fill(~mask, 1e9).min(1, keepdim=True).values + 1e-9) & mask
+    log_t = torch.tensor(0.0, dtype=torch.float64, requires_grad=True)
+    opt = torch.optim.Adam([log_t], lr=0.05)
+    for _ in range(iters):
+        opt.zero_grad()
+        lp = torch.log_softmax((log_t.exp() * score).masked_fill(~mask, -1e9), 1)
+        loss = -torch.logsumexp(lp.masked_fill(~best, -1e9), 1).mean()
+        loss.backward()
+        opt.step()
+    return float(log_t.detach().exp())
+
+
+def gate_wer(rows, gate):
+    """Word error rate of the top candidate of each final pass, with these weights."""
+    errs = 0.0
+    for sc, err, f in rows:
         g = gate.weights(f.numpy())
-        S = g[0] * sc[:, 0].numpy() + g[1] * sc[:, 1].numpy() + g[2] * sc[:, 2].numpy() + gate.gamma * sc[:, 4].numpy()
-        wins += int(np.argmax(S) == idx)
-    return wins / len(rows)
+        sc = sc.numpy()
+        S = (g[0] * sc[:, 0] + g[1] * sc[:, 1] + g[2] * sc[:, 2] + gate.gamma * sc[:, 4] + gate.final * sc[:, 5])
+        errs += float(err.numpy()[int(np.argmax(S))])
+    return errs / len(rows)
 
 
 # ------------------------------------------------------------------ lock simulation (for tau0)
@@ -392,12 +422,11 @@ def cmd_fit_gate(a):
     from fusion.search import Gate
     recs = load_records(a.passes)
     gate, rows = fit_gate(recs)
-    before = truth_rank_report(rows, Gate())
-    after = truth_rank_report(rows, gate)
-    print(f'true sentence on top of the final pass: default gate {100 * before:.1f}% -> fitted {100 * after:.1f}% '
+    before, after = gate_wer(rows, Gate()), gate_wer(rows, gate)
+    print(f'final pass WER (mean per sentence): default gate {100 * before:.1f}% -> fitted {100 * after:.1f}% '
           f'({len(rows)} final passes)')
     print('gate', json.dumps(gate.to_dict()))
-    save_params(gate=gate, extra={'gate_fit': {'final_passes': len(rows), 'top1_before': before, 'top1_after': after,
+    save_params(gate=gate, extra={'gate_fit': {'final_passes': len(rows), 'wer_default': before, 'wer_fitted': after,
                                                'from': a.passes}}, path=a.params)
 
 

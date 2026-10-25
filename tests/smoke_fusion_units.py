@@ -142,7 +142,7 @@ def main():
         texts = [' '.join(c.words) for c in cands]
         check('look-alike swaps join the candidates', 'i want waiter' in texts, f'{len(cands)} candidates')
         sc = search.judge_scores(cands, cam, None, {}, True)
-        check('judge scores: one row per candidate, five columns', sc.shape == (len(cands), 5))
+        check('judge scores: one row per candidate, six columns', sc.shape == (len(cands), 6))
 
         # EMG settles a look-alike: the camera is unsure between water and waiter, EMG strongly favours waiter
         cam2 = CamReading(reading(pieces, ['i', 'want', 'water'], noise={'water': ('waiter', 0.42)}))

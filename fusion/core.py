@@ -87,7 +87,7 @@ class Fusion:
         elif topic == 'cam.final':
             for u in self.closing:
                 if u.seg_id == int(msg['seg_id']) and u.state == 'ending':
-                    u.nbest = [h['text'] for h in msg.get('nbest') or []]
+                    u.nbest = [dict(text=str(h['text']), score=float(h['score'])) for h in msg.get('nbest') or []]
                     out += self._final(u, now)
         elif topic == 'claude.predict' and self.use_hints:
             h = {}
@@ -170,7 +170,8 @@ class Fusion:
         f = gate_features(cam, emg_read, self.emg_quality)
         g = self.gate.weights(f)
         return f, {'cam': g[0], 'emg': g[1] if emg_read is not None else 0.0, 'lm': g[2] if self.use_lm else 0.0,
-                   'beta': self.gate.beta if self.use_hints else 0.0, 'gamma': self.gate.gamma}
+                   'beta': self.gate.beta if self.use_hints else 0.0, 'gamma': self.gate.gamma,
+                   'final': self.gate.final}
 
     def _pass(self, u, now, final, nbest=()):
         t_start = time.perf_counter()
@@ -181,7 +182,7 @@ class Fusion:
         gf, w = self._weights(u.cam, self.last_emg_read if self.use_emg else None)
         hints = self.hints if (self.use_hints and now < self.hints_until) else {}
         locked = [x['w'] for x in u.locked]
-        cands = self.search.candidates(u.cam, w, hints, locked, list(nbest), final)
+        cands = self.search.candidates(u.cam, w, hints, locked, [h['text'] for h in nbest], final)
         emg_read = job.result() if job is not None else None
         if emg_read is not None:
             self.last_emg_read = emg_read
@@ -195,10 +196,10 @@ class Fusion:
         elif self.use_emg:
             w['emg'] = 0.0
         emg_fn = self.svr.verify if emg_read is not None else None
-        scores = self.search.judge_scores(cands, u.cam, emg_fn, hints, final)
+        scores = self.search.judge_scores(cands, u.cam, emg_fn, hints, final, nbest)
         P = softmax(self.search.combine(scores, w))
-        Pc = softmax(scores[:, 0])
-        Pe = softmax(scores[:, 1]) if emg_read is not None else np.full(len(cands), 1.0 / len(cands))
+        Pc = softmax(self.gate.t_cam * scores[:, 0])
+        Pe = softmax(self.gate.t_emg * scores[:, 1]) if emg_read is not None else np.full(len(cands), 1.0 / len(cands))
         best, post = word_posteriors(cands, P, start=len(locked))
         tau = self.lock.threshold(self.predictability if hints else 0.0)
         pause = 1.0 - float(u.cam.activity[-8:].mean()) if u.cam is not None and len(u.cam.activity) else 1.0
@@ -245,7 +246,7 @@ class Fusion:
         ms = (time.perf_counter() - t_start) * 1000
         if self.records is not None:
             rec = dict(utt_id=u.utt_id, seg_id=u.seg_id, seg_start=u.seg_start, t=now, final=final,
-                       with_nbest=bool(nbest), gate=gf, weights=dict(w), scores=scores,
+                       with_nbest=bool(nbest), nbest=list(nbest), gate=gf, weights=dict(w), scores=scores,
                        cands=[c.words for c in cands], sources=[c.source for c in cands], best=best.words,
                        n_locked_before=len(locked), locked_now=[x['w'] for x in new],
                        words=[dict(i=x['i'], w=x['w'], p=x['p'], f=x['f'], cam_top=x['cam_top'],
@@ -258,7 +259,7 @@ class Fusion:
                     tw = norm_words(truth)
                     tc = [Cand(tw, [self.search.pieces.word_ids(x) for x in tw], 'truth')]
                     rec['truth'] = tuple(tw)
-                    rec['truth_scores'] = self.search.judge_scores(tc, u.cam, emg_fn, hints, True)[0]
+                    rec['truth_scores'] = self.search.judge_scores(tc, u.cam, emg_fn, hints, True, nbest)[0]
                     rec['truth_in_cands'] = tuple(tw) in set(rec['cands'])
                     if u.cam is not None:   # when each true word ends on the lips: the lock delay's reference
                         rec['truth_ends'] = viterbi_word_ends(u.cam, tc[0].tokens)

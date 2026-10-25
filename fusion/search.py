@@ -11,7 +11,9 @@ One pass over the current segment:
         emg    S_emg, SVR-1's letter + phoneme CTC + verifier score (svr/live.py verify)
         lm     the conversational LM with the call cache, over its finished words (all of them at segment end)
         hint   the sum of Claude's prediction weights of its words
-     S = g_cam cam + g_emg emg + g_lm lm + beta hint + gamma |words|, (g_cam, g_emg, g_lm) from the gate.
+        final  at segment end only: the camera's own final-pass score for the candidates cam.final lists
+     S = g_cam cam + g_emg emg + g_lm lm + beta hint + gamma |words| + g_final final, (g_cam, g_emg, g_lm) from the
+     gate.
   4. Posteriors: softmax(S) over the candidates; a word's posterior at position i is the mass of the candidates
      with that word there. The camera-only and EMG-only posteriors (softmax of cam or emg alone) are the lock
      model's agreement features (fusion/lock.py).
@@ -196,12 +198,16 @@ def viterbi_word_ends(cam, word_tokens):
 
 
 class Gate:
-    """(g_cam, g_emg, g_lm) = scale * softmax(W f + b), plus the hint weight beta and the length bonus gamma."""
+    """(g_cam, g_emg, g_lm) = scale * softmax(W f + b), plus the hint weight beta, the length bonus gamma and the
+    weight of the camera's own final-pass score (cam.final, end of segment only). t_cam and t_emg calibrate the
+    camera-only and EMG-only posteriors (softmax(t * judge score)): SVR-1's raw sentence scores are far too sure of
+    themselves to be read as probabilities."""
 
-    def __init__(self, W=None, b=None, scale=1.5, beta=1.0, gamma=0.5):
+    def __init__(self, W=None, b=None, scale=1.5, beta=1.0, gamma=0.5, final=1.0, t_cam=1.0, t_emg=0.05):
         self.W = np.zeros((3, len(GATE_FEATURES))) if W is None else np.asarray(W, np.float64)
         self.b = np.log([0.6, 0.15, 0.25]) if b is None else np.asarray(b, np.float64)
-        self.scale, self.beta, self.gamma = float(scale), float(beta), float(gamma)
+        self.scale, self.beta, self.gamma, self.final = float(scale), float(beta), float(gamma), float(final)
+        self.t_cam, self.t_emg = float(t_cam), float(t_emg)   # reader-only posteriors: softmax(t * that judge)
 
     def weights(self, f):
         z = self.W @ np.asarray(f, np.float64) + self.b
@@ -210,11 +216,13 @@ class Gate:
 
     def to_dict(self):
         return {'W': self.W.tolist(), 'b': self.b.tolist(), 'scale': self.scale, 'beta': self.beta,
-                'gamma': self.gamma, 'features': list(GATE_FEATURES)}
+                'gamma': self.gamma, 'final': self.final, 't_cam': self.t_cam, 't_emg': self.t_emg,
+                'features': list(GATE_FEATURES)}
 
     @classmethod
     def from_dict(cls, d):
-        return cls(d['W'], d['b'], d['scale'], d['beta'], d['gamma'])
+        return cls(d['W'], d['b'], d['scale'], d['beta'], d['gamma'], d.get('final', 1.0), d.get('t_cam', 1.0),
+                   d.get('t_emg', 0.05))
 
 
 def gate_features(cam, emg_read, emg_quality):
@@ -372,8 +380,10 @@ class JointSearch:
             total += lp
         return total + (self.lm.end(st) if final and words else 0.0)
 
-    def judge_scores(self, cands, cam, emg_fn, hints, final):
-        """(K, 5) array: cam, emg, lm, hint, number of words, per candidate. emg_fn(texts) -> S_emg or None."""
+    def judge_scores(self, cands, cam, emg_fn, hints, final, nbest=()):
+        """(K, 6) array per candidate: cam, emg, lm, hint, number of words, and the camera's final-pass score
+        (cam.final's n-best score, its worst minus 5 for a candidate it doesn't list; 0 before the segment ends).
+        emg_fn(texts) -> S_emg or None; nbest: cam.final's [{'text', 'score'}]."""
         K = len(cands)
         cam_s = ctc_loglik(cam, [c.flat() for c in cands]) if cam is not None else np.zeros(K)
         emg_s = None
@@ -383,13 +393,21 @@ class JointSearch:
         lm_s = np.array([self.lm_score(c.words, final) for c in cands])
         hint_s = np.array([sum(hints.get(x, 0.0) for x in set(c.words)) for c in cands])
         n = np.array([len(c.words) for c in cands], np.float64)
-        return fix_infeasible(np.stack([cam_s, emg_s, lm_s, hint_s, n], 1))
+        fin = np.zeros(K)
+        listed = {}
+        for h in nbest:
+            words = tuple(norm_words(h['text']))
+            listed[words] = max(listed.get(words, -1e9), float(h['score']))
+        if listed:
+            floor = min(listed.values()) - 5.0
+            fin = np.array([listed.get(c.words, floor) for c in cands])
+        return fix_infeasible(np.stack([cam_s, emg_s, lm_s, hint_s, n, fin], 1))
 
     @staticmethod
     def combine(scores, w):
         """S per candidate from the judge scores and this pass's weights."""
         return (w['cam'] * scores[:, 0] + w['emg'] * scores[:, 1] + w['lm'] * scores[:, 2] + w['beta'] * scores[:, 3]
-                + w['gamma'] * scores[:, 4])
+                + w['gamma'] * scores[:, 4] + w.get('final', 0.0) * scores[:, 5])
 
 
 def fix_infeasible(scores):
