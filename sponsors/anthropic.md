@@ -22,6 +22,27 @@ Claude is the one part of Silent Voice that knows what the conversation is about
 - It's held back on purpose, so it never adds ideas, it can never lock a word by itself, and when nobody's sure the screen says "Please repeat".
 - Under the hood it's the Claude API with JSON schema outputs, prompt caching, and a backoff that carries the judge's lines into the next request, so a short outage or a 429 loses nothing.
 
+One turn of the conversation, from Claude's side.
+
+```mermaid
+sequenceDiagram
+    participant I as Cartesia Ink
+    participant C as Claude Haiku 5.5
+    participant J as Joint search
+    participant A as Austin
+    I->>C: the judge's line so far, from 2 words in
+    C-->>J: likely next words and how predictable they are
+    Note over C: two predictions in flight, a fresh one every 0.8 s
+    I->>C: the judge's full line
+    C-->>J: updated prediction, in about 2 s
+    A->>J: mouths silently, read by camera and EMG
+    J->>J: boost the predicted words and set the lock threshold
+    J->>C: an uncertain word and its look-alikes, bills or pills or mills
+    C-->>J: picks one look-alike or keeps the word
+    J->>J: locks only when camera, EMG and Claude agree
+    Note over J: Claude alone never locks a word, and unsure means Please repeat
+```
+
 We started on Opus 5.5 and it was too slow for a phone call, so we timed every option on live calls and moved to Haiku 5.5 with thinking off.
 Opus took 5.7 to 6.9 s a call, and Haiku answers in about 2 to 3 s, so a prediction is ready before Austin starts mouthing.
 
@@ -38,6 +59,23 @@ Thai is an Anthropic Claude Builder Campus Ambassador and runs the Claude Builde
 - A repo skill, [signal-check](../.claude/skills/signal-check/SKILL.md), lets Claude run the pad check itself, speaking each cue out loud while Austin wears the pads.
 - Loops keep an eye on long runs, and parallel subagents review a PR from several angles at once.
 - Main is locked, so every change is a PR, and Claude writes each one in the same four sections.
+
+```mermaid
+flowchart LR
+    subgraph H["Thai's Claude Code setup"]
+        direction TB
+        MD["CLAUDE.md<br/>every team decision"]
+        SK["Skills<br/>PR format, review, signal check"]
+        PL["Plugins and loops<br/>long runs, parallel reviewers"]
+    end
+    MD & SK & PL --> CC["Claude Code<br/>all 4 teammates"]
+    CC --> HW["Hardware<br/>breadboard, pad map"]
+    CC --> FW["Firmware<br/>1 kHz Arduino, serial reader"]
+    CC --> SP["Signals<br/>hum filter, signal check"]
+    CC --> SW["Software<br/>SVR-1, Claude, Cartesia, dashboard"]
+    CC --> TS["271 tests"]
+    HW & FW & SP & SW & TS --> PR["A PR for every change<br/>main is locked"]
+```
 
 Claude didn't stop at software either.
 It laid out the breadboard, wrote the 1 kHz Arduino firmware and the serial reader, mapped the pads to the face, designed the hum filter, and wrote the scripts that check the signal and the tests that keep it all honest.
