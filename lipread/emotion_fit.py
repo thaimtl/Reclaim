@@ -2,6 +2,13 @@
 
     venv-live/bin/python -m lipread.emotion_fit                                         # writes data/emotion/head.npz
     venv-live/bin/python -m lipread.emotion_fit --sessions session_01 --test session_02
+
+What carries to a new call, measured on Austin's sessions 1 to 3 (each scored by a head fitted on the others):
+the HSEmotion scores alone (--features logits, the default) with strong regularisation (C 0.01). The 52 blendshapes
+fit one session and fail the next (the EMG pads on the cheeks move between sessions). Training subtracts each
+session's median face (where the running baseline settles, so it looks ahead); scoring replays the live, causal
+RunningBaseline on sessions the head never saw. With one session, 5-fold by clip shares that session's median
+(no labels in it) between folds.
 """
 import argparse
 import itertools
@@ -15,7 +22,7 @@ import numpy as np
 
 import lipread
 from lipread.emotion import BASELINE_S
-from lipread.expression import HEAD_PATH, MODEL_SHA256, N_FEATURES, Head
+from lipread.expression import HEAD_PATH, LOGITS, MODEL_SHA256, N_FEATURES, Head
 
 LABELS = ('neutral', 'happy', 'sad', 'surprised')
 TRUTH = {'smile': 'happy', 'frown': 'sad', 'surprised': 'surprised'}
@@ -24,6 +31,7 @@ PROCESS = (1280, 720)
 GRID = list(itertools.product((0.4, 0.5, 0.6, 0.7), (0.5, 0.8), (0.3, 0.5, 1.0)))   # margin, hold_s, tau_s
 FEATURE_DIR = os.path.join(lipread.WORK, 'data', 'emotion')
 CACHE_VERSION = 3
+C_DEFAULT = 0.01     # strong: 10 clips per expression per session; best leave-one-session-out
 
 
 def truth(row):
@@ -82,25 +90,33 @@ def extract(root, session, cache=FEATURE_DIR):
     return out
 
 
-def baseline(clips):
-    """Mean features over the first BASELINE_S of face frames, as live."""
-    xs, t_first = [], None
+def session_median(clips):
+    """The session's neutral face for training: the median of its sentence frames (most are neutral), without the
+    ones RunningBaseline keeps out, i.e. where the running baseline settles. It reads no labels."""
+    from lipread.emotion import RunningBaseline
+    f = np.vstack([c[4] for c in clips if not c[2]])
+    f = f[~np.isnan(f).any(1)]
+    expressive = RunningBaseline().expressive
+    return np.median(f[[not expressive(x) for x in f]], 0)
+
+
+def running_bases(clips):
+    """Per clip, per frame: the baseline the live tagger would hold at that moment (RunningBaseline over the session
+    in recorded order, causal), or None while it warms up."""
+    from lipread.emotion import RunningBaseline
+    rb, out = RunningBaseline(), []
     for _, _, _, t, f in clips:
-        for ti, x in zip(t, f):
-            if np.isnan(x[0]):
-                continue
-            t_first = ti if t_first is None else t_first
-            xs.append(x)
-            if ti - t_first >= BASELINE_S:
-                return np.mean(xs, 0), ti
-    raise ValueError('no 3 s of face in the session')
+        out.append([rb.push(ti, None if np.isnan(x[0]) else x) for ti, x in zip(t, f)])
+    return out
 
 
-def fit_head(X, y, C=1.0):
+def fit_head(X, y, C=C_DEFAULT, cols=LOGITS):
+    """X: (N, N_FEATURES) baseline-subtracted frames; the head reads `cols` of them."""
     from sklearn.linear_model import LogisticRegression
     from sklearn.preprocessing import StandardScaler
+    X = X[:, list(cols)]
     sc = StandardScaler().fit(X)
-    m = LogisticRegression(C=C, max_iter=3000, class_weight='balanced').fit(sc.transform(X), y)
+    m = LogisticRegression(C=C, max_iter=4000, class_weight='balanced').fit(sc.transform(X), y)
     classes = list(m.classes_)
     coef = np.zeros((len(LABELS), X.shape[1]), np.float32)
     intercept = np.full(len(LABELS), -20.0, np.float32)     # a label this fold never saw: never predicted
@@ -112,11 +128,11 @@ def fit_head(X, y, C=1.0):
             else:            # binary: sigmoid(w x + b) == softmax over +-(w x + b) / 2
                 sign = 0.5 if j == 1 else -0.5
                 coef[i], intercept[i] = sign * m.coef_[0], sign * m.intercept_[0]
-    return Head(LABELS, sc.mean_, sc.scale_, coef, intercept, 0.5, 0.5, 0.3)
+    return Head(LABELS, sc.mean_, sc.scale_, coef, intercept, 0.5, 0.5, 0.3, cols=cols)
 
 
 def training_frames(clips, base):
-    """Frames after the first third of each clip, once the expression is held."""
+    """Frames after the first third of each clip, once the expression is held, minus the session's median face."""
     X, y = [], []
     for _, lab, _, t, f in clips:
         f = f[len(f) // 3:]
@@ -168,33 +184,45 @@ def score(clips, res):
     return acc, fresh / max(1, n_neutral), carry / max(1, n_neutral), float(np.mean(rest_ok)) if rest_ok else 0.0
 
 
-def held_out_probs(sessions):
-    """Per session, per clip: (T, 4) probabilities from a 5-fold model that never saw the clip."""
+def held_out_probs(sessions, C=C_DEFAULT, cols=LOGITS):
+    """Per session, per clip: (T, 4) probabilities from a head that never saw the clip, read the way the live tagger
+    reads it (running baseline). With several sessions, each is scored by a head fitted on the others
+    (leave-one-session-out: the honest test, since a new call is a new session); with one, 5-fold by clip."""
+    probs = [[None] * len(s['clips']) for s in sessions]
+    if len(sessions) > 1:
+        for k, s in enumerate(sessions):
+            rest = [o for o in sessions if o is not s]
+            X, Y = zip(*(training_frames(o['clips'], o['median']) for o in rest))
+            head = fit_head(np.vstack(X), np.concatenate(Y), C, cols)
+            probs[k] = [predict(head, c[4], b) for c, b in zip(s['clips'], s['bases'])]
+        return probs
     from sklearn.model_selection import StratifiedGroupKFold
-    flat = [(si, ci) for si, (clips, base, _) in enumerate(sessions) for ci in range(len(clips))]
-    y = np.array([sessions[si][0][ci][1] for si, ci in flat])
-    probs = [[None] * len(c) for c, _, _ in sessions]
-    folds = StratifiedGroupKFold(5, shuffle=True, random_state=0).split(flat, y, groups=np.arange(len(flat)))
-    for train, test in folds:
-        X, Y = [], []
-        for i in train:
-            si, ci = flat[i]
-            x, yy = training_frames([sessions[si][0][ci]], sessions[si][1])
-            X.append(x)
-            Y.append(yy)
-        head = fit_head(np.vstack(X), np.concatenate(Y))
+    s = sessions[0]
+    y = np.array([c[1] for c in s['clips']])
+    for train, test in StratifiedGroupKFold(5, shuffle=True, random_state=0).split(y, y, groups=np.arange(len(y))):
+        X, Y = training_frames([s['clips'][i] for i in train], s['median'])
+        head = fit_head(X, Y, C, cols)
         for i in test:
-            si, ci = flat[i]
-            probs[si][ci] = predict(head, sessions[si][0][ci][4], sessions[si][1])
+            probs[0][i] = predict(head, s['clips'][i][4], s['bases'][i])
     return probs
 
 
-def predict(head, feats, base):
+def predict(head, feats, bases):
+    """(T, 4) probabilities, NaN where there is no face or the running baseline is still warming up."""
     p = np.full((len(feats), len(LABELS)), np.nan, np.float32)
-    ok = ~np.isnan(feats).any(1)
+    ok = np.array([b is not None for b in bases], bool) & ~np.isnan(feats).any(1)
     if ok.any():
-        p[ok] = head.predict(feats[ok] - base)
+        p[ok] = head.predict(feats[ok] - np.stack([b for b, k in zip(bases, ok) if k]))
     return p
+
+
+def load_session(root, name):
+    clips = extract(root, name)
+    bases = running_bases(clips)
+    t_start = next((t for c, bs in zip(clips, bases) for t, b in zip(c[3], bs) if b is not None), None)
+    if t_start is None:
+        raise SystemExit(f'{name}: not {BASELINE_S:.0f} s of face anywhere')
+    return dict(name=name, clips=clips, bases=bases, t_start=t_start, median=session_median(clips))
 
 
 def summary(acc, fresh, carry, rest):
@@ -208,6 +236,9 @@ def main(argv=None):
     ap.add_argument('--sessions', help='comma list (default: every session_0* under --root except --test)')
     ap.add_argument('--test', help='a session scored with the head fitted on --sessions, never fitted on')
     ap.add_argument('--out', default=HEAD_PATH)
+    ap.add_argument('--features', choices=('logits', 'all'), default='logits',
+                    help='logits: the HSEmotion scores alone (carry across sessions); all: plus the 52 blendshapes')
+    ap.add_argument('--C', type=float, default=C_DEFAULT, help='logistic-regression regularisation (smaller: stronger)')
     args = ap.parse_args(argv)
     names = args.sessions.split(',') if args.sessions else sorted(
         d for d in os.listdir(args.root) if d.startswith('session_') and d != args.test and
@@ -215,37 +246,40 @@ def main(argv=None):
     if not names:
         sys.exit(f'no sessions with manifest.jsonl under {args.root}')
     sessions = []
-    for s in names:
-        clips = extract(args.root, s)
-        base, t_start = baseline(clips)
-        sessions.append((clips, base, t_start))
-        print(f'{s}: {len(clips)} clips, {Counter(c[1] for c in clips if not c[2])} sentences')
-    missing = set(LABELS) - {c[1] for clips, _, _ in sessions for c in clips}
+    for name in names:
+        s = load_session(args.root, name)
+        sessions.append(s)
+        print(f'{name}: {len(s["clips"])} clips, {Counter(c[1] for c in s["clips"] if not c[2])} sentences')
+    missing = set(LABELS) - {c[1] for s in sessions for c in s['clips']}
     if missing:
         sys.exit(f'no {sorted(missing)} clips in {names}; the head needs every label in {LABELS}')
-    probs = held_out_probs(sessions)
+    cols = LOGITS if args.features == 'logits' else tuple(range(N_FEATURES))
+    probs = held_out_probs(sessions, args.C, cols)
     best = None
     for margin, hold_s, tau_s in GRID:
-        res = [replay(c, p, ts, margin, hold_s, tau_s) for (c, _, ts), p in zip(sessions, probs)]
-        scored = [score(c, r) for (c, _, _), r in zip(sessions, res)]
-        acc = {k: float(np.nanmean([s[0][k] for s in scored])) if any(not np.isnan(s[0][k]) for s in scored)
+        scored = [score(s['clips'], replay(s['clips'], p, s['t_start'], margin, hold_s, tau_s))
+                  for s, p in zip(sessions, probs)]
+        acc = {k: float(np.nanmean([sc[0][k] for sc in scored])) if any(not np.isnan(sc[0][k]) for sc in scored)
                else float('nan') for k in LABELS}
-        fresh, carry, rest = (float(np.mean([s[i] for s in scored])) for i in (1, 2, 3))
+        fresh, carry, rest = (float(np.mean([sc[i] for sc in scored])) for i in (1, 2, 3))
         objective = float(np.nanmean(list(acc.values()))) - 2 * fresh    # labels with no sentences are left out
         if best is None or objective > best[0]:
-            best = (objective, (margin, hold_s, tau_s), acc, fresh, carry, rest)
-    _, (margin, hold_s, tau_s), acc, fresh, carry, rest = best
-    held = f'held-out clips ({",".join(names)}): {summary(acc, fresh, carry, rest)}'
+            best = (objective, (margin, hold_s, tau_s), acc, fresh, carry, rest, scored)
+    _, (margin, hold_s, tau_s), acc, fresh, carry, rest, scored = best
+    how = 'each session scored by a head fitted on the others' if len(sessions) > 1 else 'held-out clips, 5-fold'
+    held = f'{how} ({",".join(names)}): {summary(acc, fresh, carry, rest)}'
     print(f'smoothing margin {margin}, hold {hold_s} s, tau {tau_s} s\n{held}')
-    X, Y = zip(*(training_frames(c, b) for c, b, _ in sessions))
-    head = fit_head(np.vstack(X), np.concatenate(Y))
+    for s, sc in zip(sessions, scored):
+        print(f'  {s["name"]}: {summary(*sc)}')
+    X, Y = zip(*(training_frames(s['clips'], s['median']) for s in sessions))
+    head = fit_head(np.vstack(X), np.concatenate(Y), args.C, cols)
     head.margin, head.hold_s, head.tau_s = margin, hold_s, tau_s
     info = held
     if args.test:
-        clips = extract(args.root, args.test)
-        base, t_start = baseline(clips)
-        res = replay(clips, [predict(head, c[4], base) for c in clips], t_start, margin, hold_s, tau_s)
-        test = f'{args.test} (never fitted on): {summary(*score(clips, res))}'
+        t = load_session(args.root, args.test)
+        res = replay(t['clips'], [predict(head, c[4], b) for c, b in zip(t['clips'], t['bases'])], t['t_start'],
+                     margin, hold_s, tau_s)
+        test = f'{args.test} (never fitted on): {summary(*score(t["clips"], res))}'
         print(test)
         info += f' | {test}'
     head.info = info

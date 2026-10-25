@@ -42,7 +42,7 @@ Useful flags: `--size 1920x1080` (camera capture, default), `--process-size 1280
 | `model.py` | Auto-AVSR encoder + CTC top-k per read, front end / Conformer timing |
 | `final.py` | beam 5 + LM in a background process, which publishes `cam.final` |
 | `emotion.py` | emotion tag for the voice: the expression network when its model is there (on its own thread), else the blendshape rules |
-| `expression.py` | HSEmotion expression network on the face crop + the head fitted on the speaker's sessions |
+| `expression.py` | HSEmotion expression network on the face crop + the head fitted on the speaker's sessions (reads the 8 HSEmotion scores) |
 | `emotion_fit.py` | fits that head on `recordings/session_0*` and prints held-out scores (`--test session_02` scores a session it never saw) |
 | `types.py` | `Frame` and `Crop`; the message types live in `bus/` |
 | `bench/` | `laptop_check.py` (the laptop), `tick_bench.py` (tick speed) |

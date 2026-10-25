@@ -4,6 +4,7 @@ import math
 import os
 import threading
 import time
+from collections import deque
 from types import SimpleNamespace
 
 import numpy as np
@@ -39,6 +40,7 @@ MARGIN = 0.35
 NOFACE_TAU_S = 2.0
 MAX_DT = 0.5
 BASELINE_S = 3.0        # the speaker's neutral face at call start
+BASELINE_WINDOW_S = 60.0   # the expression network's baseline: the face over the last minute (RunningBaseline)
 
 
 def _ramp(v, lo_hi):
@@ -175,14 +177,55 @@ class EmotionTagger:
 RESTING = Emotion(NEUTRAL, 1.0, {e: float(e == NEUTRAL) for e in EMOTIONS})
 
 
+class RunningBaseline:
+    """The speaker's neutral face for the expression network: the median of their features over the last window_s
+    (every keep_every-th face frame, refreshed every every_s), ready warm_s after the first kept frame.
+
+    Why not the first seconds alone: whatever the face does then becomes "neutral" for the whole call. Session 2
+    opened on a "Raise your eyebrows" rest clip, and every neutral sentence after it read as sad or happy. Most of
+    a conversation is a neutral face, so a running median follows light and posture and outvotes the odd smile.
+    Frames the network alone (no baseline, so no feedback loop) reads as clearly expressive, non-neutral above gate,
+    stay out, so a long smile at the start doesn't become the neutral face: on Austin's sessions that keeps 93 to
+    100% of neutral frames and drops 15 to 100% of held expressions. A face that is never neutral gets no baseline
+    (the tag stays neutral). After a gap longer than the window the old baseline stays until warm_s after the first
+    new kept frame."""
+
+    def __init__(self, window_s=BASELINE_WINDOW_S, warm_s=BASELINE_S, every_s=1.0, keep_every=5, gate=0.8):
+        self.window_s, self.warm_s, self.every_s = window_s, warm_s, every_s
+        self.keep_every, self.gate = keep_every, gate
+        self.reset()
+
+    def reset(self):
+        self.buf, self.base, self.t_update, self.n = deque(), None, -math.inf, 0
+
+    def expressive(self, feats):
+        from lipread.expression import GENERIC, generic_probs
+        return 1.0 - generic_probs(feats[:8])[list(GENERIC).index('Neutral')] > self.gate
+
+    def push(self, t, feats):
+        """One face frame's features (None: no face) -> the current baseline, None while warming up."""
+        if feats is not None:
+            self.n += 1
+            while self.buf and t - self.buf[0][0] > self.window_s:
+                self.buf.popleft()
+            if (self.n - 1) % self.keep_every == 0 and not self.expressive(feats):     # 1st, 6th, ...
+                self.buf.append((t, feats))
+            # only neutral-looking frames are kept, so the old baseline (or none) stays until warm_s after the first
+            if self.buf and t - self.buf[0][0] >= self.warm_s and t - self.t_update >= self.every_s:
+                self.base, self.t_update = np.median([f for _, f in self.buf], 0), t
+        return self.base
+
+
 class NetTagger:
-    """Expression network -> Emotion, with the same baseline, hold and no-face decay as EmotionTagger."""
+    """Expression network -> Emotion, with the hold and no-face decay of EmotionTagger, and a running baseline
+    (RunningBaseline) instead of the first seconds."""
 
     GENERIC_SMOOTHING = (0.6, 0.5, 1.0)     # margin, hold_s, tau_s: best on RAVDESS without a head
 
-    def __init__(self, net, head=None, baseline_s=BASELINE_S, labels=EMOTIONS):
+    def __init__(self, net, head=None, baseline_s=BASELINE_S, labels=EMOTIONS, window_s=BASELINE_WINDOW_S):
         from lipread.expression import GENERIC
-        self.net, self.head, self.baseline_s, self.labels = net, head, baseline_s, tuple(labels)
+        self.net, self.head, self.labels = net, head, tuple(labels)
+        self.baseline = RunningBaseline(window_s=window_s, warm_s=baseline_s)
         self.own = head.labels if head else tuple(GENERIC.values())
         self.margin, self.hold_s, self.tau = (head.margin, head.hold_s, head.tau_s) if head else self.GENERIC_SMOOTHING
         if NEUTRAL not in self.own or NEUTRAL not in self.labels:
@@ -190,9 +233,13 @@ class NetTagger:
         self.reset_baseline()
 
     def reset_baseline(self):
-        self.base, self.base_feats, self.base_t0 = None, [], None
+        self.baseline.reset()
         self.smooth = None
         self.label, self.cand, self.cand_since, self.t = NEUTRAL, NEUTRAL, None, None
+
+    @property
+    def base(self):
+        return self.baseline.base
 
     def _probs(self, feats):
         from lipread.expression import generic_probs
@@ -211,16 +258,8 @@ class NetTagger:
         return self.push_features(t, feats)
 
     def push_features(self, t, feats):
-        """[8 logits, 52 blendshapes] or None (no face): the baseline first, then step() with the probabilities."""
-        if feats is not None and self.base is None:
-            self.base_t0 = t if self.base_t0 is None else self.base_t0
-            self.base_feats.append(feats)
-            if t - self.base_t0 >= self.baseline_s:
-                self.base = np.mean(self.base_feats, 0)
-                self.base_feats = []
-            self.t = float(t)
-            return self._emit()
-        if self.base is None:
+        """[8 logits, 52 blendshapes] or None (no face): the running baseline, then step() with the probabilities."""
+        if self.baseline.push(t, feats) is None:
             self.t = float(t)
             return self._emit()
         return self.step(t, None if feats is None else self._probs(feats))
