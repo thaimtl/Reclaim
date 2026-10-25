@@ -1,9 +1,10 @@
-"""Words and names Austin says on every demo call: hints for the joint search from the first second, before Claude's
-first prediction, and in every claude.predict after it. The one list both sides read (claude_service/brain.py adds it
-to each prediction; fusion/core.py hints it always). Every word is in data/lexicon (cmudict.dict or
-g2p_supplement.dict), so SVR-1 can grade it by sound.
+"""Words and names Austin says on every demo call: in the joint search from the first second, before Claude's first
+prediction, and in every claude.predict after it. The one list both sides read (claude_service/brain.py adds it to
+each prediction; fusion/core.py adds it to Claude's words always). At ALWAYS_WEIGHT they are weak predictions, so
+they carry over the camera's reading only on a close lip match (fusion.search.WEAK_LIP_MIN), not in free speech that
+merely sounds a bit like them. Every word is in data/lexicon (cmudict.dict or g2p_supplement.dict).
 """
-ALWAYS_WEIGHT = 0.4     # hint weight of an always-on word: a strong Claude prediction (~0.9) still counts more
+ALWAYS_WEIGHT = 0.4     # an always-on word's weight: a strong Claude prediction (~0.9) counts more
 
 ALWAYS = (
     'austin', 'frank', 'cal hacks', 'calhacks', 'mcgill university', 'red bull', 'meta', 'anthropic', 'cartesia',

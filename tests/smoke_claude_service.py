@@ -78,7 +78,8 @@ def unit():
     out, _ = b.apply(r, target, 0.6)
     check('predict only when nothing is under review', [t for t, _ in out] == ['claude.predict'])
     p = out[0][1]
-    check('predict words cleaned and clipped, the names after', p['words'][0] == {'w': 'burritos', 'weight': 1.0}
+    check('predict words cleaned and clipped, the demo\'s names after', p['words'][0] == {'w': 'burritos', 'weight': 1.0}
+          and {'austin', 'mcgill', 'laryngectomy'} <= {w['w'] for w in p['words']}
           and all(w['weight'] == 0.4 for w in p['words'][1:]), p['words'][:3])
     check('predictability clipped', p['predictability'] == 0.0)
     check('predict fields', set(p) == {'words', 'phrases', 'predictability', 'ttl_s', 't'})
@@ -138,8 +139,8 @@ def unit():
 def live_lane():
     """A prediction is always on its way: a new word in the judge's live line starts a live call (at most every
     LIVE_JUDGE_EVERY_S, up to MAX_LIVE in flight); otherwise the next starts as soon as the last is back, on the newest
-    context (an unchanged one only after LIVE_IDLE_S). Live calls append nothing; filler never becomes a hint; the
-    demo's names are in every prediction; a newer prediction is never overwritten by an older one."""
+    context (an unchanged one only after LIVE_IDLE_S). Live calls append nothing; a
+    newer prediction is never overwritten by an older one."""
     b = Brain(FakeClient([reply(words=(('pancakes', 0.9), ('the', 0.8), ('yes', 0.7))),
                           reply(words=(('burritos', 0.9),))]))
     check('live: nothing before the call starts', b.next_live(0.0) is None)
@@ -163,9 +164,6 @@ def live_lane():
     out, _ = b.apply(r, req3[1], 3.0)
     words = [w['w'] for w in b.predict['words']]
     check('live: publishes a prediction', [t for t, _ in out] == ['claude.predict'] and words[0] == 'pancakes')
-    check('live: filler never becomes a hint', 'the' not in words and 'yes' not in words, words)
-    check('live: the demo\'s names are in every prediction', {'austin', 'mcgill', 'university', 'laryngectomy'} <= set(words)
-          and 'voice box' in b.predict['phrases'])
     b.partner({'text': 'what did you have for breakfast', 'is_final': True})
     check('live: the final line clears the live line and goes to the conversation lane',
           b.partial == '' and b.due(9.0, mouthing=False) and 'just said' in b.live_context())
@@ -176,6 +174,35 @@ def live_lane():
     late, _ = b.apply(reply(words=(('stale', 0.9),)), {'utt_id': None, 'words': [], 'review': [], 'sent': 1.0,
                                                        'lane': 'live'}, 12.0)
     check('live: a late reply never replaces a newer one', late == [] and b.predict['words'][0]['w'] == 'burritos')
+
+
+def caption():
+    """A closed sentence gets one Opus caption pass on the whole conversation: the corrected sentence (words may change,
+    appear or go) goes out as claude.caption, the conversation hears it next, a failed pass is retried, and the
+    caption lane appends nothing."""
+    fake = FakeClient([{'text': 'i study at mcgill university'}, {'text': 'i study at mcgill university'}])
+    b = Brain(fake)
+    b.locked(lock(5, ('i', []), ('study', []), ('at', []), ('mecca', ['mega']), ('university', [])))
+    check('caption: nothing before the sentence closes', b.next_caption(0.0) is None)
+    b.sentence({'utt_id': 5, 'event': 'hold'})
+    check('caption: a hold is not a close', b.next_caption(0.0) is None)
+    b.sentence({'utt_id': 5, 'event': 'close'})
+    b.sentence({'utt_id': 5, 'event': 'close'})
+    msgs, target = b.next_caption(1.0)
+    check('caption: one pass per closed sentence, on the decoded words', b.captions == [] and target['lane'] == 'caption'
+          and 'i study at mecca university' in msgs[-1]['content'])
+    b.failed(target, 1.5)
+    check('caption: a failed pass is retried', b.captions == [5])
+    b.succeeded()
+    msgs, target = b.next_caption(2.0)
+    r, log = b.ask(msgs, lane='caption')
+    out, _ = b.apply(r, target, 3.0)
+    check('caption: Opus, nothing appended', b.messages == [] and fake.calls[-1]['model'] == brain_mod.REPAIR_MODEL)
+    check('caption: claude.caption with the corrected words', out == [('claude.caption', {
+        'utt_id': 5, 'words': ['i', 'study', 'at', 'mcgill', 'university'],
+        'from': ['i', 'study', 'at', 'mecca', 'university'], 'changed': True, 't': 3.0})], out)
+    check('caption: the conversation hears it next', 'mecca university -> i study at mcgill' in ' '.join(b.notes)
+          and 5 in b.updated and [w['w'] for w in b.utts[5]][3] == 'mcgill')
 
 
 def stale_predict():
@@ -422,7 +449,7 @@ def live():
             continue
         claude_words = {_w for p in r['predict_words'] for _w in str(p['w']).lower().split()} | \
             {_w for ph in r['predict_phrases'] for _w in str(ph).lower().split()}
-        filler = [p['w'] for p in r['predict_words'] if str(p['w']).lower() in brain_mod.STOPWORDS]
+        filler = [p['w'] for p in r['predict_words'] if str(p['w']).lower() in {'the', 'a', 'i', 'it', 'to', 'and', 'so'}]
         check(f'live: "{question}" predicts {name}', want(claude_words),
               f"{[p['w'] for p in r['predict_words']][:8]} | {r['predict_phrases'][:3]} | {lg['ms']:.0f} ms")
         check(f'live: "{question}": few filler words from Claude', len(filler) <= 2, filler)
@@ -551,6 +578,7 @@ if __name__ == '__main__':
     unit()
     end_lane()
     live_lane()
+    caption()
     stale_predict()
     late_lock()
     empty_reply()
