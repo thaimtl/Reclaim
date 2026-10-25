@@ -23,6 +23,7 @@ from collections import deque
 
 import numpy as np
 
+from claude_service.names import always_phrases
 from dashboard.emg_level import PadLevels
 
 PADS = (('A0', 'Tongue'), ('A1', 'Jaw'), ('A2', 'Lower lip'), ('A3', 'Upper lip'))   # HARDWARE.md pad sites
@@ -32,6 +33,7 @@ TONE = {'neutral': 'Sounds calm', 'happy': 'Sounds warm', 'sad': 'Sounds concern
         'angry': 'Sounds firm'}
 TONE_ORDER = ('warm', 'concerned', 'calm', 'surprised', 'firm')    # the end screen's donut, in this colour order
 REUSE_S = 10.0              # a finished sentence's utt_id seen again after this long: the decoder restarted
+FORESEEN_SIM = 0.5          # a predicted sentence at least this close (1 - word error) counts as seen coming
 MOUTHING_S = 0.5            # the decoder spoke this recently: he is mouthing (dec.hyp comes every 100 ms)
 TONE_GAP_S = 0.5            # a longer gap between camera ticks counts as this long (a stall isn't a mood)
 SPEAKING_MAX_S = 8.0        # no 'played' mark this long after the first audio: the voice has stopped anyway
@@ -51,8 +53,24 @@ def pretty(words, first=True):
     return ' '.join(out)
 
 
+NAME_PHRASES = set(always_phrases())          # the demo's names, in every prediction: not a guess at his sentence
 SSML_TAG = re.compile(r'<[^>]*>')            # the voice's volume tags (a clenched word): never shown
 PUNCT = re.compile(r'^(.*?)([,.!?;:]*)$')   # a spoken token: the word, then its punctuation
+
+
+def _words(text):
+    """Words to compare: lower case, no punctuation."""
+    return [w for w in re.sub(r"[^\w' ]+", ' ', str(text).lower()).split() if w.strip("'")]
+
+
+def _edits(hyp, ref):
+    """Word edit distance (Levenshtein): substitutions + insertions + deletions."""
+    row = list(range(len(ref) + 1))
+    for i, h in enumerate(hyp, 1):
+        prev, row[0] = row[0], i
+        for j, r in enumerate(ref, 1):
+            prev, row[j] = row[j], min(row[j] + 1, row[j - 1] + 1, prev + (h != r))
+    return row[-1]
 
 
 def _marked(words, marks):
@@ -104,6 +122,7 @@ class CallState:
         self.tone_s = {}                     # tone -> seconds his face showed it while he mouthed (end screen)
         self.tone_t = None                   # the last cam.tick's time, for the seconds between ticks
         self.review = None                   # the end-of-call review (dashboard/review.py), once the call ended
+        self.predictions = deque(maxlen=60)  # (t, phrases) from claude.predict: did Claude see his sentence coming?
 
     def _utt(self, utt_id, t, current=False):
         """Austin's sentence utt_id. Only the decoder's messages (current=True) make it the live one, so a late
@@ -261,15 +280,37 @@ class CallState:
         text = pretty(u['caption']) if u.get('caption') else (self._said(u) or pretty(u['locked']))
         if text:
             emotion = u['emotion'] or self.emotion[0]
+            # Claude's predictions since his last sentence (the judge's whole turn included), before this one began
+            since = next((x['t'] for x in reversed(self.transcript) if x['who'] == 'austin'), -1e9)
             self._line(dict(who='austin', text=text, t=t, utt_id=u['utt_id'], emotion=emotion,
-                                        tone=TONE.get(emotion, '').replace('Sounds', 'sounded'),
-                                        repairs=[dict(index=i, frm=pretty([f], False), to=pretty([to], False))
-                                                 for i, (f, to) in u['repaired'].items()],
-                                        repeat=u['repeat'], face_hidden=u['face_hidden']))
+                            tone=TONE.get(emotion, '').replace('Sounds', 'sounded'),
+                            repairs=[dict(index=i, frm=pretty([f], False), to=pretty([to], False))
+                                     for i, (f, to) in u['repaired'].items()],
+                            repeat=u['repeat'], face_hidden=u['face_hidden'],
+                            foreseen=self.foreseen(text, u['t'], since)))
 
     def _line(self, line):
         self.seq += 1
         self.transcript.append(dict(line, seq=self.seq))
+
+    def _predict(self, topic, msg, now):
+        self.seen['claude'] = now
+        phrases = [str(p) for p in msg.get('phrases') or [] if str(p).strip() and str(p) not in NAME_PHRASES]
+        if phrases and not (self.predictions and self.predictions[-1][1] == phrases):   # a resend isn't news
+            self.predictions.append((now, phrases))
+
+    def foreseen(self, said, start, since):
+        """Claude's closest predicted sentence made before he began this one (and after `since`), and how
+        close: 1 - word error against what he said. None when no prediction came in that window."""
+        ref = _words(said)
+        best = None
+        for t, phrases in self.predictions:
+            if since <= t < start:
+                for p in phrases:
+                    sim = max(0.0, 1 - _edits(_words(p), ref) / max(1, len(ref)))
+                    if best is None or sim > best[1]:
+                        best = (p, sim)
+        return None if best is None else dict(phrase=best[0], sim=round(best[1], 2))
 
     def _close_open_sentences(self, t):
         for u in self.utts.values():
@@ -498,7 +539,13 @@ class CallState:
         else:                   # no camera ticks while he mouthed (a replay without them): each sentence's tone
             said = [TONE.get(s.get('emotion'), '').replace('Sounds ', '') for s in austin]
             tones = {t: said.count(t) for t in TONE_ORDER if said.count(t)}
-        return dict(seconds=elapsed, words=n_words, tones=tones, benchmark=self.benchmark,
+        seen = [s['foreseen'] for s in austin if s.get('foreseen')]
+        hits = [f for f in seen if f['sim'] >= FORESEEN_SIM]
+        best = max(((s['foreseen'], s['text']) for s in austin if s.get('foreseen')), key=lambda x: x[0]['sim'],
+                   default=None)
+        foreseen = dict(n=len(hits), of=len(austin), predicted=len(seen), share=round(100 * len(hits) / len(austin)) if austin else None,
+                        best=dict(expected=best[0]['phrase'], said=best[1], sim=best[0]['sim']) if best else None)
+        return dict(seconds=elapsed, words=n_words, tones=tones, benchmark=self.benchmark, foreseen=foreseen,
                     wpm=round(n_words / (elapsed / 60)) if elapsed >= 10 else None,
                     repairs=self.repairs[:], repeats=self.repeats[:], face_hidden_s=round(hidden, 1),
                     emg_words=self.emg_words, disagree=disagree, latency=lat, transcript=self.transcript[:])
@@ -507,7 +554,7 @@ class CallState:
 HANDLERS = {
     'call.state': CallState._call_state, 'partner.text': CallState._partner,
     'dec.hyp': CallState._hyp, 'dec.lock': CallState._lock, 'dec.repeat': CallState._repeat,
-    'claude.repair': CallState._repair, 'claude.caption': CallState._caption, 'voice.say': CallState._say,
-    'voice.text': CallState._voice_text,
+    'claude.repair': CallState._repair, 'claude.caption': CallState._caption, 'claude.predict': CallState._predict,
+    'voice.say': CallState._say, 'voice.text': CallState._voice_text,
     'cam.tick': CallState._tick, 'cam.face': CallState._face_msg, 'emg.raw': CallState._emg,
 }

@@ -630,6 +630,11 @@ function renderEnd(s) {
     ['s-repeat', use('repeat-icon'), 'Asked to repeat', String(m.repeats.length), '',
      m.repeats.length ? 'Readers disagreed, so nothing was spoken.' : 'Every word was clear enough to speak.'],
   ];
+  const f = m.foreseen;
+  if (f && f.of && f.predicted) stats.splice(3, 0, ['s-foresee', use('claude-mark'), 'Claude saw coming', String(f.share), '%',
+    `${f.n} of ${f.of} sentences predicted before he mouthed them` +
+    (f.best ? `. Expected “${f.best.expected}”, he said “${f.best.said}”.` : '.')]);
+  $('end-stats').classList.toggle('five', stats.length === 5);
   $('end-stats').innerHTML = stats.map(([cls, icon, label, value, unit, tip]) =>
     `<div class="stat ${cls}"><span class="wm-clip"><span class="wm">${cls === 's-lips' ? liveIcon('sonic') : icon}</span></span><div class="tip">${esc(tip)}</div>` +
     `<div class="top"><span class="ic">${icon}</span><span class="k">${label}</span></div>` +

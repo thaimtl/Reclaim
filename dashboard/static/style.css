@@ -193,10 +193,16 @@ body { font-family: var(--font); font-variant-numeric: tabular-nums; color: var(
 @keyframes end-rise { to { opacity: 1; transform: none; } }
 
 #end .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: auto; }
+#end .stats.five { grid-template-columns: repeat(5, 1fr); }
+#end .stats.five .stat { padding: 22px 20px 18px; }
+#end .stats.five .k { font-size: 19px; line-height: 24px; }
+#end .stats.five .stat b { font-size: 68px; line-height: 76px; }
+#end .stats.five .stat b small { font-size: 30px; }
 #end .stat { position: relative; padding: 24px 28px 20px; border-radius: var(--r-lg); cursor: default;
   background: linear-gradient(135deg, var(--deep), var(--tint)); }
 #end .stat.s-mouthed { --deep: var(--emg-deep); --tint: var(--emg); } #end .stat.s-lips { --deep: var(--camera-deep); --tint: var(--camera); }
-#end .stat.s-claude { --deep: var(--claude-deep); --tint: var(--claude); } #end .stat.s-repeat { --deep: var(--repeat-deep); --tint: var(--repeat); }
+#end .stat.s-claude, #end .stat.s-foresee { --deep: var(--claude-deep); --tint: var(--claude); }
+#end .stat.s-foresee { background: linear-gradient(135deg, var(--claude), var(--claude-deep)); } #end .stat.s-repeat { --deep: var(--repeat-deep); --tint: var(--repeat); }
 #end .wm-clip { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: var(--r-lg); }
 #end .wm { position: absolute; right: 4px; bottom: -40px; width: 128px; height: 128px; color: var(--on-dark); opacity: .09; }
 #end .wm svg, #end .wm img { width: 100%; height: 100%; }
@@ -204,13 +210,15 @@ body { font-family: var(--font); font-variant-numeric: tabular-nums; color: var(
 #end .ic { display: flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 40px; border-radius: var(--r-md);
   background: var(--bg); color: var(--emg); }
 #end .ic svg, #end .ic img { width: 24px; height: 24px; }
-#end .s-claude .ic { color: var(--claude-brand); } #end .s-repeat .ic { color: var(--repeat); } #end .s-lips .ic { color: var(--camera); }
+#end .s-claude .ic, #end .s-foresee .ic { color: var(--claude-brand); } #end .s-repeat .ic { color: var(--repeat); } #end .s-lips .ic { color: var(--camera); }
 #end .k { font-weight: 600; font-size: 22px; line-height: 28px; }
 #end .stat b { position: relative; display: block; margin-top: 12px; color: var(--on-dark); font-weight: 800; font-size: 84px;
   line-height: 88px; letter-spacing: -2px; }
 #end .stat b small { font-size: 36px; margin-left: 4px; }
 #end .tip { position: absolute; left: 24px; top: calc(100% + 8px); padding: 8px 12px; border-radius: var(--r-md); background: var(--overlay);
   color: var(--on-dark); font-size: 18px; line-height: 24px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 2; }
+#end .s-foresee .tip { white-space: normal; width: 440px; left: auto; right: 0; }
+#end .s-foresee .tip::after { left: auto; right: 20px; }
 #end .tip::after { content: ""; position: absolute; left: 20px; top: -6px; width: 12px; height: 12px; background: var(--overlay);
   transform: rotate(45deg); }
 #end .stat:hover .tip { opacity: 1; }

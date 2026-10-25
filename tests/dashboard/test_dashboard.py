@@ -148,6 +148,19 @@ def test_the_captions_carry_the_voices_punctuation():
                              'text': ' <volume ratio="1.40"/> we <volume ratio="1.00"/> won!'}, 2.0)
     assert '<' not in st.snapshot(2.0)['austin']['spoken']        # a clenched word's volume tag never shows
 
+
+def test_the_end_screen_counts_the_sentences_claude_saw_coming():
+    st = fed(('call.state', {'state': 'connected', 't': 0.0}), now=0.0)
+    st.feed('claude.predict', {'phrases': ['i would love a coffee', 'cal hacks']}, 1.0)     # while the judge asks
+    st.feed('partner.text', {'text': 'What would you like?', 'is_final': True}, 1.5)
+    st.feed('dec.hyp', {'utt_id': 1, 'locked': ['I', 'WOULD', 'LIKE', 'A', 'COFFEE'], 'unlocked': []}, 2.0)
+    st.feed('claude.predict', {'phrases': ['i would like a coffee']}, 2.5)   # mid-sentence: too late to count
+    st.feed('dec.hyp', {'utt_id': 2, 'locked': ['WITH', 'OAT', 'MILK'], 'unlocked': []}, 4.0)
+    st.feed('call.state', {'state': 'ended'}, 5.0)
+    f = st.snapshot(5.0)['summary']['foreseen']
+    assert (f['n'], f['of'], f['share']) == (1, 2, 50)           # "I would like a coffee" seen, "with oat milk" not
+    assert f['best'] == {'expected': 'i would love a coffee', 'said': 'I would like a coffee', 'sim': 0.8}
+
 def test_voice_offset_skips_resent_words_and_keeps_real_repeats():
     st = fed(('voice.say', {'utt_id': 1, 'words': ['no'], 'offset': 0}),
              ('voice.say', {'utt_id': 1, 'words': ['no', 'no', 'way'], 'offset': 0}),
