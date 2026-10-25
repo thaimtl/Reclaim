@@ -10,4 +10,4 @@ Without ?cam it plays recorded face-tracking data; click "Use webcam" to switch.
 The face is MediaPipe Face Landmarker, the same model Lipflow uses for mouth crops: 468 landmarks, blendshapes, head pose.
 Call content, timings and EMG levels are still sample data.
 
-track_face.py VIDEO face_landmarker.task OUT.json START DUR FPS turns a clip of Austin into playback data.
+track_face.py VIDEO face_landmarker.task OUT.json START DUR FPS turns a clip of Austin into playback data (`TRACK` in face_data.js).
