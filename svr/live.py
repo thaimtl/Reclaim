@@ -1,4 +1,4 @@
-"""SVR-1 in the live loop (docs/SVR1_SPEC.md section 5): the EMG half of the decoder process.
+"""SVR-1 in the live loop (docs/SVR1_SPEC.md section 5): the EMG half of the fusion process.
 
     live = LiveSVR1('checkpoints/W_svr1/model.pt')       # session gains and effort reference from fine-tuning
     live.calibrate(raw_minute)                            # demo day: ~1 min of rig data -> new gains + effort reference
@@ -6,7 +6,7 @@
     every 100 ms:               out = live.read(camera_active=...)
     for disputed words:         live.verify(['i need to go', 'i need to know'])
 
-No bus code here: the decoder subscribes to `emg.raw` and calls this. The filter is rig/filters.py, run once per
+No bus code here: the fusion process subscribes to `emg.raw` and calls this. The filter is rig/filters.py, run once per
 sample as samples arrive (state kept across messages), exactly as in training; slots, gain and soft clip are
 svr.preprocess's. Each read re-runs SVR-1 over the whole current segment (up to --max-seconds; past that the window
 restarts with the last --context-seconds), or over the last --idle-seconds while nobody is speaking, to catch the

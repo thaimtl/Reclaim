@@ -1,8 +1,10 @@
 # SVR-1: engineering spec
 
-SVR-1 is our EMG model: it reads 4 channels of face-muscle signals and, every 100 ms, gives the fusion decoder per-frame letter and sound probabilities, a speaking-or-not signal, the speaking pace and effort, and a verifier that settles disputed look-alike words. This page specifies it precisely enough to implement: inputs, layers, outputs, losses, training, live use, and the models that sit on top of it (the decoder and the lock model). How it fits the whole system: [REALTIME_PIPELINE.md](REALTIME_PIPELINE.md).
+SVR-1 is our EMG model: it reads 4 channels of face-muscle signals and, every 100 ms, gives the joint search per-frame letter and sound probabilities, a speaking-or-not signal, the speaking pace and effort, and a verifier that settles disputed look-alike words. This page specifies it precisely enough to implement: inputs, layers, outputs, losses, training, live use, and the models that sit on top of it (the joint search, its language model and the lock model). How it fits the whole system: [REALTIME_PIPELINE.md](REALTIME_PIPELINE.md).
 
-The code is in `svr/` (model, training, fine-tuning, live wrapper), `bench/` (benchmarks), `cluster/` (H100/H200 jobs, [runbook](../cluster/RUNBOOK.md)) and `tests/`. It implements this design; the last section maps each part to its file. The decoder and the lock model (section 6) are not written yet.
+The code is in `svr/` (model, training, fine-tuning, live wrapper), `bench/` (benchmarks), `cluster/` (H100/H200 jobs, [runbook](../cluster/RUNBOOK.md)) and `tests/`. It implements this design; the last section maps each part to its file. The joint search and the lock model (section 6) are not written yet; their language model is (`fusion/lm.py`).
+
+**Terms used here.** The *joint search* is the pipeline's search, every 100 ms, over camera + EMG + language model + Claude's hints (`fusion/`). The *language model* (LM) is the conversational n-gram plus the call cache inside it (`fusion/lm.py`). The *fusion process* is the program that runs the joint search, the gate and the lock model. "Decoder" alone is kept for decoders inside neural networks: Auto-AVSR's attention decoder and the verifier's cross-attention layers.
 
 ![SVR-1 architecture: EMG path on top, camera and fusion in the middle, training ideas A to F and the real-time loop G below](../figures/svr1_architecture.png)
 
@@ -146,18 +148,18 @@ The comparison baseline is Gaddy and Klein's architecture retrained on the same 
 
 ## 5. Live use, every 100 ms
 
-`svr/live.py` (`LiveSVR1`) does this inside the decoder process: `feed()` each `emg.raw` message, `read()` every 100 ms, `verify()` for disputed candidates, `calibrate()` on the demo-day minute.
+`svr/live.py` (`LiveSVR1`) does this inside the fusion process: `feed()` each `emg.raw` message, `read()` every 100 ms, `verify()` for disputed candidates, `calibrate()` on the demo-day minute.
 
 1. The EMG reader keeps the filtered signal (60 s) in a ring buffer. The filter is causal, so it runs once per sample as samples arrive; nothing is re-filtered.
 2. Every 100 ms, SVR-1 re-reads the whole current segment (up to 8 s; longer segments keep the last 2 s as context), or the last 2 s while nobody is speaking, and returns per-frame letter and phoneme log-probabilities with frame times, the speaking probability, the rate, `pace` and `effort`.
-3. The decoder calls the verifier only for the disputed candidates of words about to lock.
+3. The joint search calls the verifier only for the disputed candidates of words about to lock.
 4. A segment starts when the speaking probability (or the camera's mouth activity) rises, including 300 ms before, and ends after 0.5 s below threshold on both.
 
 ## 6. The models on top of SVR-1
 
 These are not part of the network but are trained on the same data, so they are specified here.
 
-### The joint decoder
+### The joint search
 
 A beam search (beam 16) over the camera's word pieces (Auto-AVSR's SentencePiece vocabulary, top 32 tokens per frame). Every partial hypothesis *h* carries four running scores, updated incrementally as it grows:
 
@@ -166,7 +168,7 @@ S(h) = g_{cam} \log P^{cam}_{CTC}(h) + g_{emg} \log P^{emg}_{CTC}(\text{chars}(h
 ```
 
 - **Camera and EMG terms:** CTC prefix probabilities, the camera's over word pieces at 25 fps and SVR-1's over characters at 86 fps. A hypothesis is converted to characters by lowercasing it and turning "▁" into a space.
-- **LM term:** a word-level KenLM n-gram language model.
+- **LM term:** the conversational language model with the call cache (below), scored each time a hypothesis completes a word.
 - **Hints:** a bonus for each word in Claude's current prediction list, weighted by its prediction weight.
 - **Length term:** γ|h| is a length bonus.
 - **Weights:** g_cam, g_emg, g_lm come from the gate.
@@ -182,6 +184,29 @@ Extra hypotheses enter the beam from two places: SVR-1's own best letter strings
 
 It is fitted on sessions 1 and 2 by making the true sentence win among the beam's 16-best: the same objective as the judge loss, with a few dozen parameters.
 
+### The language model: conversational n-gram (H) with a call cache (I)
+
+The LM is the joint search's sense of which words follow which. It is one term with one learned weight (g_lm), applied to the combined camera + EMG hypotheses, so word plausibility is counted once. SVR-1 has no language model of its own and needs no change or retraining for it. Auto-AVSR's own neural LM stays where it is, in the camera's end-of-segment beam search.
+
+**(H) Conversational n-gram.** A word 4-gram over everyday dialogue instead of audiobook text. Gaddy and Klein's LM was built from book text, which matches Berkeley's novel sentences but not a phone call.
+- Text: about 72M words. OpenSubtitles 2018 (film and TV dialogue, every 3rd line of the first 36M), Cornell Movie-Dialogs, DailyDialog and Topical-Chat.
+- Normalised exactly like SVR-1's targets (`svr.text.clean_text`), so the joint search's words and the LM's words match.
+- Every recording prompt (sessions 1 to 3) removed: session 3 is the test set, and the joint search's weights are fitted on sessions 1 and 2.
+- KenLM, singleton 3- and 4-grams pruned, 8-bit quantised trie (`python -m fusion.build_lm`). A word's score takes about 2 µs, so every hypothesis is scored on every pass.
+
+**(I) Call cache.** A small model of this call's own words, mixed into the n-gram:
+
+```latex
+P(w \mid h) = (1 - \lambda)\, P_{ngram}(w \mid h) + \lambda\, P_{cache}(w \mid w_{-1})
+```
+
+- P_cache: bigram counts of the call so far (the judge's final lines from Cartesia Ink, Austin's locked words), backed off to its unigram counts. Counts fade with a half-life of 400 words, so the current topic counts most.
+- λ grows with the cache, from 0 (empty: the n-gram alone) to 0.15.
+- Names and topics just mentioned become likely at once, including words the n-gram never saw: a name the judge says gets a usable probability on its next mention instead of the unknown-word floor.
+- Claude stays separate: smarter, but answering every couple of seconds; its predicted words are the hints bonus. The cache reacts within the same 100 ms pass.
+
+Which LM to use (none, the book LM, or this one) is decided on session 3, decoded each way.
+
 ### The lock model
 
 After each pass, every unlocked word gets one probability that it is right and final:
@@ -191,7 +216,7 @@ p_{lock}(w) = \sigma(\theta \cdot f(w))
 ```
 
 The features f(w) are:
-- the decoder's posterior for the word at its position, across the beam;
+- the joint search's posterior for the word at its position, across the beam;
 - the camera-only and EMG-only posteriors, after rescoring the beam with one reader alone;
 - their minimum (agreement);
 - Claude's prior for the word, capped at 0.3;
@@ -213,7 +238,7 @@ At the end of a sentence, the final pass rescores with the camera's attention be
 | Homophene judge, 10 and 50 candidates | Berkeley test set | Top-1: can EMG pick the true sentence among lip look-alikes? |
 | Fast-speech judge | Berkeley test set compressed 1.25× and 1.5× | Top-1 |
 | Austin, session 3 | 100 held-out sentences, demo conditions | WER for camera alone, camera + EMG, camera + EMG + Claude; lock delay; wrong-lock rate; "Please repeat" rate |
-| Speed | RTX 5060, on battery | Per-pass time for SVR-1, camera and decoder |
+| Speed | RTX 5060, on battery | Per-pass time for SVR-1, camera and the joint search |
 
 Reference points: Gaddy and Klein report 76.8% of words wrong for their best 4 sites against 68.0% for all 8, on their audio-output metric. Our Gaddy-architecture retrain on 6 sites reached 33.2% WER (beam + LM) and 84.0% homophene-10. The 4-site numbers come from the `G4` and `SVR1_4ch` runs.
 
@@ -229,9 +254,10 @@ Reference points: Gaddy and Klein report 76.8% of words wrong for their best 4 s
 | Articulator targets on the causal cache | `svr/precompute_svr1.py` (`sparc`, `align`) | Done |
 | `G4` baseline on the causal inputs | `svr/train.py --preprocess causal` (default) | Done |
 | Fine-tuning on the recorder's format; calibration mode; `G4` fine-tune | `svr/finetune.py` | Done; the fixed-sentence head, "none" and closed-lips transfer are gone |
-| Live wrapper | `svr/live.py` | Done; library, no bus code (the decoder process owns the bus) |
+| Live wrapper | `svr/live.py` | Done; library, no bus code (the fusion process owns the bus) |
 | Benchmarks at 4 slots with the checkpoint's own preprocessing | `bench/run_model.py` | Done |
 | Cluster runs `SVR1_4ch` and `G4`, smoke tests, runbook | `cluster/` | Done |
 | Unit checks: 4 slots, speaking head, causal filter, alignment, cuts, delivery augmentation, live wrapper | `tests/smoke_svr1_units.py` | Done |
-| Joint decoder, gate, lock model | `fusion/decoder.py`, `fusion/lock.py` | Not started |
+| Language model: conversational n-gram (H) + call cache (I) | `fusion/lm.py`, `fusion/build_lm.py` | Done; the model file is `data/lm/conversational.binary` |
+| Joint search, gate, lock model | `fusion/search.py`, `fusion/lock.py` | Not started |
 | The figure on this page | `figures/make_architecture.py` | Done |

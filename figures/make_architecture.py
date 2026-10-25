@@ -1,5 +1,5 @@
 """SVR-1 and the real-time fusion around it (revised design, docs/SVR1_SPEC.md), in the visual language of the Varest
-method figure.
+method figure. Panels: (A)-(F) SVR-1's contributions, (G) the real-time loop, (H)-(I) the joint search's language model.
 
     venv-svr/bin/python figures/make_architecture.py   ->  figures/svr1_architecture.{pdf,png}
 """
@@ -27,10 +27,10 @@ FILL = {'op': '#ffffff', 'mod': '#ddebf7', 'new': '#6fa3d8', 'sup': '#c9b8e8', '
 EMG_TOKEN, PHON_TOKEN, DISPUTED = '#f08c84', '#fde27a', '#d62728'
 PANEL = '#7ea6d9'
 
-fig = plt.figure(figsize=(20, 11.6))
+fig = plt.figure(figsize=(20, 14.4))
 ax = fig.add_axes([0, 0, 1, 1])
 ax.set_xlim(0, 2000)
-ax.set_ylim(1160, 0)
+ax.set_ylim(1440, 0)
 ax.axis('off')
 
 
@@ -181,7 +181,7 @@ box(1195, 222, 160, 42, 'Partial-Sentence\nTraining$^{(F)}$', 'sup', fs=11)
 arrow([(1272, 222), (1272, 202)], dashed=True)
 box(1420, 160, 160, 42, 'start · end · word ends', 'lit', fs=11)
 arrow([(1355, 181), (1420, 181)])
-label(1500, 214, 'to the decoder and the lock', fs=9.5, italic=True)
+label(1500, 214, 'to the joint search and the lock', fs=9.5, italic=True)
 
 # ---------------------------------------------------------------- camera path (lower row)
 video_image(170, 300, 140, 80)
@@ -224,6 +224,9 @@ label(1708, 305, '$g_{cam}, g_{emg}, g_{lm}$', fs=10, ha='left')
 arrow([(1580, 340), (1620, 340)])
 arrow([(575, 375), (575, 495), (1660, 495), (1660, 400)])
 label(1120, 487, 'camera log-probability', fs=10, italic=True)
+box(1675, 418, 125, 48, 'Conversational\nLM$^{(H)}$ + cache$^{(I)}$', 'new', fs=9.5)
+arrow([(1737, 418), (1737, 400)])
+label(1737, 479, 'judge (Ink) + locked words', fs=8.5, italic=True)
 box(1810, 335, 160, 50, 'Confidence\nLock$^{(G)}$', 'new', fs=11.5, icon='fire')
 arrow([(1780, 360), (1810, 360)])
 box(1810, 420, 160, 50, '“grab the mat”\n→ Cartesia, call', 'lit', fs=11)
@@ -293,7 +296,7 @@ for i, (xx, words) in enumerate(cols):
                         zorder=2)
 arrow([(cx, PY + 126), (cx, PY + 146)])
 label(cx, PY + 262, 'every word sequence that looks the same', fs=10, italic=True)
-box(cx - 125, PY + 280, 250, 40, 'LM + Claude hints prune', 'mod', fs=11.5, icon='snow')
+box(cx - 125, PY + 280, 250, 40, 'LM$^{(H, I)}$ + Claude hints prune', 'mod', fs=11.5)
 arrow([(cx, PY + 256 + 12), (cx, PY + 280)])
 box(cx - 125, PY + 340, 250, 40, 'EMG Verifier picks$^{(B)}$', 'new', fs=11.5, icon='fire')
 arrow([(cx, PY + 320), (cx, PY + 340)])
@@ -371,7 +374,7 @@ label(cx, PY + 408, 'every 100 ms, so SVR-1 trains on them.', fs=10, italic=True
 GY, GH = 1005, 150
 panel(5, GY, 1988, GH, '(G) Real-Time Loop: text and voice while you mouth')
 row1 = [('Claude predicts likely words\nbefore you mouth', 'mod'), ('Every 100 ms while mouthing:\nre-read clip, camera + EMG', 'mod'),
-        ('Joint search: camera + EMG\n+ LM + Claude hints', 'new'), ('Confidence lock: one learned\nscore, threshold moves with context', 'new'),
+        ('Joint search: camera + EMG\n+ LM$^{(H, I)}$ + Claude hints', 'new'), ('Confidence lock: one learned\nscore, threshold moves with context', 'new'),
         ('Locked words: grey \u2192 black\n+ Cartesia voice into the call', 'lit'), ('Everything logged,\nreplay any session', 'op')]
 row2 = [('Endpoint$^{(G)}$: ~0.5 s of\nEMG quiet + lips still', 'new'), ('Final pass: camera beam\n+ look-alikes$^{(C)}$ + verifier$^{(B)}$ + Claude', 'new'),
         ('Corrected text\nreplaces live text', 'lit'), ('Still unsure: \u201cPlease repeat\u201d\n+ reasons in the error log', 'new')]
@@ -386,6 +389,45 @@ for i, (t, k) in enumerate(row2):
     box(x, GY + 96, bw, 46, t, k, fs=10.5)
     if i:
         arrow([(x - gap, GY + 119), (x, GY + 119)])
+
+# (H) Conversational LM and (I) call cache: a row of two panels under the real-time loop
+HY, HH, HW = 1165, 265, 989
+x0 = 5
+panel(x0, HY, HW, HH, '(H) Conversational Language Model')
+steps = [('72M words of dialogue\nsubtitles · Cornell films\nDailyDialog · Topical-Chat', 'lit'),
+         ("Normalised like SVR-1\nrecording prompts removed", 'op'),
+         ('Pruned word 4-gram (KenLM)\n110 MB, loads in 0.4 s', 'new'),
+         ('Every hypothesis, every pass\n~2 µs per word', 'lit')]
+for i, (t, k) in enumerate(steps):
+    xx = x0 + 20 + i * 240
+    box(xx, HY + 40, 210, 66, t, k, fs=10.5)
+    if i:
+        arrow([(xx - 30, HY + 73), (xx, HY + 73)])
+label(x0 + HW / 2, HY + 132, 'Perplexity on our 600 recording prompts (lower is better: the LM expects how people talk)',
+      fs=10.5, italic=True)
+for i, (name, val, col) in enumerate([('book LM (Gaddy & Klein)', 181.2, '#b8b6ae'), ('conversational LM (ours)', 61.0, '#6fa3d8')]):
+    yy = HY + 152 + i * 34
+    label(x0 + 300, yy + 12, name, fs=10.5, ha='right')
+    ax.add_patch(Rectangle((x0 + 315, yy), val * 2.6, 24, facecolor=col, edgecolor=INK, lw=1.2, zorder=3))
+    label(x0 + 325 + val * 2.6, yy + 12, f'{val:.0f}', fs=10.5, ha='left')
+label(x0 + HW / 2, HY + 240, 'size 946 MB → 110 MB · load 5.2 s → 0.4 s · words never seen 8 → 3', fs=10, italic=True)
+
+x0 = 5 + HW + 10
+panel(x0, HY, HW, HH, '(I) Call Cache: the conversation so far')
+box(x0 + 20, HY + 40, 170, 48, "Judge's lines\n(Cartesia Ink)", 'lit', fs=10.5)
+box(x0 + 20, HY + 100, 170, 48, "Austin's locked\nwords", 'lit', fs=10.5)
+box(x0 + 235, HY + 64, 250, 60, 'Call cache: bigram + unigram\ncounts, fading (half-life 400 words)', 'new', fs=10.5)
+arrow([(x0 + 190, HY + 64), (x0 + 212, HY + 64), (x0 + 212, HY + 88), (x0 + 235, HY + 88)])
+arrow([(x0 + 190, HY + 124), (x0 + 212, HY + 124), (x0 + 212, HY + 100), (x0 + 235, HY + 100)])
+box(x0 + 525, HY + 64, 270, 60, '$P = (1-\\lambda)\\,P_{ngram} + \\lambda\\,P_{cache}$\n$\\lambda$: 0 → 0.15 as the call grows', 'op', fs=10.5)
+arrow([(x0 + 485, HY + 94), (x0 + 525, HY + 94)])
+box(x0 + 835, HY + 69, 135, 50, 'to the joint\nsearch ($g_{lm}$)', 'lit', fs=10.5)
+arrow([(x0 + 795, HY + 94), (x0 + 835, HY + 94)])
+box(x0 + 20, HY + 176, 330, 40, 'judge: “hi, this is Priya from admissions”', 'lit', fs=10.5)
+box(x0 + 385, HY + 176, 400, 40, '“i talked to priya …”: ln P −33.7 → −25.3 (×4000)', 'lit', fs=10.5)
+arrow([(x0 + 350, HY + 196), (x0 + 385, HY + 196)])
+label(x0 + HW / 2, HY + 240, 'A name just mentioned becomes likely at once; its look-alike “pria” does not. Claude stays separate: hints.',
+      fs=10, italic=True)
 
 out = os.path.join(HERE, 'svr1_architecture')
 fig.savefig(out + '.pdf', bbox_inches='tight', pad_inches=0.05)

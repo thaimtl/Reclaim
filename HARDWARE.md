@@ -19,7 +19,7 @@ flowchart LR
 | BioAmp EXG Pill, 4 boards | Boost each channel about 1,000x and cancel the hum shared by all pads |
 | Breadboard | Shares the Uno's 5V and ground with all 4 boards |
 | Arduino Uno | Reads each board 1,000 times a second and sends the numbers over USB |
-| Austin's laptop, RTX 5060, on battery | Reads the Uno, filters out hum, records, and runs the EMG model (SVR-1), lip reading, the decoder, Claude, Cartesia, the Twilio call, and the dashboard |
+| Austin's laptop, RTX 5060, on battery | Reads the Uno, filters out hum, records, and runs the EMG model (SVR-1), lip reading, the joint search, Claude, Cartesia, the Twilio call, and the dashboard |
 | Webcam | Films the lips and the face, for lip reading and the voice's emotion |
 
 The BioAmp is built for 5V boards like the Uno, so its output plugs straight in, and the Uno runs off the laptop's USB with no separate battery.

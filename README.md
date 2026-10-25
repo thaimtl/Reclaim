@@ -16,13 +16,13 @@ Our demo speaker is Austin, who is healthy; no patients take part in the demo.
 ## How it works
 
 One mode: open mouth, no sound, real time.
-Three readers work together, because each sees what the others can't, and every 100 ms a decoder combines them and locks in each word as soon as they're confident enough.
+Three readers work together, because each sees what the others can't, and every 100 ms one joint search combines them and locks in each word as soon as they're confident enough.
 
 ```mermaid
 flowchart LR
     W[Webcam] --> AV[Camera reader<br/>Auto-AVSR]
     P[4 EMG pads] --> E[EMG reader<br/>SVR-1]
-    AV --> D[Fusion decoder]
+    AV --> D[Joint search + language model]
     E --> D
     M[Phone call<br/>the other person] --> I[Cartesia Ink]
     I --> C[Claude<br/>whole conversation]
@@ -70,6 +70,7 @@ All code lives in this repo; datasets, checkpoints, results and Python environme
 | Folder | What it is |
 | --- | --- |
 | `svr/` | SVR-1, the EMG model: model, training, fine-tuning, preprocessing ([docs/SVR1_SPEC.md](docs/SVR1_SPEC.md)) |
+| `fusion/` | The joint search over camera + EMG + Claude, and its language model: a conversational 4-gram with a cache of the call (`fusion/lm.py`, built by `fusion/build_lm.py`) |
 | `bench/` | Benchmarks and their frozen test splits |
 | `cluster/` | H100/H200 job scripts (PBS), smoke tests, runbook |
 | `camera/` | Camera-only baselines (Auto-AVSR, BRAVEn, LipLearner) |
