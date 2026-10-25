@@ -121,6 +121,20 @@ def test_sms_mode_shows_texts_as_the_judges_lines():
     assert st.snapshot(2.0)['channel'] == 'sms'
 
 
+def test_each_line_has_its_own_number_and_the_judges_last_line_stays_in_view():
+    st = CallState()
+    st.feed('call.state', {'state': 'connected'}, 1.0)
+    st.feed('partner.text', {'text': 'Tell me everything.', 'is_final': True, 't': 999.0}, 2.0)
+    for i in range(15):                 # a long answer, the same utt_id reused (a decoder restart)
+        st._line(dict(who='austin', text=f'sentence {i}', t=3.0 + i, utt_id=1))
+    lines = st.snapshot(20.0)['transcript']
+    assert lines[0]['who'] == 'judge' and lines[0]['t'] == 2.0      # on our clock, not the message's
+    assert len({x['seq'] for x in lines}) == len(lines) == 16
+    for i in range(40):                 # an answer past the cap: the judge's line still leads
+        st._line(dict(who='austin', text=f'more {i}', t=30.0 + i, utt_id=2))
+    lines = st.snapshot(80.0)['transcript']
+    assert lines[0]['who'] == 'judge' and len(lines) == 41 and lines[-1]['text'] == 'more 39'
+
 def test_voice_offset_skips_resent_words_and_keeps_real_repeats():
     st = fed(('voice.say', {'utt_id': 1, 'words': ['no'], 'offset': 0}),
              ('voice.say', {'utt_id': 1, 'words': ['no', 'no', 'way'], 'offset': 0}),

@@ -108,69 +108,286 @@ function render(s) {
   renderCamera(s);
 }
 
+// ---- the conversation ------------------------------------------------------------------------------------
+// Reads top to bottom in time, anchored to the bottom like a chat: older lines (small) fade out at the top, then
+// the judge's latest line, then Austin's earlier sentences in this answer (small), then the sentence he is
+// mouthing now (big). Nothing still part of the exchange is ever dropped.
+//
+// Motion: every bubble is a keyed element that lives across snapshots. When the layout changes, each one glides
+// from where it was drawn to its new place (measure, change, then animate the difference: FLIP), a bubble that
+// grows reveals its new line as the column moves up, Austin's finished sentence shrinks into the conversation, and
+// each new word rises in. A change mid-motion starts from where things are on screen, so motion never jumps.
+const MOTION = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+const EASE = 'cubic-bezier(.22, 1, .36, 1)', MOVE_MS = 460, ENTER_MS = 380;
+let convSig = null, flips = new Map();          // element -> {anim, clipR, clipB}: the motion running on it
+
 function renderConversation(s) {
   const t = s.transcript;
-  const lastJudge = t.map(x => x.who).lastIndexOf('judge');
+  const lastJudge = s.judge_live ? -1 : t.map(x => x.who).lastIndexOf('judge');
   const judge = s.judge_live || (lastJudge >= 0 ? t[lastJudge].text : '');
-  $('judge').classList.toggle('hidden', !judge);
-  $('judge-text').textContent = judge;
-  $('judge-text').classList.toggle('live', !!s.judge_live);
-  const a = s.austin, words = $('words');
-  $('austin').classList.toggle('waiting', s.mode !== 'live');
-  const current = a && !(a.final && lastJudge >= 0 && t[lastJudge].t > (a.t || 0)) ? a : null;
-  const cut = s.judge_live ? t.length : Math.max(0, lastJudge);
-  const past = t.slice(0, cut).filter(x => !(current && x.who === 'austin' && x.utt_id === current.utt_id));
-  $('history').innerHTML = past.slice(-2).map(x => `<div class="past ${x.who}">${esc(x.text)}</div>`).join('');
-  if (!current || !current.words.length) {
-    words.className = 'words empty';
-    words.innerHTML = `<div class="word"><span class="w">${s.mode === 'live' ? 'Listening' : 'Not on a call yet'}</span></div>`;
-  } else {
-    words.className = 'words';
-    const thr = current.cands && current.cands.threshold;
-    words.innerHTML = current.words.map(w => {
-      const src = w.locked ? (SRC[w.src] || 'camera') : 'pending';
-      const was = w.was ? `<span class="was">${esc(w.was)}</span>` : '';
-      return `<div class="word${w.locked ? '' : ' pending'}">${was}<span class="w">${esc(w.w)}</span>` +
-             `<div class="bar"><i class="src-${src}" style="width:${barWidth(w, thr)}%"></i></div></div>`;
-    }).join('');
+  const a = s.austin;
+  // a finished sentence stays big until the judge answers (or starts to)
+  const answered = !!s.judge_live || (lastJudge >= 0 && t[lastJudge].t > (a && a.t || 0));
+  const current = a && a.words.length && !(a.final && answered) ? a : null;
+  // the transcript line that is the current sentence (a restarted decoder reuses utt_id: match the newest after it began)
+  const curLine = current ? t.filter(x => x.who === 'austin' && x.utt_id === current.utt_id && x.t >= (current.t || 0)).pop() : null;
+  const small = x => ({ key: 'l' + x.seq, cls: 'past ' + x.who, text: x.text });
+  const keep = (x, i) => i !== lastJudge && x !== curLine;
+  const before = t.filter((x, i) => (lastJudge < 0 || i < lastJudge) && keep(x, i)).map(small);
+  const turn = lastJudge < 0 ? [] : t.filter((x, i) => i > lastJudge && keep(x, i)).map(small);
+  // what the big bubbles hold: when it changes, the old content leaves as the small bubble with that key
+  const judgeId = s.judge_live ? 'live' : lastJudge >= 0 ? 'l' + t[lastJudge].seq : '';
+  const austinId = current ? 'u' + current.utt_id + '@' + current.t : 'empty-' + s.mode;   // the same as it finishes
+  const words = current ? current.words : null;
+  const panel = explainShape(s, current);
+  const sig = JSON.stringify([s.mode, judge, judgeId, austinId, before.map(x => x.key + x.text), turn.map(x => x.key),
+    words && words.map(w => [w.w, w.was]), panel]);
+  if (sig === convSig) {                // nothing moved: only the live values (bars, colours) update, in place
+    updateWords(words, current);
+    renderExplain(s, current, false);
+    return;
   }
-  renderExplain(s, current);
+
+  // FIRST: where everything is drawn now (mid-motion included), keyed by what it holds
+  const first = new Map(), mid = $('middle'), jb = $('judge-text'), ab = $('austin-bubble');
+  const k = $('stage').getBoundingClientRect().width / 1920 || 1;
+  const seen = el => { const r = el.getBoundingClientRect(), f = flips.get(el);
+    return r.width ? { x: r.left, y: r.top, w: r.width - (f ? f.clipR * k * progressLeft(f) : 0),
+                       h: r.height - (f ? f.clipB * k * progressLeft(f) : 0) } : null; };
+  mid.querySelectorAll('[data-key]').forEach(el => first.set(el.dataset.key, seen(el)));
+  const prevJudge = jb.dataset.id, prevAustin = ab.dataset.id;
+  // the small bubble Austin's previous big sentence becomes, once it has left the big bubble
+  const was = ab.dataset.utt ? t.filter(x => x.who === 'austin' && String(x.utt_id) === ab.dataset.utt &&
+                                             x.t >= parseFloat(ab.dataset.start)).pop() : null;
+  const leftKey = was && prevAustin !== austinId ? 'l' + was.seq : null;
+  if (prevJudge) first.set('big:' + prevJudge, seen(jb));
+  if (prevAustin) first.set('big:' + prevAustin, seen(ab));
+  for (const el of [$('judge-label'), $('austin-label'), $('explain')]) first.set('#' + el.id, seen(el));
+  for (const f of flips.values()) f.anim.cancel();
+  flips.clear();
+
+  // CHANGE: the new content, keyed elements reused
+  $('judge').classList.toggle('hidden', !judge);
+  if (jb.textContent !== judge) jb.textContent = judge;
+  jb.classList.toggle('live', !!s.judge_live);
+  jb.dataset.id = judgeId;
+  $('austin').classList.toggle('waiting', s.mode !== 'live');
+  ab.dataset.id = austinId;
+  ab.dataset.utt = current ? current.utt_id : '';
+  ab.dataset.start = current ? current.t || 0 : '';
+  reconcile($('history'), before);
+  reconcile($('turn'), turn);
+  const fresh = prevAustin !== austinId;
+  if (fresh) $('words').replaceChildren();
+  if (current) updateWords(words, current); else showEmpty(s.mode === 'live' ? 'Listening' : 'Not on a call yet');
+  renderExplain(s, current, false);
+  const judges = t.filter(x => x.who === 'judge'), prev = judges[judges.length - (s.judge_live ? 1 : 2)];
+  const aw = getComputedStyle($('austin')).getPropertyValue('--aw');
+  fitConversation(prev ? prev.seq : 0);
+  convSig = sig;                        // only once the change is fully on screen: an error retries next snapshot
+
+  // LAST + PLAY: each element glides from where it was to where it is now
+  if (!MOTION) return;
+  const play = (el, from, opts = {}) => {
+    const to = el.getBoundingClientRect();
+    if (!to.width) return;
+    if (!from) {                        // new on screen: rise in
+      el.animate([{ opacity: 0, transform: 'translateY(18px)' }, { opacity: 1, transform: 'none' }],
+                 { duration: ENTER_MS, easing: EASE, delay: opts.delay || 0, fill: 'backwards' });
+      return;
+    }
+    let dx = (from.x - to.left) / k, dy = (from.y - to.top) / k, scale = 1;
+    if (opts.morph) {                   // a big bubble becoming this small one: shrink into place
+      scale = Math.min(4, Math.max(0.25, from.h / to.height));
+      const right = el.classList.contains('austin');
+      dx = ((right ? from.x + from.w - to.width * scale : from.x) - to.left) / k;
+      dy = (from.y + from.h - to.height * scale - to.top) / k;
+    }
+    const clipR = opts.grow ? Math.max(0, (to.width - from.w) / k) : 0;
+    const clipB = opts.grow ? Math.max(0, (to.height - from.h) / k) : 0;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && scale === 1 && !clipR && !clipB) return;
+    const radius = getComputedStyle(el).borderRadius || '0';
+    const frames = [{ transform: `translate(${dx}px, ${dy}px) scale(${scale})`, transformOrigin: '0 0' },
+                    { transform: 'none', transformOrigin: '0 0' }];
+    if (clipR || clipB) {               // grew: the new part is revealed as it slides into place
+      frames[0].clipPath = `inset(0 ${clipR}px ${clipB}px 0 round ${radius})`;
+      frames[1].clipPath = `inset(0 0 0 0 round ${radius})`;
+    }
+    const anim = el.animate(frames, { duration: MOVE_MS, easing: EASE });
+    flips.set(el, { anim, clipR, clipB });
+    anim.onfinish = anim.oncancel = () => { if (flips.get(el) && flips.get(el).anim === anim) flips.delete(el); };
+  };
+  mid.querySelectorAll('[data-key]').forEach(el => {
+    if (el.classList.contains('hidden')) return;
+    const key = el.dataset.key, own = first.get(key);
+    if (own) play(el, own);
+    else if (key === leftKey && first.get('big:' + prevAustin)) play(el, first.get('big:' + prevAustin), { morph: true });
+    else if (first.get('big:' + key)) play(el, first.get('big:' + key), { morph: true });
+    else play(el, null);
+  });
+  play($('judge-label'), first.get('#judge-label'));
+  play($('austin-label'), first.get('#austin-label'));
+  play($('explain'), first.get('#explain'));
+  // the big bubbles: the same content glides and grows; new content rises in
+  play(jb, prevJudge === judgeId || (prevJudge === 'live' && judgeId.startsWith('l')) ? first.get('big:' + prevJudge) : null, { grow: true });
+  play(ab, fresh ? null : first.get('big:' + prevAustin), { grow: true });
+  if (!fresh && aw && aw !== getComputedStyle($('austin')).getPropertyValue('--aw')) {   // the text stepped down a size
+    const ratio = parseFloat(aw) / parseFloat(getComputedStyle($('austin')).getPropertyValue('--aw'));
+    $('words').animate([{ transform: `scale(${ratio})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }],
+                       { duration: MOVE_MS, easing: EASE });
+  }
+}
+
+function progressLeft(f) {              // how much of a running motion is still ahead (0 to 1), eased
+  const p = f.anim.effect.getComputedTiming().progress;
+  return p == null ? 0 : 1 - p;
+}
+
+// keyed children: reuse each bubble across snapshots, so it can move instead of being redrawn
+function reconcile(box, items) {
+  const old = new Map([...box.children].map(el => [el.dataset.key, el]));
+  items.forEach((it, i) => {
+    let el = old.get(it.key);
+    if (!el) { el = document.createElement('div'); el.dataset.key = it.key; }
+    old.delete(it.key);
+    el.className = it.cls;
+    if (el.textContent !== it.text) el.textContent = it.text;
+    if (box.children[i] !== el) box.insertBefore(el, box.children[i] || null);
+  });
+  old.forEach(el => el.remove());
+}
+
+// Austin's words, one element per word kept across snapshots: a new word rises in, a word that locks turns from
+// grey to black and its bar fills (CSS transitions), a word Claude repaired shows the old one struck out above it
+function updateWords(words, current) {
+  if (!words) return;
+  const box = $('words'), thr = current.cands && current.cands.threshold;
+  box.classList.remove('empty');
+  if (box.firstElementChild && box.firstElementChild.dataset.empty) box.replaceChildren();
+  words.forEach((w, i) => {
+    let el = box.children[i];
+    if (!el) {
+      el = document.createElement('div');
+      el.innerHTML = '<span class="was"></span><span class="w"></span><div class="bar"><i></i></div>';
+      if (MOTION) el.classList.add('enter');
+      box.appendChild(el);
+    }
+    el.classList.toggle('word', true);
+    el.classList.toggle('pending', !w.locked);
+    const [was, ww, bar] = [el.children[0], el.children[1], el.children[2].firstElementChild];
+    if (ww.textContent !== w.w) ww.textContent = w.w;
+    was.textContent = w.was || '';
+    was.hidden = !w.was;
+    bar.className = 'src-' + (w.locked ? (SRC[w.src] || 'camera') : 'pending');
+    bar.style.width = barWidth(w, thr) + '%';
+  });
+  while (box.children.length > words.length) box.lastElementChild.remove();
+}
+
+function showEmpty(text) {
+  const box = $('words');
+  box.classList.add('empty');
+  if (!(box.firstElementChild && box.firstElementChild.dataset.empty === text)) {
+    box.innerHTML = `<div class="word${MOTION ? ' enter' : ''}" data-empty="${esc(text)}"><span class="w">${esc(text)}</span></div>`;
+  }
+}
+
+// Fit the exchange in the space between the header and the latency strip, the most important part last to give
+// way: the text sizes step down and the candidate panel drops its note, then its rows; only then do Austin's
+// earlier sentences in this answer thin to the newest, and at the smallest size the two big bubbles keep their
+// newest lines (the start fades at the top). Within one exchange (one judge line and Austin's answer) the level
+// only goes up, so the text never grows back while Austin mouths.
+const FIT = [   // austin word px, judge px, earlier sentences kept, candidate panel
+  [80, 40, 9, 'full'], [68, 40, 9, 'full'], [68, 34, 9, 'full'], [58, 34, 9, 'full'], [58, 34, 9, 'compact'],
+  [50, 30, 9, 'compact'], [50, 30, 9, 'none'], [44, 28, 2, 'none'], [44, 28, 1, 'none']];
+let fitKey = null, fitLevel = 0;
+function fitConversation(key) {
+  if (key !== fitKey) { fitKey = key; fitLevel = 0; }
+  const mid = $('middle'), aus = $('austin'), jud = $('judge'), turn = $('turn'), ex = $('explain');
+  const words = $('words'), jt = $('judge-text');
+  const apply = ([aw, jw, keep, panel]) => {
+    aus.style.setProperty('--aw', aw + 'px');
+    jud.style.setProperty('--jw', jw + 'px');
+    [...turn.children].forEach((el, i, all) => el.classList.toggle('hidden', i < all.length - keep));
+    ex.dataset.panel = panel;
+  };
+  const need = () => [jud, turn, aus, ex].reduce((h, el) => h + (el.classList.contains('hidden') ? 0 : el.offsetHeight), 0);
+  words.style.maxHeight = jt.style.maxHeight = '';
+  let level = fitLevel;
+  apply(FIT[level]);
+  while (level < FIT.length - 1 && need() > mid.clientHeight) apply(FIT[++level]);
+  fitLevel = level;
+  let over = need() - mid.clientHeight;
+  // still too tall at the smallest size: the judge's line keeps its last 4 lines, then Austin's its newest lines
+  clip(jt, over > 0 ? 4 * parseFloat(getComputedStyle(jt).lineHeight) + 38 : null);
+  over = need() - mid.clientHeight;
+  clip(words, over > 0 ? Math.max(words.offsetHeight - over, 60) : null);
+  // older lines that don't fit whole fade out at the top (no half-cut bubble)
+  const hist = $('history'), top = hist.getBoundingClientRect().top - 0.5;
+  [...hist.children].forEach(el => el.classList.toggle('gone', el.getBoundingClientRect().top < top));
+}
+
+function clip(el, max) {                // show the end of a too-long block, the cut-off start faded
+  el.classList.toggle('clipped', max != null);
+  el.style.maxHeight = max == null ? '' : max + 'px';
+  if (max != null) el.scrollTop = el.scrollHeight;
 }
 
 // the bar under a word: full once locked; a pending word fills toward the lock threshold
 const barWidth = (w, thr) => w.locked ? 100 : w.conf == null ? 0 : Math.round(100 * Math.min(1, Math.max(0, w.conf / (thr || 1))));
 
-function renderExplain(s, a) {
-  let html = '';
+// What the panel under the caption says, without the live numbers: when only the numbers change, the bars glide
+// in place (CSS transitions) instead of the panel being redrawn.
+function explainShape(s, a) {
+  return explainParts(s, a).text;
+}
+
+function explainParts(s, a) {
+  let text = '';
   const repair = a && a.repairs.length ? a.repairs[a.repairs.length - 1] : null;
   if (a && a.repeat) {
     const w = a.repeat.words, alts = (a.repeat.alts[0] || []).slice(0, 1);
     const reader = { camera: 'Lips', emg: 'Muscles', claude: 'Claude' }[a.repeat.reader] || 'The readers';
-    html += `<div class="repeat-card"><span class="ic">!</span><b>Please repeat</b><p>${esc(reader)} read ` +
+    text += `<div class="repeat-card"><span class="ic">!</span><b>Please repeat</b><p>${esc(reader)} read ` +
             `“${esc(w[0] || '')}”${alts.length ? `, the others lean to “${esc(alts[0])}”` : ''}. ` +
             `Too close to call, so nothing was spoken.</p></div>`;
   } else if (repair) {
-    html += `<div class="note claude">✦ <span>Claude changed “${esc(repair.frm)}” to “${esc(repair.to)}”: ` +
+    text += `<div class="note claude">✦ <span>Claude changed “${esc(repair.frm)}” to “${esc(repair.to)}”: ` +
             `they look the same on the lips, and “${esc(repair.to)}” fits the conversation.</span></div>`;
   }
-  if (a && a.cands && a.cands.rows.length) {
-    const rows = a.cands.rows, thr = a.cands.threshold, tot = r => r.cam + r.emg + r.claude;
+  const rows = a && a.cands && a.cands.rows.length ? a.cands.rows : [];
+  if (rows.length) {
     const best = k => [...rows].sort((x, y) => y[k] - x[k])[0];
     const byCam = best('cam'), byEmg = best('emg'), top = rows[0];
     if (!a.repeat && !repair) {
-      html += `<div class="note">${!s.muscles ? 'The muscle sensors are off, so the camera and Claude decide alone.'
+      text += `<div class="note">${!s.muscles ? 'The muscle sensors are off, so the camera and Claude decide alone.'
         : byCam.w !== top.w ? `Lips alone see “${esc(byCam.w)}”. With the conversation, “${esc(top.w)}” leads.`
         : byEmg.w !== top.w ? `Muscles alone lean to “${esc(byEmg.w)}”. Lips and the conversation pick “${esc(top.w)}”.`
         : `Lips and muscles agree on “${esc(top.w)}”.`}</div>`;
     }
-    html += `<div class="legend"><span><i class="src-camera"></i>Lips</span><span><i class="src-emg"></i>Muscles</span>` +
+    text += `<div class="legend"><span><i class="src-camera"></i>Lips</span><span><i class="src-emg"></i>Muscles</span>` +
             `<span><i class="src-claude"></i>Claude</span><span><i class="thr"></i>Lock threshold</span></div>`;
-    html += rows.map((r, i) => `<div class="cand${i === 0 ? ' top' : ''}"><span class="cw">${esc(r.w)}</span>` +
-      `<div class="track"><i class="src-camera" style="width:${100 * r.cam}%"></i><i class="src-emg" style="width:${100 * r.emg}%"></i>` +
-      `<i class="src-claude" style="width:${100 * r.claude}%"></i>${thr == null ? '' : `<span class="thr" style="left:${100 * thr}%"></span>`}</div>` +
-      `<span class="cv">${tot(r).toFixed(2)}</span></div>`).join('');
+    text += rows.map(() => '<div class="cand"><span class="cw"></span><div class="track"><i class="src-camera"></i>' +
+                           '<i class="src-emg"></i><i class="src-claude"></i><span class="thr"></span></div>' +
+                           '<span class="cv"></span></div>').join('');
   }
-  $('explain').innerHTML = html;
+  return { text, rows, thr: a && a.cands ? a.cands.threshold : null };
+}
+
+function renderExplain(s, a, rebuild) {
+  const ex = $('explain'), { text, rows, thr } = explainParts(s, a);
+  if (rebuild || ex.dataset.shape !== text) { ex.innerHTML = text; ex.dataset.shape = text; }
+  ex.querySelectorAll('.cand').forEach((el, i) => {
+    const r = rows[i], [cam, emg, cl, mark] = el.querySelector('.track').children;
+    el.classList.toggle('top', i === 0);
+    el.querySelector('.cw').textContent = r.w;
+    cam.style.width = 100 * r.cam + '%';
+    emg.style.width = 100 * r.emg + '%';
+    cl.style.width = 100 * r.claude + '%';
+    mark.hidden = thr == null;
+    if (thr != null) mark.style.left = 100 * thr + '%';
+    el.querySelector('.cv').textContent = (r.cam + r.emg + r.claude).toFixed(2);
+  });
 }
 
 function renderLatency(s) {
@@ -349,9 +566,22 @@ function renderCamera(s) {
   const heard = a && a.spoken ? a.spoken : '';
   speaking = !!(a && a.speaking);           // Sonic's first audio arrived and Twilio hasn't confirmed it played yet
   toneLabel = (a && a.emotion) || s.emotion.label;   // the emotion the sentence went out with
-  $('heard').textContent = heard ? `“${heard}”` : '';
+  fitHeard($('heard'), heard);
   $('tone').textContent = heard ? (a.tone || '') : '';
   $('tone').style.color = css(TONE_COLOR[toneLabel] || '--calm');
+}
+
+// What the judge heard, two lines at most: a long sentence steps down in size, then keeps its newest words
+// ("…" in front), since the end is what Austin is saying now.
+function fitHeard(el, text) {
+  if (el.dataset.text === (text || '')) return;     // measured once per new text, not 15 times a second
+  el.dataset.text = text || '';
+  el.classList.remove('small');
+  el.textContent = text ? `“${text}”` : '';
+  if (!text || el.scrollHeight <= el.clientHeight + 1) return;
+  el.classList.add('small');
+  const ws = text.split(' ');
+  for (let i = 0; el.scrollHeight > el.clientHeight + 1 && i < ws.length - 1; i++) el.textContent = `“…${ws.slice(i + 1).join(' ')}”`;
 }
 
 // a "voice playing" indicator, not a level meter (the call's audio isn't on the bus): it moves from Sonic's first
