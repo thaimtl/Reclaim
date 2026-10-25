@@ -178,17 +178,8 @@ RESTING = Emotion(NEUTRAL, 1.0, {e: float(e == NEUTRAL) for e in EMOTIONS})
 
 
 class RunningBaseline:
-    """The speaker's neutral face for the expression network: the median of their features over the last window_s
-    (every keep_every-th face frame, refreshed every every_s), ready warm_s after the first kept frame.
-
-    Why not the first seconds alone: whatever the face does then becomes "neutral" for the whole call. Session 2
-    opened on a "Raise your eyebrows" rest clip, and every neutral sentence after it read as sad or happy. Most of
-    a conversation is a neutral face, so a running median follows light and posture and outvotes the odd smile.
-    Frames the network alone (no baseline, so no feedback loop) reads as clearly expressive, non-neutral above gate,
-    stay out, so a long smile at the start doesn't become the neutral face: on Austin's sessions that keeps 93 to
-    100% of neutral frames and drops 15 to 100% of held expressions. A face that is never neutral gets no baseline
-    (the tag stays neutral). After a gap longer than the window the old baseline stays until warm_s after the first
-    new kept frame."""
+    """The speaker's neutral face: the median of every keep_every-th face frame over the last window_s, leaving out
+    frames the network alone reads as non-neutral above gate. None until warm_s of kept frames."""
 
     def __init__(self, window_s=BASELINE_WINDOW_S, warm_s=BASELINE_S, every_s=1.0, keep_every=5, gate=0.8):
         self.window_s, self.warm_s, self.every_s = window_s, warm_s, every_s
@@ -210,15 +201,13 @@ class RunningBaseline:
                 self.buf.popleft()
             if (self.n - 1) % self.keep_every == 0 and not self.expressive(feats):     # 1st, 6th, ...
                 self.buf.append((t, feats))
-            # only neutral-looking frames are kept, so the old baseline (or none) stays until warm_s after the first
             if self.buf and t - self.buf[0][0] >= self.warm_s and t - self.t_update >= self.every_s:
                 self.base, self.t_update = np.median([f for _, f in self.buf], 0), t
         return self.base
 
 
 class NetTagger:
-    """Expression network -> Emotion, with the hold and no-face decay of EmotionTagger, and a running baseline
-    (RunningBaseline) instead of the first seconds."""
+    """Expression network -> Emotion, with EmotionTagger's hold and no-face decay and a RunningBaseline."""
 
     GENERIC_SMOOTHING = (0.6, 0.5, 1.0)     # margin, hold_s, tau_s: best on RAVDESS without a head
 
