@@ -61,7 +61,7 @@ class Service:
     def __init__(self, cfg, voice=None, ink_factory=None, pub=None, sub=None):
         self.cfg = cfg
         self.pub = pub or bus.Publisher(cfg.call_pub)
-        self.sub = sub or bus.Subscriber([cfg.dec_pub, cfg.cam_pub], [bus.VOICE_SAY, bus.CAM_TICK])
+        self.sub = sub or bus.Subscriber([cfg.dec_pub, cfg.cam_pub], [bus.VOICE_SAY, bus.CAM_TICK, bus.DEC_HYP])
         self.voice = voice or Voice(cfg, self._audio, on_timing=self._timing, on_done=self._voice_done)
         self.ink_factory = ink_factory or (lambda on_text: Ink(cfg, on_text, gate=cfg.noise_gate,
                                                                  record=cfg.record_inbound))
@@ -103,6 +103,8 @@ class Service:
                         self.voice.set_emotion(e['label'], e.get('confidence', 1.0))
                 elif topic == bus.VOICE_SAY:
                     self.says.put_nowait(msg)       # in order; a slow Sonic (reconnect) doesn't hold up emotion
+                elif topic == bus.DEC_HYP:          # his decoder: a word in his mouth now? (phrases end on pauses)
+                    self.voice.mouthing(msg['utt_id'], bool(msg.get('unlocked')))
             except Exception:  # noqa: BLE001  one bad message must not end the call
                 log.exception('bad %s message', topic)
 

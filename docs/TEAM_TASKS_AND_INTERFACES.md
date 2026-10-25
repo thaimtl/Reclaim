@@ -46,7 +46,7 @@ Follow [EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md). You can pro
 ### Frank
 
 1. Instant Voice Clone of Austin, from about 60 s of his real voice read aloud, recorded separately with his consent ([RECORDING.md](../RECORDING.md#voice-sample-for-the-clone)); the silent sessions have no audio.
-2. Sonic 3.6 over the WebSocket: one context per sentence, words streamed in with "more to come" as they arrive on `voice.say`, `max_buffer_delay_ms` kept low. Speed, volume and emotion are set per sentence with `generation_config` and changed within a sentence with inline `<speed>`, `<volume>` and `<emotion>` tags, since Sonic ignores `generation_config` changes inside a context. `pace` maps to speed 0.6 to 1.5, `effort` to volume 0.5 to 2.0.
+2. Sonic 3.6 over the WebSocket: one context per sentence, locked words from `voice.say` streamed in with "more to come" as natural phrases: a phrase goes when Austin pauses (`dec.hyp` shows nothing being mouthed) or after about 4 words, each its own flush with no server buffer, Sonic's padding trimmed. A word sent alone sounds like a one-word sentence; phrases sound like talking, about 1 s behind his lips. Speed, volume and emotion are set per sentence with `generation_config` and changed within a sentence with inline `<speed>`, `<volume>` and `<emotion>` tags, since Sonic ignores `generation_config` changes inside a context. `pace` maps to speed 0.6 to 1.5, `effort` to volume 0.5 to 2.0.
 3. Twilio:
     - Austin's call to the judge, with a two-way audio stream to the laptop.
     - Cartesia's audio goes into the call; ask Cartesia for phone-format audio, or convert it.

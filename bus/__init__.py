@@ -96,9 +96,7 @@ class CamFace:
 
 @dataclass(frozen=True)
 class CamPreview:
-    """The dashboard's mirror of the webcam (topic cam.preview): one processed frame as a JPEG, with that frame's
-    face points (x / w, y / h, and MediaPipe's z on x's scale: 478 x 3), so the dashboard draws the pads on the very
-    frame it shows. pts is None without a face."""
+    """cam.preview: one processed frame as a JPEG and its face points (478 x 3: x / w, y / h, z), or None."""
     t: float
     w: int
     h: int

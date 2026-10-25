@@ -37,6 +37,17 @@ EMG_RAIL = (8, 1015)        # a pad off the skin pins its channel to a rail of t
 EMG_FLAT = 1.0              # standard deviation below this (raw units): no contact
 
 
+def pretty(words, first=True):
+    """The lip reader's UPPERCASE words as written: lowercase, 'I' capitalised, and the first word if first."""
+    out = []
+    for i, w in enumerate(words):
+        w = str(w).lower()
+        if w == 'i' or w.startswith("i'"):
+            w = 'I' + w[1:]
+        out.append(w[:1].upper() + w[1:] if first and i == 0 else w)
+    return ' '.join(out)
+
+
 def _bare(w):
     return str(w).strip().strip('.,!?;:"“”')
 
@@ -84,7 +95,8 @@ class CallState:
             self.utts[('old', utt_id, old['t'])] = self.utts.pop(utt_id)
         if utt_id not in self.utts:
             self.utts[utt_id] = dict(utt_id=utt_id, t=t, locked=[], unlocked=[], source=[], conf=[], repaired={},
-                                     spoken=[], final=False, t_final=None, emotion=None, lock_t=[], cam_top=[],
+                                     spoken=[], said=[], final=False, t_final=None, emotion=None, lock_t=[],
+                                     cam_top=[],
                                      emg_top=[], cands=None, threshold=None, repeat=None, face_hidden=False,
                                      speaking=None, voiced=False)
         if current and (restarted or self.cur_utt is None or utt_id >= self.cur_utt):
@@ -165,7 +177,8 @@ class CallState:
         for e in msg.get('edits') or []:
             frm, to = _bare(e['from']), _bare(e['to'])
             u['repaired'][int(e['index'])] = (frm, to)
-            self.repairs.append(dict(utt_id=u['utt_id'], index=int(e['index']), frm=frm, to=to))
+            self.repairs.append(dict(utt_id=u['utt_id'], index=int(e['index']), frm=pretty([frm], False),
+                                     to=pretty([to], False)))
 
     def _say(self, topic, msg, now):
         u = self._utt(msg['utt_id'], now)
@@ -179,16 +192,22 @@ class CallState:
         if msg.get('final'):
             self._close(u, now)
 
+    @staticmethod
+    def _said(u):
+        """What the call heard: the voice's own phrases once reported, else the words sent to it."""
+        return ' '.join(u['said']) if u['said'] else pretty(u['spoken'])
+
     def _close(self, u, t):
         if u['final']:
             return
         u['final'], u['t_final'] = True, t
-        text = ' '.join(u['spoken']) or ' '.join(u['locked'])
+        text = self._said(u) or pretty(u['locked'])
         if text:
             emotion = u['emotion'] or self.emotion[0]
             self.transcript.append(dict(who='austin', text=text, t=t, utt_id=u['utt_id'], emotion=emotion,
                                         tone=TONE.get(emotion, '').replace('Sounds', 'sounded'),
-                                        repairs=[dict(index=i, frm=f, to=to) for i, (f, to) in u['repaired'].items()],
+                                        repairs=[dict(index=i, frm=pretty([f], False), to=pretty([to], False))
+                                                 for i, (f, to) in u['repaired'].items()],
                                         repeat=u['repeat'], face_hidden=u['face_hidden']))
 
     def _close_open_sentences(self, t):
@@ -251,6 +270,12 @@ class CallState:
         elif topic == 'timing.voice':
             self.seen['voice'] = now
             u = self.utts.get(msg.get('utt_id'))
+            if stage == 'voice_phrase' and u and msg.get('text'):
+                u['said'].append(str(msg['text']))
+                for entry in reversed(self.transcript if u['final'] else []):   # open: its entry doesn't exist yet
+                    if entry['who'] == 'austin' and entry.get('utt_id') == u['utt_id']:
+                        entry['text'] = self._said(u)
+                        break
             if stage == 'sonic_first_audio' and ms is not None:
                 self.lat['sonic'].append(float(ms))
                 if u and not u['voiced']:        # a sentence's first audio only (a fallback replay isn't a new sample)
@@ -322,18 +347,20 @@ class CallState:
             if rep and _bare(w) == rep[0]:     # the decoder hasn't applied the repair yet: show it, punctuation kept
                 w = rep[1] + w[len(w.rstrip('.,!?;:')):]
             conf = u['conf'][i] if i < len(u['conf']) else None
-            words.append(dict(w=w, src='claude' if rep else src, locked=True, was=rep[0] if rep else None, conf=conf))
+            words.append(dict(w=pretty([w], i == 0), src='claude' if rep else src, locked=True,
+                              was=pretty([rep[0]], i == 0) if rep else None, conf=conf))
         n = len(u['locked'])
-        words += [dict(w=w, src=None, locked=False, was=None, conf=u['conf'][n + j] if n + j < len(u['conf']) else None)
-                  for j, w in enumerate(u['unlocked'])]
+        words += [dict(w=pretty([w], n + j == 0), src=None, locked=False, was=None,
+                       conf=u['conf'][n + j] if n + j < len(u['conf']) else None) for j, w in enumerate(u['unlocked'])]
         cands = None
         if u['cands']:
             cands = dict(rows=u['cands'], threshold=u['threshold'])
         return dict(utt_id=u['utt_id'], t=u['t'], words=words, cands=cands, repeat=u['repeat'],
                     emotion=u['emotion'], tone=TONE.get(u['emotion'] or self.emotion[0], ''),
                     speaking=u['speaking'] is not None and now - u['speaking'] < SPEAKING_MAX_S,
-                    repairs=[dict(index=i, frm=f, to=t) for i, (f, t) in u['repaired'].items()],
-                    spoken=' '.join(u['spoken']), final=u['final'])
+                    repairs=[dict(index=i, frm=pretty([f], False), to=pretty([t], False))
+                             for i, (f, t) in u['repaired'].items()],
+                    spoken=self._said(u), final=u['final'])
 
     def snapshot(self, now):
         c = self.call

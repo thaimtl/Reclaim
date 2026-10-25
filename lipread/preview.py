@@ -4,11 +4,8 @@
     preview.submit(frame.t, frame.image, cropper.last_face, cropper.last_z)    # the crop thread, every frame
     preview.close()
 
-The crop thread only hands over a reference to the newest frame (submit() never waits and never copies); this worker
-thread shrinks it to WIDTH px, JPEG-encodes it (OpenCV releases the GIL) and sends it without blocking, at most HZ
-times a second. A frame it hasn't reached yet is replaced by the next one, so a slow encode or a busy socket costs
-preview frames, never lip-reading time. Each message carries that frame's own face points, so the dashboard draws the
-pads on the very frame it shows.
+submit() never waits or copies. This thread shrinks the newest frame to WIDTH px, encodes it and sends it without
+blocking, at most HZ times a second, so a slow encode costs preview frames, never lip-reading time.
 """
 import logging
 import threading

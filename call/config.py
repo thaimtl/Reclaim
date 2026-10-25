@@ -32,12 +32,19 @@ class Config:
     # CARTESIA_PHRASE_WORDS > 1 is an opt-in experiment: group words client-side (then use CARTESIA_MAX_BUFFER_MS=0).
     max_buffer_delay_ms: int = field(default_factory=lambda: int(_env('CARTESIA_MAX_BUFFER_MS', '120')))
     phrase_words: int = field(default_factory=lambda: int(_env('CARTESIA_PHRASE_WORDS', '1')))
+    # paced (call/voice.py): words go to Sonic as phrases cut at his pauses; ignores the two settings above
+    paced: bool = field(default_factory=lambda: _env('CARTESIA_PACED', '1') != '0')
     twilio_sid: str = field(default_factory=lambda: _env('TWILIO_ACCOUNT_SID'))
     twilio_token: str = field(default_factory=lambda: _env('TWILIO_AUTH_TOKEN'), repr=False)
     twilio_number: str = field(default_factory=lambda: _env('TWILIO_NUMBER'))         # the number we call from
     public_host: str = field(default_factory=lambda: _env('PUBLIC_HOST'))              # ngrok / cloudflared host
     port: int = field(default_factory=lambda: int(_env('PORT', '8787')))
     noise_gate: bool = field(default_factory=lambda: _env('NOISE_GATE', '1') != '0')
+    # Ink turn detection: how sure it must be that the caller started a turn (Cartesia: 0.5-0.9, default 0.8)
+    turn_start_threshold: float = field(default_factory=lambda: float(_env('INK_TURN_START', '0.8')))
+    # words Ink should get right (Cartesia keyterm boosting)
+    stt_keyterms: tuple = ('Silent Voice', 'Austin', 'Cal Hacks', 'Cartesia', 'Claude', 'Anthropic', 'laryngectomy',
+                           'EMG')
     # debug only, with the caller's consent: write the caller's raw audio (mu-law 8 kHz) here to tune the gate
     record_inbound: str = field(default_factory=lambda: _env('RECORD_INBOUND'))
     # unguessable path for the media websocket: only Twilio (who gets it in our TwiML) can open it

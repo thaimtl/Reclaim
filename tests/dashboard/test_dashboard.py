@@ -111,7 +111,7 @@ def test_voice_offset_skips_resent_words_and_keeps_real_repeats():
     st = fed(('voice.say', {'utt_id': 1, 'words': ['no'], 'offset': 0}),
              ('voice.say', {'utt_id': 1, 'words': ['no', 'no', 'way'], 'offset': 0}),
              ('voice.say', {'utt_id': 1, 'words': [], 'offset': 3, 'final': True}))
-    assert st.utts[1]['spoken'] == ['no', 'no', 'way'] and st.transcript[-1]['text'] == 'no no way'
+    assert st.utts[1]['spoken'] == ['no', 'no', 'way'] and st.transcript[-1]['text'] == 'No no way'   # cased
 
 
 def test_repair_already_applied_by_the_decoder_is_shown_once():
@@ -257,8 +257,20 @@ def test_a_decoder_restart_starts_a_new_sentence():
     st.feed('voice.say', {'utt_id': 1, 'words': ['hi'], 'offset': 0, 'final': True}, 10.5)
     st.feed('dec.hyp', {'utt_id': 1, 'locked': ['hello'], 'unlocked': []}, 30.0)   # after a restart: utt 1 again
     st.feed('voice.say', {'utt_id': 1, 'words': ['hello'], 'offset': 0, 'final': True}, 30.5)
-    assert st.snapshot(30.5)['austin']['words'][0]['w'] == 'hello'
-    assert [t['text'] for t in st.transcript if t['who'] == 'austin'] == ['hi', 'hello']
+    assert st.snapshot(30.5)['austin']['words'][0]['w'] == 'Hello'
+    assert [t['text'] for t in st.transcript if t['who'] == 'austin'] == ['Hi', 'Hello']
+
+
+def test_a_restarted_sentence_never_rewrites_the_old_caption():
+    st = fed(('dec.hyp', {'utt_id': 1, 'locked': ['hi'], 'unlocked': []}))
+    st.feed('voice.say', {'utt_id': 1, 'words': ['hi'], 'offset': 0, 'final': True}, 10.5)
+    st.feed('timing.voice', {'stage': 'voice_phrase', 'utt_id': 1, 'text': 'Hi.'}, 11.0)
+    st.feed('dec.hyp', {'utt_id': 1, 'locked': ['second'], 'unlocked': []}, 30.0)  # after a restart: utt 1 again
+    st.feed('voice.say', {'utt_id': 1, 'words': ['second'], 'offset': 0}, 30.5)
+    st.feed('timing.voice', {'stage': 'voice_phrase', 'utt_id': 1, 'text': 'Second,'}, 31.0)
+    assert [t['text'] for t in st.transcript if t['who'] == 'austin'] == ['Hi.']
+    st.feed('voice.say', {'utt_id': 1, 'words': [], 'offset': 1, 'final': True}, 31.5)
+    assert [t['text'] for t in st.transcript if t['who'] == 'austin'] == ['Hi.', 'Second,']
 
 
 def test_voice_indicator_times_out_and_lips_to_voice_counts_first_audio_once():
@@ -274,6 +286,20 @@ def test_end_summary_is_built_once():
     st = fed(('call.state', {'state': 'connected'}), ('call.state', {'state': 'ended'}))
     first = st.snapshot(10.0)['summary']
     assert st.snapshot(20.0)['summary'] is first
+
+
+def test_the_call_heard_text_is_the_voices_own_with_its_punctuation():
+    """The voice reports each phrase as it spoke it (cased, with the punctuation his face and pauses gave it); the
+    dashboard shows that, not the lip reader's UPPERCASE words."""
+    st = CallState()
+    st.feed('dec.hyp', dict(utt_id=1, locked=['I', 'GOT', 'THE', 'JOB'], unlocked=['I'], source=['camera'] * 4), 1.0)
+    assert [w['w'] for w in st.snapshot(1.1)['austin']['words']] == ['I', 'got', 'the', 'job', 'I']
+    st.feed('voice.say', dict(utt_id=1, words=['I', 'GOT', 'THE', 'JOB'], final=False), 1.2)
+    assert st.snapshot(1.3)['austin']['spoken'] == 'I got the job'
+    st.feed('timing.voice', dict(stage='voice_phrase', utt_id=1, words='I GOT THE JOB', text='I got the job!'), 1.5)
+    st.feed('voice.say', dict(utt_id=1, words=['I', 'START', 'MONDAY'], final=True), 1.6)
+    st.feed('timing.voice', dict(stage='voice_phrase', utt_id=1, words='I START MONDAY', text='I start monday!'), 1.8)
+    assert st.transcript[-1]['text'] == 'I got the job! I start monday!'
 
 
 def unpack(frame):
