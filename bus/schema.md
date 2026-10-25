@@ -63,7 +63,7 @@ frames' probabilities change between ticks (the Conformer looks both ways), so k
 | `activity` | `<f4` (T,) | mouthing activity, 0 to 1 |
 | `face_ok` | bool | face found on the newest frame |
 | `timing_ms` | map | cost of this pass, required: `T` (int, == len(`frame_t`)), `mediapipe`, `frontend`, `conformer`, `ctc`, `total` (ms, finite, ≥ 0) |
-| `emotion` | map | `label` (one of neutral, happy, sad, angry, surprised; placeholder until Frank confirms), `confidence` 0 to 1, `scores` {label: 0 to 1} |
+| `emotion` | map | `label` (one of neutral, happy, sad, angry, surprised: Cartesia's names; with the expression head, `angry` stays 0), `confidence` 0 to 1, `scores` {label: 0 to 1} |
 
 **Token ids** are the model's ids: blank is 0, and ids 1..5047 (`<unk>` = 1) are the line numbers of
 `third_party/lipflow/lipflow/unigram5000_units.txt` (the same as `auto_avsr/spm/unigram/unigram5000_units.txt`), and

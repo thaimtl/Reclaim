@@ -1,0 +1,9 @@
+.env
+keys.env
+__pycache__/
+# Austin's voice recordings and clone test renders: personal data, never committed
+*.wav
+*.m4a
+*.mp3
+clone_ab/
+clone_test_*.wav

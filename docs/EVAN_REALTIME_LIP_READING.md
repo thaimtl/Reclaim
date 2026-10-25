@@ -93,6 +93,8 @@ Done when: segments line up with sentences you mouth, and they don't trigger on 
 
 Done when: smiling, raising eyebrows and frowning while mouthing each produce the right label, and a neutral face stays neutral.
 
+Measured, and what changed (Frank, who owns the emotion tag): on real faces MediaPipe's `mouthFrown`, `noseSneer` and `browInnerUp` stay near 0, so the blendshape rules missed frowns and raised brows (Austin's session 1: 4 of 40 smile, frown and surprised sentences right). The tag now reads the face picture with HSEmotion, an open-source expression network (`lipread/expression.py`, Apache-2.0, about 7 to 11 ms per face on the CPU, on its own thread), plus a small head fitted on Austin's own delivery clips by `lipread/emotion_fit.py`. Steps 2 to 4 are unchanged: the first 3 s of face are the baseline, the label must win for its hold time, and `cam.tick` carries label, confidence and scores. Labels: neutral, happy (smile), sad (frown), surprised; Austin recorded no angry clips, so `angry` stays 0. The blendshape rules remain as the fallback when the model file is missing or the network fails.
+
 ### E6. Final pass at the end of a segment (about 1 hour)
 
 When a segment ends, run Auto-AVSR's own beam search (beam 5, with the subword language model at Lipflow's weight) on the whole segment in a background thread, and publish the 5 best sentences with scores as `cam.final`. Austin's joint search uses it to polish the captions. It must never block the next tick.

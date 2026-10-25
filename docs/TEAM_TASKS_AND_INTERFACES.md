@@ -74,6 +74,7 @@ Follow [EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md). You can pro
 
 The parts run as separate small programs on the laptop and talk through ZeroMQ publish/subscribe over TCP on the loopback (`tcp://127.0.0.1:<port>`, one port per publisher; the camera reader is 5556), with messages encoded as msgpack (numpy arrays as raw bytes).
 `ipc://` sockets don't work on Windows, which is why it is TCP.
+Ports, each bound by its publisher: camera reader 5556 (`RECLAIM_CAM_PUB`), Austin's joint search 5557 (`RECLAIM_DEC_PUB`), Claude service 5558, call service 5559 (`RECLAIM_CALL_PUB`).
 A message takes well under a millisecond.
 All timestamps are `bus.now()` seconds on the same laptop, which is `time.perf_counter()`: on Windows before Python 3.13, `time.monotonic()` only ticks every 15.6 ms.
 Every message also carries `v` (schema version), `seq` (counts up per topic, so a gap is a drop) and `t_pub` (send time).
@@ -103,8 +104,9 @@ flowchart TD
 | `dec.repeat` | Austin → dashboard | at sentence end | `utt_id`, `reason` (which reader disagreed, confidences) |
 | `claude.predict` | Claude → Austin | on judge line, ~2 s | `words` [{`w`, `weight`}], `phrases`, `predictability` (0 to 1), `ttl_s` |
 | `claude.repair` | Claude → Austin, dashboard | on reply | `utt_id`, `edits` [{`index`, `from`, `to`}], `please_repeat` |
-| `voice.say` | Austin → Frank | words leaving the repair window | `utt_id`, `words`, `final`, `pace`, `effort` (both relative, 1.0 = Austin's normal; below) |
+| `voice.say` | Austin → Frank | words leaving the repair window | `utt_id`, `words` (only the new ones), `offset` (index of `words[0]` in the sentence, optional), `final`, `pace`, `effort` (both relative, 1.0 = Austin's normal; below) |
 | `partner.text` | Frank → Claude, dashboard | streaming | `text`, `is_final`, `t` |
+| `call.state` | Frank → dashboard | on change | `state` (`connected` / `ended`), `t`, plus `call_sid` and `ink` on connect |
 | `timing.*` | everyone → logger | every event | the stage and its duration in ms (the camera's ride in `cam.tick.timing_ms`) |
 
 Austin applies Claude's repairs before forwarding words on `voice.say`, so the voice never needs to know about Claude. The logger subscribes to every topic.
@@ -113,6 +115,11 @@ Austin applies Claude's repairs before forwarding words on `voice.say`, so the v
 - `pace`: speaking rate relative to Austin's normal, `exp(0.37 × the rate head's z-score)` divided by its median over the calibration minute. 1.0 is normal, 0.5 half speed.
 - `effort`: muscle effort relative to Austin's normal, the RMS of the EMG over the last 100 ms divided by the session's median while speaking. 1.0 is normal; soft mouthing is below, emphatic above.
 - Both come with every message, so a single stressed word can get its own volume.
+
+`voice.say` sentences:
+- `offset` lets the voice skip a resent word and still speak a real repeat ("no no"); without it, every word in `words` is spoken.
+- Every sentence ends with a `final` message.
+- If a `final` is lost, the voice closes that sentence once it has been silent for 3 s and the next sentence is waiting, and ignores its late messages.
 
 ## Order of work
 
