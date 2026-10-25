@@ -4,6 +4,7 @@ per-frame timestamps (recorder/record.py + svr/recordings.py layout, and RECORDI
     venv-live/bin/python -m pytest tests/lipread/test_source.py -q
 """
 import json
+import os
 import threading
 import time
 
@@ -70,6 +71,9 @@ class StallCap:
 
     def retrieve(self):
         return self._call(lambda: (True, np.zeros((SIZE[1], SIZE[0], 3), np.uint8)))
+
+    def read(self):
+        return (True, self.retrieve()[1]) if self.grab() else (False, None)
 
     def release(self):
         with type(self).lock:
@@ -284,7 +288,7 @@ def test_session_source_order_clock_and_gap(tmp_path):
     write_clip(d / 's1_nots.mp4', 15)
     rows.append({'id': 's1_nots', 'video': 's1_nots.mp4', 'clip_t0': 1500.0})
     (d / 'manifest.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in rows))
-    assert [p.rsplit('/', 1)[-1] for p in session_clips('session_01', str(tmp_path))] == \
+    assert [os.path.basename(p) for p in session_clips('session_01', str(tmp_path))] == \
         ['s1_a.mp4', 's1_b.mp4', 's1_c.mp4', 's1_nots.mp4']
 
     src = SessionSource('session_01', realtime=False, root=str(tmp_path))
