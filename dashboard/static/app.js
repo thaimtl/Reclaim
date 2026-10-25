@@ -212,44 +212,134 @@ function wave(t) {
 }
 requestAnimationFrame(wave);
 
-// ---- end of call -----------------------------------------------------------------------------------------
+// ---- end of call ----------------------------------------------------------------------------------------
+const PLACEHOLDER_WER = { lips: 22, lips_muscles: 14, claude: 4 };    // design values until a session is scored
+const TONES = { warm: 'Warm', concerned: 'Concerned', calm: 'Calm', surprised: 'Surprised', firm: 'Firm' };
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const use = (id, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><use href="#${id}"/></svg>`;
+const liveIcon = k => document.querySelector(`.stage[data-k="${k}"] .ib svg`)?.outerHTML || '';
+const ARCHIE = '<img src="/static/icons/cartesia-archie.svg" alt="">';
+let endKey = null;
+
 function renderEnd(s) {
-  const m = s.summary;
-  $('end-sub').textContent = `Call ended ${mmss(m.seconds)}${s.number ? ' on ' + s.number : ''}`;
-  const dur = m.seconds < 60 ? `${m.seconds} seconds` : `${Math.floor(m.seconds / 60)} min ${m.seconds % 60} s`;
-  $('end-head').textContent = `Austin held a conversation for ${dur} without making a sound.`;
-  const pct = v => v == null ? '--' : v + '%';
-  const claudePct = m.words ? Math.round(100 * m.repairs.length / m.words) : null;
-  const rows = [['Lips alone', m.disagree.lips, '--camera', ''], ['Muscles alone', m.disagree.muscles, '--emg', ''],
-                ['Words Claude changed', claudePct, '--claude', ' claude']];
-  $('end-bars').innerHTML = rows.map(([l, v, col, cls]) => `<div class="brow${cls}"><span class="bl">${l}</span>` +
-    `<div class="bt"><i style="width:${v || 0}%;background:var(${col})"></i></div><span class="bv">${pct(v)}</span></div>`).join('');
-  $('end-bars-note').textContent = m.disagree.lips == null
-    ? 'Measured live, on this call. Each reader’s own pick isn’t on the bus yet, so its share shows as --.'
-    : 'Measured live, on this call: there is no answer key during a call, so this counts disagreement, not errors.';
-  const L = m.latency, parts = [['read', 'Lips and muscles read it', '--camera'], ['lock', 'Locks', '--text-muted'],
-    ['claude', L.claude_label, '--claude'], ['sonic', 'Cartesia Sonic starts speaking', '--emg']];
-  const total = parts.reduce((a, [k]) => a + (L[k] || 0), 0) || 1;
-  $('end-lat-label').textContent = `Where the ${L.lips_to_voice == null ? '' : (L.lips_to_voice / 1000).toFixed(2) + ' s '}from lips to voice goes, median per word, before the phone network`;
-  $('end-split').innerHTML = parts.map(([k, , c]) => `<i style="flex:${L[k] || 0.0001};background:var(${c})"></i>`).join('');
-  $('end-split-labels').innerHTML = parts.map(([k, lab]) => `<div style="flex:${L[k] || 0.0001}"><b>${L[k] == null ? '--' : L[k] + ' ms'}</b>${lab}</div>`).join('');
-  const ex = m.repairs.slice(0, 2).map(r => `${r.frm} to ${r.to}`).join(', ');
-  $('end-hl').innerHTML = [
-    [m.repairs.length, `look-alikes fixed by Claude${ex ? ': ' + esc(ex) : ''}`, '--claude'],
-    [m.repeats.length, 'Please repeat, instead of guessing', '--repeat'],
-    [m.face_hidden_s + ' s', `with the face hidden; the muscles carried ${m.emg_words} words`, '--emg'],
-    [m.wpm == null ? '--' : m.wpm, 'words per minute, mouthed silently', '--text-primary'],
-  ].map(([v, l, c]) => `<div class="hl"><b style="color:var(${c})">${v}</b><span>${l}</span></div>`).join('');
-  $('end-transcript').innerHTML = m.transcript.slice(-12).map(x => {
-    if (x.who === 'judge') return `<div class="turn"><div class="who"><span>Judge</span></div><div class="tx">${esc(x.text)}</div></div>`;
-    const ws = x.text.split(' ').map(esc), bare = w => w.toLowerCase().replace(/[.,!?;:"“”]/g, '');
-    for (const r of x.repairs)      // the repaired word at its own position, only if it is still that word
-      if (r.index < ws.length && bare(ws[r.index]) === bare(r.to)) ws[r.index] = `<s>${esc(r.frm)}</s> ${ws[r.index]}`;
-    const tx = ws.join(' ');
-    const an = [...x.repairs.map(r => `<div class="an claude">Claude fixed ${esc(r.frm)} to ${esc(r.to)}</div>`),
-      x.repeat ? `<div class="an repeat">Please repeat on “${esc(x.repeat.words[0] || '')}”</div>` : '',
-      x.face_hidden ? '<div class="an face">Face hidden: muscles only</div>' : ''].join('');
-    const tone = x.emotion === 'neutral' ? '' : (x.tone || '');
-    return `<div class="turn austin"><div class="who"><span>Austin</span><span style="color:var(${TONE_COLOR[x.emotion] || '--calm'})">${tone}</span></div><div class="tx">${tx}</div>${an}</div>`;
+  const m = s.summary, key = JSON.stringify(m);
+  if (key === endKey) return;                 // the summary never changes once the call is over: build once
+  endKey = key;
+  const L = m.latency, num = v => v == null ? '--' : v;
+  $('end-call').textContent = `Call ended ${mmss(m.seconds)}${s.number ? ' on ' + s.number : ''}`;
+  const [n, unit] = m.seconds < 120 ? [m.seconds, 'second'] : [Math.round(m.seconds / 60), 'minute'];
+  $('end-head').innerHTML = `Austin held a <span class="num">${n}</span>-${unit} phone call without making a sound.`;
+
+  const r = m.repairs[0];
+  const stats = [
+    ['s-mouthed', liveIcon('read'), 'Words mouthed', String(m.words), '', 'Mouthed silently, spoken in his cloned voice.'],
+    ['s-lips', ARCHIE, 'Lips to voice', L.lips_to_voice == null ? '--' : (L.lips_to_voice / 1000).toFixed(2), 's',
+     `Read ${num(L.read)}, lock ${num(L.lock)}, Claude ${num(L.claude)}, voice ${num(L.sonic)} ms.`],
+    ['s-claude', use('claude-mark'), 'Fixed by Claude', String(m.repairs.length), '',
+     !r ? 'No look-alikes needed fixing.' : m.repairs.length === 1 ? `“${r.frm}” to “${r.to}”, a lip look-alike.`
+       : `${m.repairs.length} lip look-alikes, like “${r.frm}” to “${r.to}”.`],
+    ['s-repeat', use('repeat-icon'), 'Asked to repeat', String(m.repeats.length), '',
+     m.repeats.length ? 'Readers disagreed, so nothing was spoken.' : 'Every word was clear enough to speak.'],
+  ];
+  $('end-stats').innerHTML = stats.map(([cls, icon, label, value, unit, tip]) =>
+    `<div class="stat ${cls}"><span class="wm-clip"><span class="wm">${cls === 's-lips' ? liveIcon('sonic') : icon}</span></span><div class="tip">${esc(tip)}</div>` +
+    `<div class="top"><span class="ic">${icon}</span><span class="k">${label}</span></div>` +
+    `<b class="num">${esc(value)}${unit && value !== '--' ? `<small>${unit}</small>` : ''}</b></div>`).join('');
+
+  const b = m.benchmark, wer = b || PLACEHOLDER_WER;
+  const rows = [['Lips alone', wer.lips, '--camera'], ['+ muscles', wer.lips_muscles, '--emg'], ['+ Claude', wer.claude, '--claude']];
+  const max = Math.max(...rows.map(x => x[1]), 1) * 1.14;
+  $('end-ph').classList.toggle('hidden', !!b);
+  $('end-wer-sub').textContent = `${b && b.session ? b.session : 'Session 3'}, scored against the script he mouthed.`;
+  $('end-steps').classList.toggle('placeholder', !b);
+  $('end-steps').innerHTML = rows.map(([name, v, col], i) => {
+    const drop = i ? Math.round(rows[i - 1][1] - v) : 0, shown = b ? `${Math.round(v)}%` : `[${v}%]`;
+    return `<div class="step-row"><span class="sn">${name}</span><div class="st"><i style="--w:${(100 * v / max).toFixed(1)}%;` +
+      `background:var(${col})"></i></div><b>${shown}</b><span class="drop">${drop > 0 ? drop + ' fewer' : ''}</span></div>`;
   }).join('');
+  const pct = v => v == null ? '--' : v + '%';
+  $('end-call-line').textContent = `This call: lips alone disagreed ${pct(m.disagree.lips)} of the time, muscles ${pct(m.disagree.muscles)}.`;
+
+  renderTones(m.tones);
+  $('end-latency').innerHTML = [['read', liveIcon('read'), 'Lips and muscles', L.read], ['lock', liveIcon('lock'), 'Locking', L.lock],
+    ['claude', use('claude-mark'), L.claude_label, L.claude], ['sonic', ARCHIE, 'Cartesia Sonic', L.sonic]].map(([k, icon, label, ms]) =>
+    `<div class="stage"><div class="ib${k === 'claude' ? ' claude' : ''}">${icon}</div><div><div class="sl">${esc(label)}</div>` +
+    `<div class="sv"><b>${num(ms)}</b><span>ms</span></div></div></div>`).join('');
+
+  renderThread(m.transcript);
+  document.fonts.ready.then(() => { if (endKey === key) renderThread(m.transcript); });   // re-trim with final font metrics
+  document.querySelectorAll('#end .num').forEach((el, k) => roll(el, k));
+  setTimeout(() => document.querySelectorAll('#end .st i').forEach(x => x.classList.add('go')), reduceMotion ? 0 : 700);
+}
+
+// numbers roll up from 0 like an odometer; each lower digit spins one more loop before it lands
+function roll(el, k) {
+  const node = el.firstChild, text = node.textContent, h = parseFloat(getComputedStyle(el).lineHeight);
+  const odo = document.createElement('span');
+  odo.className = 'odo'; odo.style.setProperty('--h', h + 'px'); odo.setAttribute('aria-hidden', 'true');
+  let n = 0;
+  for (const c of text) {
+    const cell = document.createElement('span');
+    if (!/\d/.test(c)) { cell.textContent = c; odo.appendChild(cell); continue; }
+    const loops = n++, target = 10 * loops + Number(c), col = document.createElement('span');
+    col.className = 'col';
+    col.innerHTML = Array.from({ length: target + 1 }, (_, i) => `<i>${i % 10}</i>`).join('');
+    cell.appendChild(col); odo.appendChild(cell);
+    const go = () => { col.style.transition = reduceMotion ? 'none' : `transform ${1.5 + 0.3 * loops}s cubic-bezier(.15, .7, .2, 1)`;
+                       col.style.transform = `translateY(-${target * h}px)`; };
+    reduceMotion ? go() : setTimeout(() => requestAnimationFrame(go), 500 + 160 * k);
+  }
+  const sr = document.createElement('span'); sr.className = 'sr'; sr.textContent = text;
+  el.replaceChild(odo, node); el.insertBefore(sr, odo);
+}
+
+
+function renderTones(tones) {
+  const R = 56, C = 2 * Math.PI * R, entries = Object.entries(tones || {}), total = entries.reduce((a, [, c]) => a + c, 0);
+  let off = 0;
+  $('end-donut').innerHTML = total ? entries.map(([t, c]) => {
+    const len = C * c / total, seg = `<circle cx="72" cy="72" r="${R}" class="seg" data-name="${t}" ` +
+      `style="stroke:var(--tone-${t});stroke-dasharray:${Math.max(0, len - 4).toFixed(1)} ${C.toFixed(1)};stroke-dashoffset:${(-off).toFixed(1)}"/>`;
+    off += len; return seg;
+  }).join('') : `<circle cx="72" cy="72" r="${R}" class="seg empty"/>`;
+  $('end-legend').innerHTML = total ? entries.map(([t, c]) =>
+    `<div class="lg" data-name="${t}"><i style="background:var(--tone-${t})"></i><span>${TONES[t] || t}</span><b>${c}</b></div>`).join('')
+    : '<p class="lg-empty">No tone data on this call.</p>';
+  const donut = document.querySelector('#end .donut'), legend = $('end-legend');
+  const show = name => {
+    const seg = name && donut.querySelector(`.seg[data-name="${name}"]`);
+    donut.classList.toggle('hot', !!seg);
+    legend.classList.toggle('hot', !!seg);
+    donut.querySelectorAll('.seg').forEach(x => x.classList.toggle('on', x === seg));
+    legend.querySelectorAll('.lg').forEach(x => x.classList.toggle('on', !!seg && x.dataset.name === name));
+  };
+  document.querySelectorAll('#end .seg, #end .lg').forEach(el => {
+    el.addEventListener('mouseenter', () => show(el.dataset.name));
+    el.addEventListener('mouseleave', () => show(null));
+  });
+  show(null);
+}
+
+// the call as a chat; a long call keeps its newest messages and counts the rest
+function renderThread(turns) {
+  const bare = w => w.toLowerCase().replace(/[.,!?;:"“”]/g, '');
+  const msgs = turns.map(x => {
+    if (x.who === 'judge') return `<div class="msg judge"><div class="bubble">${esc(x.text)}</div></div>`;
+    const ws = x.text.split(' ').map(esc);
+    for (const r of x.repairs || [])
+      if (r.index < ws.length && bare(ws[r.index]) === bare(r.to)) ws[r.index] = `<s>${esc(r.frm)}</s> ${ws[r.index]}`;
+    const notes = [
+      (x.repairs || []).length ? `<div class="cnote claude">${use('claude-mark')}Claude fixed a look-alike</div>` : '',
+      x.repeat ? `<div class="cnote repeat">${use('repeat-icon')}Asked to repeat, nothing wrong was said</div>` : '',
+      x.face_hidden ? `<div class="cnote face">${liveIcon('read')}Face hidden, muscles carried it</div>` : ''].join('');
+    return `<div class="msg austin${x.repeat ? ' unspoken' : ''}"><div class="bubble">${ws.join(' ')}${x.repeat ? ' …' : ''}</div>${notes}</div>`;
+  });
+  const thread = $('end-thread');
+  let from = 0;
+  const fill = () => {
+    thread.innerHTML = `<span class="sep">${from ? `${from} earlier message${from === 1 ? '' : 's'}` : 'Call started'}</span>` +
+      msgs.slice(from).join('') + '<span class="sep">Call ended</span>';
+  };
+  fill();
+  while (from < msgs.length - 1 && thread.scrollHeight > thread.clientHeight + 1) { from++; fill(); }
 }
