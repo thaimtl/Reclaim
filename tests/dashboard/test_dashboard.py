@@ -261,6 +261,18 @@ def test_a_decoder_restart_starts_a_new_sentence():
     assert [t['text'] for t in st.transcript if t['who'] == 'austin'] == ['Hi', 'Hello']
 
 
+def test_a_restarted_sentence_never_rewrites_the_old_caption():
+    st = fed(('dec.hyp', {'utt_id': 1, 'locked': ['hi'], 'unlocked': []}))
+    st.feed('voice.say', {'utt_id': 1, 'words': ['hi'], 'offset': 0, 'final': True}, 10.5)
+    st.feed('timing.voice', {'stage': 'voice_phrase', 'utt_id': 1, 'text': 'Hi.'}, 11.0)
+    st.feed('dec.hyp', {'utt_id': 1, 'locked': ['second'], 'unlocked': []}, 30.0)  # after a restart: utt 1 again
+    st.feed('voice.say', {'utt_id': 1, 'words': ['second'], 'offset': 0}, 30.5)
+    st.feed('timing.voice', {'stage': 'voice_phrase', 'utt_id': 1, 'text': 'Second,'}, 31.0)
+    assert [t['text'] for t in st.transcript if t['who'] == 'austin'] == ['Hi.']
+    st.feed('voice.say', {'utt_id': 1, 'words': [], 'offset': 1, 'final': True}, 31.5)
+    assert [t['text'] for t in st.transcript if t['who'] == 'austin'] == ['Hi.', 'Second,']
+
+
 def test_voice_indicator_times_out_and_lips_to_voice_counts_first_audio_once():
     st = fed(('dec.lock', {'utt_id': 1, 'words': [{'w': 'hi', 't': 9.7}]}),
              ('timing.voice', {'stage': 'sonic_first_audio', 'utt_id': 1, 'ms': 190.0, 't_pub': 10.0}))

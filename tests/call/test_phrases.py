@@ -78,11 +78,12 @@ class PhraseCtx:
 
     def __init__(self, cid, latency=0.03, **defaults):
         self.cid, self.defaults, self.latency = cid, defaults, latency
-        self.pushed, self.closed = [], False
+        self.pushed, self.gens, self.closed = [], [], False
         self.q = asyncio.Queue()
 
     async def push(self, transcript, generation_config=None, flush=False):
         self.pushed.append((transcript, flush))
+        self.gens.append(generation_config)
         fid = len(self.pushed) - 1
 
         async def later():
@@ -201,9 +202,38 @@ async def test_a_typed_sentence_goes_as_one_phrase():
     await v.close()
 
 
-async def test_a_change_of_face_mid_sentence_starts_a_fresh_recording():
+async def test_a_flickering_face_never_splits_a_sentence():
+    v, conn, _, _, _ = await make()
+    words = 'SO I THINK WE SHOULD GET LUNCH AFTER THE DEMO'.split()
+    for i, w in enumerate(words):
+        v.set_emotion('happy' if i % 2 else 'neutral', 0.6)
+        await v.say(7, [w], final=i == len(words) - 1)
+    await asyncio.sleep(0.3)
+    assert len(conn.contexts) == 1
+    assert {g['emotion'] for g in conn.contexts[0].gens} == {'neutral'}
+    await v.close()
+
+
+async def test_a_face_held_mid_sentence_splits_it(monkeypatch):
+    monkeypatch.setattr(cv, 'FACE_HOLD_S', 0.1)
+    v, conn, _, _, _ = await make()
+    v.set_emotion('happy', 0.9)
+    await v.say(5, ['I', 'GOT', 'THE', 'JOB'])
+    v.set_emotion('sad', 0.9)
+    await v.say(5, ['BUT'])                                      # too soon: still the happy recording
+    await asyncio.sleep(0.15)
+    v.set_emotion('sad', 0.9)
+    await v.say(5, ['I', 'MISS', 'YOU'], final=True)
+    await asyncio.sleep(0.3)
+    assert [c.defaults['generation_config']['emotion'] for c in conn.contexts] == ['excited', 'sad']
+    assert [p for p, _ in conn.contexts[1].pushed] == ['I miss you.']
+    await v.close()
+
+
+async def test_a_change_of_face_mid_sentence_starts_a_fresh_recording(monkeypatch):
     """Sonic keeps one recording's mood (measured on his clone), so when his face changes the words so far finish the
     current context and the rest of the sentence gets its own, with the new emotion, played after it."""
+    monkeypatch.setattr(cv, 'FACE_HOLD_S', 0.0)
     v, conn, heard, timing, _ = await make()
     v.set_emotion('happy', 0.9)
     await v.say(5, ['I', 'GOT', 'THE', 'JOB'])
@@ -316,7 +346,8 @@ async def test_a_question_waits_for_his_pause_so_it_can_rise():
     await v.close()
 
 
-async def test_a_sentence_split_by_a_face_change_is_reported_played_once():
+async def test_a_sentence_split_by_a_face_change_is_reported_played_once(monkeypatch):
+    monkeypatch.setattr(cv, 'FACE_HOLD_S', 0.0)
     done = []
 
     async def on_done(utt_id, t):

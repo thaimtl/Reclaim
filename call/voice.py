@@ -55,6 +55,7 @@ PCM = {'container': 'raw', 'encoding': 'pcm_s16le', 'sample_rate': RATE}     # p
 EMOTION = {'neutral': 'neutral', 'happy': 'excited', 'sad': 'sad', 'angry': 'angry', 'surprised': 'surprised'}
 EXCLAIM = {'excited', 'surprised', 'angry'}    # Sonic emotions whose sentences end in '!'
 MIN_CONFIDENCE = 0.5        # below this the face label is a guess: speak neutral
+FACE_HOLD_S = 0.8           # a new face must hold this long to split a sentence into a fresh recording
 SPEED_BIAS = 1.1            # speech plays about as fast as Austin mouths; 10% faster keeps the voice up with him
 FIRST_WORDS, NEXT_WORDS, MAX_WORDS = 2, 3, 5
 PAUSE_S = 0.5               # Austin stopped mouthing for this long: speak what is waiting
@@ -217,6 +218,7 @@ class Voice:
         self.open = set()           # utterances (and parts of one) with a Sonic context open
         self.order = asyncio.Queue()    # utterances in the order their audio started
         self.emotion = ('neutral', 1.0)
+        self.emotion_since = float('-inf')     # when the face's Sonic emotion last changed
         self._lock = asyncio.Lock()
         self._tasks = set()
         self._player = None
@@ -273,6 +275,8 @@ class Voice:
         return t
 
     def set_emotion(self, label, confidence):
+        if generation_config(label, float(confidence))['emotion'] != generation_config(*self.emotion)['emotion']:
+            self.emotion_since = time.perf_counter()
         self.emotion = (label, float(confidence))
 
     # --- words in -------------------------------------------------------------------------------------------------
@@ -296,7 +300,10 @@ class Voice:
             u.effort = u.effort if effort is None else effort
             u.gen = generation_config(*self.emotion, pace=u.pace, effort=u.effort)
             if self.cfg.paced and u.said_gen and u.gen['emotion'] != u.said_gen['emotion'] and words:
-                u = await self._new_part(u)     # his face changed: the rest of the sentence in a fresh recording
+                if time.perf_counter() - self.emotion_since >= FACE_HOLD_S:
+                    u = await self._new_part(u)     # his face changed: the rest in a fresh recording
+                else:
+                    u.gen = dict(u.gen, emotion=u.said_gen['emotion'])     # a passing look keeps the mood
             new = u.new_words(words, offset)
             u.pending += new
             u.pending_gen += [u.gen] * len(new)

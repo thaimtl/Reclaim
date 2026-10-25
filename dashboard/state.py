@@ -274,7 +274,7 @@ class CallState:
             u = self.utts.get(msg.get('utt_id'))
             if stage == 'voice_phrase' and u and msg.get('text'):
                 u['said'].append(str(msg['text']))     # what the call heard, with its punctuation
-                for entry in reversed(self.transcript):     # its last phrase comes after the sentence closed
+                for entry in reversed(self.transcript if u['final'] else []):   # open: its entry doesn't exist yet
                     if entry['who'] == 'austin' and entry.get('utt_id') == u['utt_id']:
                         entry['text'] = self._said(u)
                         break
