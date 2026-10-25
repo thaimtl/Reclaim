@@ -405,7 +405,7 @@ for i, (t, k) in enumerate(steps):
         arrow([(xx - 30, HY + 73), (xx, HY + 73)])
 label(x0 + HW / 2, HY + 132, 'Perplexity on our 600 recording prompts (lower is better: the LM expects how people talk)',
       fs=10.5, italic=True)
-for i, (name, val, col) in enumerate([('book LM (Gaddy & Klein)', 181.2, '#b8b6ae'), ('conversational LM (ours)', 61.0, '#6fa3d8')]):
+for i, (name, val, col) in enumerate([('book LM (Gaddy & Klein)', 181.2, '#b8b6ae'), ('conversational LM (ours)', 62.1, '#6fa3d8')]):
     yy = HY + 152 + i * 34
     label(x0 + 300, yy + 12, name, fs=10.5, ha='right')
     ax.add_patch(Rectangle((x0 + 315, yy), val * 2.6, 24, facecolor=col, edgecolor=INK, lw=1.2, zorder=3))

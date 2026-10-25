@@ -191,7 +191,7 @@ The LM is the joint search's sense of which words follow which. It is one term w
 **(H) Conversational n-gram.** A word 4-gram over everyday dialogue instead of audiobook text. Gaddy and Klein's LM was built from book text, which matches Berkeley's novel sentences but not a phone call.
 - Text: about 72M words. OpenSubtitles 2018 (film and TV dialogue, every 3rd line of the first 36M), Cornell Movie-Dialogs, DailyDialog and Topical-Chat.
 - Normalised exactly like SVR-1's targets (`svr.text.clean_text`), so the joint search's words and the LM's words match.
-- Every recording prompt (sessions 1 to 3) removed: session 3 is the test set, and the joint search's weights are fitted on sessions 1 and 2.
+- Every recording prompt (sessions 1 to 3) removed, and every line that contains a session 3 sentence as whole words: session 3 is the test set, and the joint search's weights are fitted on sessions 1 and 2.
 - KenLM, singleton 3- and 4-grams pruned, 8-bit quantised trie (`python -m fusion.build_lm`). A word's score takes about 2 µs, so every hypothesis is scored on every pass.
 
 **(I) Call cache.** A small model of this call's own words, mixed into the n-gram:

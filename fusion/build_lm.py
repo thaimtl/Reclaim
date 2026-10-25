@@ -12,8 +12,9 @@ Sources (free for research; licences in each dataset):
     DailyDialog (train)                  everyday two-person chats, about 90k utterances (CC BY-NC-SA 4.0)
     Topical-Chat (train)                 casual chats between people, about 190k messages (CDLA-Sharing 1.0)
 Text is normalised exactly like SVR-1's targets (svr.text.clean_text: ASCII, no punctuation, lowercase), so the words
-the joint search builds and the LM's words match. Every recording prompt (docs/recording/, sessions 1-3) is removed:
-session 3 is the test set, and the joint search's weights are fitted on sessions 1-2.
+the joint search builds and the LM's words match. Every recording prompt (docs/recording/, sessions 1-3) is removed
+on an exact match, since the joint search's weights are fitted on sessions 1-2; and any line that contains a session 3
+sentence as whole words is removed too, since session 3 is the test set.
 `build` needs KenLM's lmplz and build_binary: KENLM_BIN=<folder with both> (built from github.com/kpu/kenlm); it sorts in
 LMPLZ_MEMORY (default 8G) of RAM, with its sort files in LMPLZ_TMP (default: the system temp dir; must be a local disk).
 """
@@ -23,6 +24,7 @@ import gzip
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -97,9 +99,12 @@ def normalise(text):
     return ' '.join(clean_text(text).split())
 
 
-def recording_prompts():
+TEST_PROMPTS = 'session3_test.txt'
+
+
+def recording_prompts(pattern='*.txt'):
     out = set()
-    for path in glob.glob(os.path.join(PROMPTS, '*.txt')):
+    for path in glob.glob(os.path.join(PROMPTS, pattern)):
         with open(path, encoding='utf-8') as f:
             for line in f:
                 if line.strip():
@@ -109,8 +114,10 @@ def recording_prompts():
 
 def corpus():
     excluded = recording_prompts()
+    test = sorted(recording_prompts(TEST_PROMPTS), key=len, reverse=True)
+    inside_test = re.compile(r'(?:^| )(?:' + '|'.join(re.escape(p) for p in test) + r')(?: |$)')
     stats = collections.Counter()
-    removed = 0
+    removed = contains_test = 0
     with open(CORPUS + '.tmp', 'w') as out:
         for source, text in raw_lines():
             t = normalise(text)
@@ -119,10 +126,14 @@ def corpus():
             if t in excluded:
                 removed += 1
                 continue
+            if inside_test.search(t):  # a longer line that holds a whole session 3 sentence
+                contains_test += 1
+                continue
             out.write(t + '\n')
             stats[source] += len(t.split())
     os.replace(CORPUS + '.tmp', CORPUS)
-    print(f'{len(excluded)} recording prompts excluded ({removed} exact matches removed)')
+    print(f'{len(excluded)} recording prompts excluded ({removed} exact matches removed); '
+          f'{contains_test} more lines removed for containing one of the {len(test)} session 3 sentences')
     print('words per source:', dict(stats), 'total', sum(stats.values()))
 
 
