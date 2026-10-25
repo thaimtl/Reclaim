@@ -6,7 +6,8 @@ Two lanes, one conversation (docs/REALTIME_PIPELINE.md, "Claude"):
   reuses everything before. It runs on every final judge line and about every PREDICT_EVERY_S while something
   changed.
 - The early lane: while the judge is still speaking, Cartesia Ink's partial transcript starts a prediction call as soon
-  as EARLY_MIN_WORDS words are in, then again every EARLY_STEP_WORDS more (at most every EARLY_EVERY_S, one at a time).
+  as EARLY_MIN_WORDS words are in, then again every EARLY_STEP_WORDS more (at most every EARLY_EVERY_S, up to
+  MAX_EARLY in flight, so a fresher one is always on its way).
   Like a repair call it reads the conversation and appends nothing; the final line still goes through the
   conversation lane, and that newer prediction replaces the early ones. The early call adds no delay to anything.
 - The repair lane: each dec.lock starts its own call at once (up to MAX_REPAIRS in flight), so a repair never waits
@@ -42,7 +43,8 @@ PREDICT_EVERY_S = 2.0  # while Austin is mouthing
 PREDICT_TTL_S = 4.0
 MAX_UTTS = 8           # utterances kept for late locks and reviews
 MAX_REPAIRS = 3        # repair calls in flight at once, besides the conversation call
-EARLY_MIN_WORDS = 3    # the judge's partial line starts an early prediction once it has this many words
+MAX_EARLY = 2          # early prediction calls in flight at once
+EARLY_MIN_WORDS = 2    # the judge's partial line starts an early prediction once it has this many words
 EARLY_STEP_WORDS = 2   # ... and another every this many more words
 EARLY_EVERY_S = 0.7    # ... but at most this often
 BACKOFF_S = (1.0, 2.0, 4.0, 8.0)  # wait after 1, 2, 3, 4+ failed calls in a row, from the moment it failed
