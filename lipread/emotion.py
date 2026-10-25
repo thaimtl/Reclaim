@@ -1,36 +1,9 @@
-"""Facial expression -> emotion tag (E5): one Emotion per Crop from MediaPipe's 52 blendshapes, for cam.tick.
-
-The mouth is busy mouthing words, so the tag leans on the upper face; mouth shapes count only when held longer than
-a mouthed syllable (SUSTAIN_S). Everything is scored as a change from the person's own neutral face: the median of
-each blendshape over the first baseline_s of frames with a face (a resting news speaker already reads browDown ~0.6,
-eyeSquint ~0.5, so raw thresholds fail; the median survives talking during the baseline).
-
-Evidence per frame, d(x) = max(0, x - baseline x), ramp(v, lo, hi) = clip((v - lo) / (hi - lo), 0, 1),
-a | b = 1 - (1 - a)(1 - b) (noisy-or), L/R pairs averaged:
-    surprised  0.7 ramp(d browOuterUp) | 0.3 ramp(d browInnerUp) | 0.5 ramp(d eyeWide), times (1 - frown)
-    angry      0.85 ramp(d browDown) | 0.3 squint
-    happy      0.8 smile | 0.5 squint (1 - ramp(d browDown))          squint = ramp(max(d eyeSquint, d cheekSquint))
-    sad        frown (0.55 + 0.45 ramp(d browInnerUp) (1 - ramp(d browOuterUp)))
-smile / frown: ramp(d mouthSmile / d mouthFrown) once it has stayed above SMILE_ON / FROWN_ON for SUSTAIN_S (dips
-shorter than GAP_S are bridged), ramping in over SUSTAIN_RAMP_S; 0 before.
-Scores are EMA-smoothed with time constant smooth_s / 2 (on crop.t deltas); neutral = 1 - max(other scores). The
-candidate is the best non-neutral label if its score >= MARGIN, else neutral; the published label switches only once
-the same candidate has won for switch_s. No face: the label is held while the scores decay to 0 with NOFACE_TAU_S;
-once the held label's score is below MARGIN / 2 it drops to neutral. Before the baseline is complete: neutral.
-
-Labels: the canonical set CANON is scored internally; label_map {canonical: published name or None} renames them
-(None drops one, e.g. if the TTS has no 'surprised'); two canonicals may share a name (max wins). Output scores have
-exactly the `labels` keys, all in [0, 1], so every Emotion passes bus.validate.
-
-    tagger = EmotionTagger()                                    # labels=EMOTIONS, label_map={'happy': 'joy', ...}
-    for crop in crops:
-        emotion = tagger.push(crop)                             # Emotion(label, confidence, scores), ~30 us
-    tagger.reset_baseline()                                     # new person in front of the camera
-
-EmotionWorker wraps it for the crop thread: submit() every frame (never raises), current() from the tick thread.
-"""
+"""Emotion tag for cam.tick: rules on MediaPipe blendshapes (EmotionTagger) or the expression network (NetTagger)."""
 import logging
 import math
+import os
+import threading
+import time
 from types import SimpleNamespace
 
 import numpy as np
@@ -65,6 +38,7 @@ GAP_S = 0.12
 MARGIN = 0.35
 NOFACE_TAU_S = 2.0
 MAX_DT = 0.5
+BASELINE_S = 3.0        # the speaker's neutral face at call start
 
 
 def _ramp(v, lo_hi):
@@ -102,7 +76,8 @@ class _Sustain:
 
 
 class EmotionTagger:
-    def __init__(self, baseline_s=3.0, smooth_s=1.0, switch_s=0.5, labels=EMOTIONS, label_map=None, margin=MARGIN):
+    def __init__(self, baseline_s=BASELINE_S, smooth_s=1.0, switch_s=0.5, labels=EMOTIONS, label_map=None,
+                 margin=MARGIN):
         self.baseline_n = max(1, int(round(baseline_s * FPS)))
         self.tau = smooth_s / 2
         self.switch_s, self.margin = switch_s, margin
@@ -200,13 +175,137 @@ class EmotionTagger:
 RESTING = Emotion(NEUTRAL, 1.0, {e: float(e == NEUTRAL) for e in EMOTIONS})
 
 
-class EmotionWorker:
-    """EmotionTagger on the crop thread. face = (t, pts, blend or None) as LiveCropper.last_face, or None."""
+class NetTagger:
+    """Expression network -> Emotion, with the same baseline, hold and no-face decay as EmotionTagger."""
 
-    def __init__(self):
+    GENERIC_SMOOTHING = (0.6, 0.5, 1.0)     # margin, hold_s, tau_s: best on RAVDESS without a head
+
+    def __init__(self, net, head=None, baseline_s=BASELINE_S, labels=EMOTIONS):
+        from lipread.expression import GENERIC
+        self.net, self.head, self.baseline_s, self.labels = net, head, baseline_s, tuple(labels)
+        self.own = head.labels if head else tuple(GENERIC.values())
+        self.margin, self.hold_s, self.tau = (head.margin, head.hold_s, head.tau_s) if head else self.GENERIC_SMOOTHING
+        if NEUTRAL not in self.own or NEUTRAL not in self.labels:
+            raise ValueError(f'{NEUTRAL!r} must be a label of the head and of the bus')
+        self.reset_baseline()
+
+    def reset_baseline(self):
+        self.base, self.base_feats, self.base_t0 = None, [], None
+        self.smooth = None
+        self.label, self.cand, self.cand_since, self.t = NEUTRAL, NEUTRAL, None, None
+
+    def _probs(self, feats):
+        from lipread.expression import generic_probs
+        x = feats - self.base
+        if self.head:
+            return self.head.predict(x)[0]
+        return generic_probs(x[:8])
+
+    def push(self, t, image, face):
+        """One processed frame: run the network on the face (if any), then push_features."""
+        feats = None
+        if face is not None and face[2] is not None:
+            logits = self.net.logits(image, face[1])
+            if logits is not None:
+                feats = np.concatenate([logits, np.asarray(face[2], np.float32)])
+        return self.push_features(t, feats)
+
+    def push_features(self, t, feats):
+        """[8 logits, 52 blendshapes] or None (no face): the baseline first, then step() with the probabilities."""
+        if feats is not None and self.base is None:
+            self.base_t0 = t if self.base_t0 is None else self.base_t0
+            self.base_feats.append(feats)
+            if t - self.base_t0 >= self.baseline_s:
+                self.base = np.mean(self.base_feats, 0)
+                self.base_feats = []
+            self.t = float(t)
+            return self._emit()
+        if self.base is None:
+            self.t = float(t)
+            return self._emit()
+        return self.step(t, None if feats is None else self._probs(feats))
+
+    def step(self, t, probs):
+        """Probabilities over self.own, or None for no face -> Emotion. emotion_fit drives this directly."""
+        t = float(t)
+        dt = 1.0 / FPS if self.t is None else min(MAX_DT, max(0.0, t - self.t))
+        self.t = t
+        if probs is not None:
+            target, tau = np.asarray(probs, np.float32), self.tau
+        else:
+            target, tau = np.zeros(len(self.own), np.float32), NOFACE_TAU_S
+        a = 1.0 - math.exp(-dt / tau) if tau > 0 else 1.0
+        self.smooth = target.copy() if self.smooth is None else self.smooth + a * (target - self.smooth)
+        if probs is not None:
+            others = [(self.smooth[i], c) for i, c in enumerate(self.own) if c != NEUTRAL and c in self.labels]
+            p, best = max(others, default=(0.0, NEUTRAL))
+            cand = best if p >= self.margin else NEUTRAL
+            if cand != self.cand:
+                self.cand, self.cand_since = cand, t
+            if cand != self.label and t - self.cand_since >= self.hold_s - 1e-9:
+                self.label = cand
+        else:
+            self.cand, self.cand_since = self.label, None     # no face: a pending switch starts its hold again
+            if self.label != NEUTRAL and self.smooth[self.own.index(self.label)] < self.margin / 2:
+                self.label = self.cand = NEUTRAL
+        return self._emit()
+
+    def _emit(self):
+        scores = dict.fromkeys(self.labels, 0.0)
+        if self.smooth is None:
+            scores[NEUTRAL] = 1.0
+        else:
+            for c, v in zip(self.own, self.smooth):
+                if c in scores:
+                    scores[c] = min(1.0, max(0.0, float(v)))
+            if self.label == NEUTRAL:
+                scores[NEUTRAL] = max(scores[NEUTRAL], 1.0 - max(v for c, v in scores.items() if c != NEUTRAL))
+        return Emotion(self.label, scores[self.label], scores)
+
+
+class EmotionWorker:
+    """submit() from the crop thread (never raises), current() for cam.tick. sync=True: net runs inline (replays)."""
+
+    NET_HZ = 15
+    NET_MAX_FAILURES = 10
+    NET_STALE_S = 2.0
+    JOIN_S = 1.0
+
+    def __init__(self, net='auto', head='auto', sync=False):
         self.tagger = EmotionTagger()
         self.emotion = RESTING
         self.failed = False
+        self.sync = sync
+        self.net_tagger, self.net_failures, self._slot, self._last_t = None, 0, None, None
+        self._net = (RESTING, -math.inf)         # (emotion, monotonic time)
+        self._lock = threading.Lock()
+        self._slot_lock = threading.Lock()
+        self._wake, self._stop = threading.Event(), threading.Event()
+        self._thread = None
+        try:
+            self.net_tagger = self._make_net(net, head)
+        except Exception:  # noqa: BLE001
+            log.exception('expression network failed to start: rule tagger only')
+        if self.net_tagger is not None and not sync:
+            self._thread = threading.Thread(target=self._net_loop, name='emotion-net', daemon=True)
+            self._thread.start()
+
+    @staticmethod
+    def _make_net(net, head):
+        from lipread import expression
+        if net == 'auto':
+            if not expression.ExpressionNet.available():
+                log.info('no verified %s: emotion from the rule tagger (lipread/setup.sh downloads it)',
+                         expression.MODEL_PATH)
+                return None
+            net = expression.ExpressionNet()
+        if net is None:
+            return None
+        if head == 'auto':
+            head = expression.Head.load() if os.path.isfile(expression.HEAD_PATH) else None
+            log.info('emotion: expression network, %s', f'head {expression.HEAD_PATH} ({head.info})' if head else
+                     'no head (lipread/emotion_fit.py makes one from recorded sessions): generic labels')
+        return NetTagger(net, head)
 
     def submit(self, t, image, face):
         try:
@@ -215,6 +314,59 @@ class EmotionWorker:
             if not self.failed:
                 self.failed = True
                 log.exception('emotion failed (logged once; the lip reader goes on)')
+        if self.net_tagger is None:
+            return
+        if self.sync:
+            if self._last_t is None or t - self._last_t >= 1.0 / self.NET_HZ - 1e-9:
+                self._last_t = t
+                self._run_net((t, image, face))
+            return
+        with self._slot_lock:
+            self._slot = (t, image, face)
+        self._wake.set()
+
+    def _run_net(self, slot):
+        try:
+            with self._lock:
+                self._net = (self.net_tagger.push(*slot), time.monotonic())
+            self.net_failures = 0
+        except Exception:  # noqa: BLE001
+            self.net_failures += 1
+            if self.net_failures == 1:
+                log.exception('expression network failed (neutral until it recovers)')
+
+    def _net_loop(self):
+        period = 1.0 / self.NET_HZ
+        while not self._stop.is_set():
+            self._wake.wait(0.5)
+            self._wake.clear()
+            with self._slot_lock:
+                slot, self._slot = self._slot, None
+            if slot is None:
+                continue
+            started = time.monotonic()
+            self._run_net(slot)
+            self._stop.wait(max(0.0, started + period - time.monotonic()))
+
+    def reset_baseline(self):
+        self.tagger.reset_baseline()
+        if self.net_tagger is not None:
+            with self._lock:
+                self.net_tagger.reset_baseline()
+                self._net = (RESTING, time.monotonic())
 
     def current(self):
-        return self.emotion
+        if self.net_tagger is None:
+            return self.emotion
+        emotion, t = self._net
+        if self.net_failures >= self.NET_MAX_FAILURES:
+            return RESTING
+        if not self.sync and time.monotonic() - t >= self.NET_STALE_S:
+            return RESTING
+        return emotion
+
+    def close(self):
+        self._stop.set()
+        self._wake.set()
+        if self._thread is not None:
+            self._thread.join(timeout=self.JOIN_S)
