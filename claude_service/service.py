@@ -8,7 +8,10 @@ The bus loop never waits on Claude, and nothing that goes wrong (a malformed
 message, a failed call, a reply that breaks apply) stops it: the error goes out on timing.claude and the
 captions go on without Claude.
 
-    ANTHROPIC_API_KEY=... python -m claude_service.service      # connects to 'dec' and 'call', binds 'claude'
+    python -m claude_service.service      # connects to 'dec' and 'call', binds 'claude'
+
+The key: ANTHROPIC_API_KEY from the environment, else from call/keys.env (or call/.env), the git-ignored file that
+already holds the call's keys, so every key lives in one place. Never in the repo or the logs.
 """
 import argparse
 import signal
@@ -21,6 +24,29 @@ from claude_service.brain import MAX_REPAIRS, Brain
 
 TOPICS = ("partner.text", "dec.lock", "dec.hyp")
 MOUTHING_S = 0.5  # dec.hyp showed unlocked words this recently
+
+
+KEY_FILES = ("keys.env", ".env")  # in call/, as call/config.py reads them
+
+
+def load_keys(call_dir=None):
+    """ANTHROPIC_API_KEY from call/keys.env (or call/.env) unless the environment already has it. Returns where it came
+    from ('environment', the file's name, or None), never the key."""
+    import os
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return "environment"
+    call_dir = call_dir or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "call")
+    for name in KEY_FILES:
+        path = os.path.join(call_dir, name)
+        if not os.path.exists(path):
+            continue
+        with open(path) as f:
+            for line in f:
+                key, sep, value = line.strip().partition("=")
+                if sep and key.strip() == "ANTHROPIC_API_KEY" and value.strip().strip("'\""):
+                    os.environ["ANTHROPIC_API_KEY"] = value.strip().strip("'\"")
+                    return name
+    return None
 
 
 def report(pub, error):
@@ -125,6 +151,10 @@ def main():
                     help="endpoint name or address to connect to, repeatable (default: dec and call)")
     ap.add_argument("--pub", default="claude", help="endpoint name or address to bind for our topics")
     args = ap.parse_args()
+    source = load_keys()
+    if source is None:
+        sys.exit("no ANTHROPIC_API_KEY: put ANTHROPIC_API_KEY=... in call/keys.env (git-ignored) or the environment")
+    print(f"claude: API key from {source}", file=sys.stderr)
     import anthropic  # here, so the tests run without the SDK
     client = anthropic.Anthropic(timeout=10.0, max_retries=1)  # key from ANTHROPIC_API_KEY, never from the repo
     signal.signal(signal.SIGTERM, signal.default_int_handler)  # stop the same way as on Ctrl-C
