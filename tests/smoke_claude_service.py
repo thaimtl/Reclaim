@@ -116,7 +116,7 @@ def unit():
                                                            for c in fake.calls if c not in convo))
     check('frozen system, schema, settings', all(c['system'] == SYSTEM and c['output_config']['format']['schema'] == SCHEMA
                                                  and c['output_config']['effort'] == 'low' for c in fake.calls))
-    check('model', all(c['model'] == 'claude-opus-5-5' for c in fake.calls))
+    check('model', all(c['model'] == 'claude-haiku-5-5' for c in fake.calls))
     check('roles alternate', [m['role'] for m in b.messages] == ['user', 'assistant'] * 2)
 
 
@@ -164,9 +164,9 @@ def late_lock():
 
 def empty_reply():
     """A refusal or an empty reply never leaves an empty assistant turn behind."""
-    empty = SimpleNamespace(content=[], stop_reason='refusal', model='claude-opus-5-5', usage=None)
+    empty = SimpleNamespace(content=[], stop_reason='refusal', model='claude-haiku-5-5', usage=None)
     blank = SimpleNamespace(content=[SimpleNamespace(type='text', text='')], stop_reason='end_turn',
-                            model='claude-opus-5-5', usage=None)
+                            model='claude-haiku-5-5', usage=None)
     fake = FakeClient([empty, blank, reply()])
     b = Brain(fake)
     for k in range(3):
@@ -356,9 +356,9 @@ def failed_call():
     def boom(kw):
         raise TimeoutError('read timed out')
     cut = SimpleNamespace(content=[SimpleNamespace(type='thinking', thinking='hm', signature='x')],
-                          stop_reason='max_tokens', model='claude-opus-5-5', usage=None)
+                          stop_reason='max_tokens', model='claude-haiku-5-5', usage=None)
     bad = SimpleNamespace(content=[SimpleNamespace(type='text', text='{not json')], stop_reason='end_turn',
-                          model='claude-opus-5-5', usage=None)
+                          model='claude-haiku-5-5', usage=None)
     for name, fail in (('error', boom), ('max_tokens', lambda kw: cut), ('bad JSON', lambda kw: bad)):
         # conversation lane
         answers = [fail, fail, fail, lambda kw: reply()]
@@ -401,7 +401,7 @@ def failed_call():
             r, log = b.ask(messages)
             last = b.failed(target, 10.0 * k)
         check(f'{name}: third repair failure drops that review only', not last and 3 not in b.review, b.review)
-    refuse = SimpleNamespace(content=[], stop_reason='refusal', model='claude-opus-5-5', usage=None)
+    refuse = SimpleNamespace(content=[], stop_reason='refusal', model='claude-haiku-5-5', usage=None)
     b = Brain(FakeClient([refuse, refuse]))
     b.partner({'text': 'how are you', 'is_final': True})
     b.locked(lock(6, ('fine', ('vine',))))

@@ -19,12 +19,11 @@ Code, not Claude, enforces the guard rails: an edit must swap one word for one o
 decoder sent, so Claude can never add, drop or reword anything.
 
 Warnings for whoever changes ask():
-- Thinking can't be turned off on claude-opus-5-5 ({"type": "disabled"} is a 400). Keep MAX_TOKENS big, or
-  garbled input spends it all on thinking and the reply has no text.
+- claude-haiku-5-5 with thinking off and low effort, for speed: a reply takes about a second instead of the ~6 s
+  claude-opus-5-5 took (it can't turn thinking off). Haiku has no server-side fallback, so no `fallbacks`.
 - Publish only when stop_reason == "end_turn" and there is a text block. content[0] may be thinking.
 - Append only: trimming old turns misses the cache and can 400 on replayed thinking blocks, so the history is
   never trimmed (a call is minutes long, far inside the 1M context).
-- fallbacks="default" re-runs a request on another model only when claude-opus-5-5 refuses it.
 
 Failures (from the reviewed service on main, kept with the two lanes): a failed call backs off both lanes
 (BACKOFF_S), a failed conversation call drops its unanswered turn and requeues what it carried, a failed repair call
@@ -33,9 +32,8 @@ requeues its words for review, each until MAX_FAILURES in a row; a refused repai
 import json
 import time
 
-MODEL = "claude-opus-5-5"
-FALLBACK_BETA = "server-side-fallback-2026-07-01"
-MAX_TOKENS = 16000  # see the thinking warning above
+MODEL = "claude-haiku-5-5"
+MAX_TOKENS = 4000  # thinking is off: the reply is a short JSON object
 PREDICT_EVERY_S = 2.0  # while Austin is mouthing
 PREDICT_TTL_S = 4.0
 MAX_UTTS = 8           # utterances kept for late locks and reviews
@@ -259,8 +257,7 @@ class Brain:
             r = self.client.beta.messages.create(
                 model=MODEL,
                 max_tokens=MAX_TOKENS,
-                betas=[FALLBACK_BETA],
-                fallbacks="default",
+                thinking={"type": "disabled"},
                 system=SYSTEM,
                 messages=msgs,
                 cache_control={"type": "ephemeral"},
