@@ -155,6 +155,19 @@ def test_a_crashed_logger_comes_back_in_a_new_folder(tmp_path):
         p.stop(1)
 
 
+def test_the_call_line_is_up_before_the_calibration(tmp_path, monkeypatch):
+    # a dead tunnel or Twilio must fail before Austin mouths for 60 s, not after
+    lc = launcher(tmp_path)
+    order = []
+    monkeypatch.setattr(lc, 'start', lambda part: order.append(part.name))
+    monkeypatch.setattr(lc, 'start_call', lambda: order.append('Call'))
+    monkeypatch.setattr(lc, 'ready_banner', lambda: None)
+    monkeypatch.setattr(lc, 'watch', lambda: None)
+    with redirect_stdout(io.StringIO()):
+        lc.run()
+    assert order == ['Logger', 'EMG', 'Camera', 'Claude', 'Call', 'Decoder', 'Dashboard']
+
+
 def test_a_restart_is_ready_only_from_its_own_output(tmp_path):
     p = Part('Decoder', py('print("fusion: running")'), ('line', r'fusion: running'), 0.5)
     p.start(tmp_path, {})

@@ -62,9 +62,9 @@ In this order, each one only once the one before is ready:
 | EMG | `rig.publish COMx` | `emg.raw` arrives on the bus |
 | Camera | `lipread.run --cam 0` | the first `cam.preview` frame arrives |
 | Claude | `claude_service.service` | it has its key |
-| Decoder | `fusion.run` (`--calibrate 60` with pads) | it runs (after the calibration) |
 | Tunnel | `cloudflared` to the call server's port | it has a public address |
 | Call | `call.server`, told the tunnel's address | Sonic is connected; then the address is checked from outside and the Twilio number pointed at it |
+| Decoder | `fusion.run` (`--calibrate 60` with pads) | it runs (after the calibration) |
 | Dashboard | `dashboard.server` | its page loads |
 
 Call-audio recording is always off. No key is ever printed or logged by the launcher.

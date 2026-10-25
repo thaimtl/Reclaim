@@ -8,8 +8,8 @@
                                                         # connects (a dry run of everything after the camera)
 
 Order (each waits until the part before it is really working, not just started):
-    pre-flight -> logger -> EMG publisher -> camera reader -> Claude -> decoder (EMG calibration: Austin mouths 60 s)
-    -> tunnel -> call server -> Twilio webhook -> dashboard
+    pre-flight -> logger -> EMG publisher -> camera reader -> Claude -> tunnel -> call server -> Twilio webhook
+    -> decoder (EMG calibration: Austin mouths 60 s) -> dashboard
 Ctrl-C stops everything in reverse order (the logger last, so it records it all). A part that crashes is restarted
 (up to MAX_RESTARTS times; a call that was on is lost with its server). Each run gets a folder under $RECLAIM_WORKDIR/logs/
 with every part's output and the bus log.
@@ -407,9 +407,11 @@ class Launcher:
         self.folder.mkdir(parents=True, exist_ok=True)
         say(f'this run\'s logs: {self.folder}')
         try:
-            for part in self.plan():
+            *before, decoder = self.plan()
+            for part in before:
                 self.start(part)
-            self.start_call()
+            self.start_call()                   # the network can fail: before the calibration, not after it
+            self.start(decoder)
             self.start(Part('Dashboard', self.module('venv-call', 'dashboard.server', '--port', str(self.dash_port),
                                                      '--number', pretty_number(self.keys.get('TWILIO_NUMBER'))),
                             ('http', f'http://127.0.0.1:{self.dash_port}/', (200,)), 30))
