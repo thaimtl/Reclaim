@@ -28,10 +28,9 @@ from fusion.offline import PARAMS, WORK, build_search, load_params
 DEFAULT_SVR = os.path.join(WORK, 'checkpoints', 'W_s12_svr1_4ch', 'model.pt')
 TOPICS = ['cam.tick', 'cam.final', 'emg.raw', 'claude.predict', 'claude.repair', 'claude.end', 'partner.text']
 STEP_S = 0.02
-# Claude's hints, live: a hint adds DEFAULT_BETA x its weight (0 to 1) to a candidate's score, enough to win a camera
-# near-tie, never against clear camera evidence (tests/smoke_fusion_units.py). params.json's beta (1.0) was never
-# fitted: fusion/offline.py runs without Claude. A modest step up: 5 changed 1 word of 459 on the live test.
-DEFAULT_BETA = 3.0
+# Claude's hints, live: a hint adds DEFAULT_BETA x its weight (0 to 1) to a candidate's score. 1.0, as in
+# params.json (never fitted: fusion/offline.py runs without Claude); --beta raises it.
+DEFAULT_BETA = 1.0
 
 
 def drain(sub, first):
