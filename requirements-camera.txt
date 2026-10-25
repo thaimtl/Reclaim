@@ -1,9 +1,10 @@
-# Camera-baseline environment (venv-camera): kept separate because MediaPipe needs numpy<2.
+# Lip reader (venv-live) and camera baselines (venv-camera). MediaPipe 1.x with numpy 2, for OpenCV 5, whose Windows
+# DirectShow honours MJPG asked for at open (OpenCV 4.10 gives the C920 5 fps YUY2 at 1080p).
 #   uv venv --python 3.11 venv-camera && uv pip install --python venv-camera/bin/python -r requirements-camera.txt
 torch>=2.4
-numpy<2
-mediapipe==0.10.21
-opencv-python>=4.9,<4.11
+numpy>=2
+mediapipe==1.1.0
+opencv-python==5.0.0.93
 sentencepiece>=0.2
 six
 setuptools
