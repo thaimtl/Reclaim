@@ -41,6 +41,7 @@ Read on for the details.
 - [docs/SVR1_SPEC.md](docs/SVR1_SPEC.md) specifies the EMG model, SVR-1.
 - [docs/TEAM_TASKS_AND_INTERFACES.md](docs/TEAM_TASKS_AND_INTERFACES.md) covers who builds what.
 - [HARDWARE.md](HARDWARE.md) describes the rig, and [RECORDING.md](RECORDING.md) the recording sessions.
+- [DEMO.md](DEMO.md) runs the demo: one launcher starts everything in order (`Launch Silent Voice.bat`).
 
 ## What we demo
 
@@ -87,7 +88,7 @@ Data folders are in `.gitignore`.
 | `buslog/` | Logs every bus message to `$RECLAIM_WORKDIR/logs/` (`record.py`) and replays a session (`replay.py`) |
 | `claude_service/` | The Claude service: predicts Austin's next words and repairs look-alikes (`brain.py`), on the bus (`service.py`) |
 | `dashboard/` | The live dashboard judges watch, from Thai's Figma v5, fed by the bus ([dashboard/README.md](dashboard/README.md)) |
-| `demo/dashboard/` | Captions dashboard prototype, sample data ([demo/dashboard/README.md](demo/dashboard/README.md)) |
+| `demo/` | The demo launcher (`launch.py`, [DEMO.md](DEMO.md)); `demo/dashboard/`: the captions dashboard prototype ([demo/dashboard/README.md](demo/dashboard/README.md)) |
 | `call/` | The phone call: Twilio, Austin's cloned voice (Cartesia Sonic) and the judge's captions (Cartesia Ink) ([call/README.md](call/README.md)) |
 | `figures/` | The SVR-1 architecture figure, the SVR-1 vs Gaddy & Klein results (`svr1_vs_gaddy_4ch*`), and the scripts that draw them |
 | `tests/` | Smoke and unit tests |
