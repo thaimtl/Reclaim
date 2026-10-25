@@ -245,3 +245,15 @@ Findings:
 - So the gain holds on a session it never saw, and is larger there. Adopted.
 - Demo adapter: `--sessions session_01 session_02_EMG-dropped-frames`, 500 sentences, 161 s ->
   `data/face_adapter/austin.pth`. Session 3 (the test session) is read with it once, for the final numbers.
+
+### Session 3, the test session: base vs the demo adapter, 2026-10-25 (5090 dev box)
+
+- 100 sentence clips at demo pace, never trained on. Scored once, offline (crops as live, whole clips), same scoring
+  as `lipread/adapt.py`; the demo adapter is the one above (sessions 1 + 2).
+
+  | 100 session 3 clips | Base | Demo face adapter |
+  | --- | --- | --- |
+  | Tick reading (greedy CTC) WER | 0.340 (18 exact) | **0.178** (50 exact) |
+  | Final pass (beam 5 + LM) WER | 0.209 (48 exact) | **0.098** (69 exact) |
+
+- Camera alone, before EMG and Claude. Not used to tune anything.
