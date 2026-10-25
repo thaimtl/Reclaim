@@ -14,13 +14,17 @@ dec.lock at once (Claude's repair lane) and on voice.say after the repair window
 captions only, never the voice. When the segment's ticks stop (end_wait_s), or its cam.final comes first, the end
 pass reads it once more as a finished sentence; when cam.final's n-best arrives (or final_wait_s passes) the final
 pass adds it to the candidates, and any word still below the threshold ends the sentence in "Please repeat"
-(dec.repeat) instead of being spoken. The segment's last tick, which comes ~0.55 s late, still belongs to it. When the
-camera caps a segment (8 s) and opens the next with its last 2 s of crops, the next utterance drops those carried
-frames (and their EMG and n-best), so no word is read or spoken twice.
+(dec.repeat) instead of being spoken. A tick that comes after end_wait_s ended its sentence (a camera stall, or the
+last tick of a replayed clip, ~0.55 s late) reopens that sentence; once it is done, only frames with the mouth moving
+after its reading go on, as a new utterance that reads just those. When the camera caps a segment (8 s) and opens the
+next with its last 2 s of crops, the next utterance drops those carried frames (and their EMG and n-best), so no word
+is read or spoken twice; a word cut in half at the cap may come out wrong. step() never raises: each stage is guarded,
+so a failure loses none of what the others built.
 
 EMG alone never writes captions: SVR-1 transcribes about 96% of words wrong on its own (dev, svr/dev_compare.py), so
 speech the muscles detect while the camera has no face ends in "Please repeat" (reader: camera), not in guesses.
 """
+import sys
 import time
 from collections import deque
 
@@ -31,6 +35,8 @@ from fusion.search import CamReading, gate_features, softmax, viterbi_word_ends,
 
 EMG_RAIL = (8, 1015)       # dashboard/state.py: a pad off the skin pins its channel to a rail of the 10-bit range
 EMG_FLAT = 1.0             # raw-unit standard deviation below this: no contact
+MIN_NEW = 5                # frames (0.2 s, the shortest word) a finished segment's late tick must add to go on,
+STILL_THR = 0.12           # ... with the mouth moving in them (lipread/endpoint.py's STILL_THR)
 PHRASE_WEIGHT = 0.3        # hint weight of a word that only appears in one of Claude's predicted phrases
 
 
@@ -122,49 +128,85 @@ class Fusion:
         return norm_words(text)
 
     def step(self, now):
+        """Never raises: each stage is guarded, so one failing (a CUDA error in the idle EMG read, say) never loses
+        what the others built, like voice.say words _release already counted as spoken."""
         out = []
         u = self.utt
         if u is not None and u.last_tick is not None and now - u.last_tick >= self.end_wait_s:
-            out += self._end(u, now)
+            out += self._guard('end pass', self._end, u, now)
         for v in list(self.closing):
             if v.state == 'ending' and now >= v.final_deadline:
-                out += self._final(v, now)
+                out += self._guard('final pass', self._final, v, now)
         for v in ([self.utt] if self.utt else []) + self.closing:
-            out += self._release(v, now)
+            out += self._guard('release', self._release, v, now)
         self.closing = [v for v in self.closing if not (v.state == 'done' and v.final_sent)]
         if self.utt is None and self.use_emg and self.idle_emg and now - self.idle_read_t >= 0.1:
-            out += self._idle_emg(now)
+            out += self._guard('idle EMG read', self._idle_emg, now)
         return out
+
+    @staticmethod
+    def _guard(what, fn, *args):
+        try:
+            return fn(*args)
+        except Exception as e:  # noqa: BLE001  logged; the captions and the voice go on
+            print(f'fusion: {what}: {type(e).__name__}: {e}', file=sys.stderr)
+            return []
 
     # ------------------------------------------------------------------ passes
     def _tick(self, msg, now):
         out = []
-        seg = int(msg['seg_id'])
-        ended = self._ended(seg, float(msg['seg_start']))
-        if ended is not None:   # the camera's last tick of a segment comes ~0.55 s late, after end_wait_s ended it:
-            if ended.state == 'ending':     # still that sentence (its final pass reads it), never a new one
-                ended.cam = self._cam(msg, ended) or ended.cam
-            return out
+        seg, start = int(msg['seg_id']), float(msg['seg_start'])
+        current = self.utt is not None and self.utt.seg_id == seg and self.utt.seg_start == start
+        ended = None if current else self._ended(seg, start)
+        if ended is not None:
+            # A tick of a segment whose sentence end_wait_s already ended: the camera stalled (its last tick of a
+            # replayed clip comes ~0.55 s late) or a pass ran long. It is still that sentence, never a new one.
+            if self.utt is not None:        # a newer segment is open: too late to go on, only the reading counts
+                if ended.state == 'ending':
+                    ended.cam = self._cam(msg, ended) or ended.cam
+                return out
+            if ended.state == 'ending':     # reopen it: the cam.final that follows still ends it at once
+                self.closing.remove(ended)
+                ended.state, ended.final_deadline = 'open', None
+                self.utt = ended
+            elif self._goes_on(msg, ended):
+                self._open(seg, start, carried_from=ended)  # done: only the frames after its reading are new words
+            else:                           # a late last tick's couple of trailing frames hold no word
+                return out
         prev = None
-        if self.utt is not None and self.utt.seg_id != seg:
+        if self.utt is not None and not (self.utt.seg_id == seg and self.utt.seg_start == start):
             prev = self.utt
             out += self._end(self.utt, now)
         if self.utt is None:
-            self.utt = Utterance(self.next_id, seg, float(msg['seg_start']))
-            if prev is not None and prev.cam is not None and float(msg['seg_start']) <= prev.cam.frame_t[-1]:
-                self.utt.carried_from = prev    # it starts with the last carry_s of the capped segment's crops
-            self.recent[self.next_id] = self.utt
-            for k in [k for k in self.recent if k < self.next_id - 20]:
-                del self.recent[k]
-            self.next_id += 1
-            self.emg_only = None
+            capped = prev is not None and prev.cam is not None and start <= prev.cam.frame_t[-1]
+            self._open(seg, start, carried_from=prev if capped else None)   # capped: it carries the last 2 s
         u = self.utt
         cam = self._cam(msg, u)
         if cam is None:                     # only carried frames so far
             return out
-        u.cam, u.last_tick = cam, now
+        u.cam = cam
+        t0 = time.perf_counter()
         out += self._pass(u, now, final=False)
-        return out
+        u.last_tick = now + (time.perf_counter() - t0)  # end_wait_s counts from the end of the pass: a slow pass
+        return out                                      # is never mistaken for the end of the sentence
+
+    @staticmethod
+    def _goes_on(msg, ended):
+        """Whether a tick of a finished sentence's segment holds more speech: MIN_NEW new frames, the mouth moving."""
+        if ended.cam is None:
+            return False
+        new = np.asarray(msg['frame_t'], np.float64) > ended.cam.frame_t[-1]
+        act = np.asarray(msg.get('activity', np.ones(len(new))), np.float64)[new]
+        return int(new.sum()) >= MIN_NEW and bool((act >= STILL_THR).any())
+
+    def _open(self, seg, start, carried_from=None):
+        self.utt = Utterance(self.next_id, seg, start)
+        self.utt.carried_from = carried_from
+        self.recent[self.next_id] = self.utt
+        for k in [k for k in self.recent if k < self.next_id - 20]:
+            del self.recent[k]
+        self.next_id += 1
+        self.emg_only = None
 
     @staticmethod
     def _cam(msg, u):
@@ -183,28 +225,25 @@ class Fusion:
 
     def _ended(self, seg, seg_start):
         """The ended utterance of this camera segment, if any (seg_start too: a restarted camera reuses seg_ids)."""
-        for v in list(self.closing) + list(self.recent.values()):
-            if v is not self.utt and v.state != 'open' and v.seg_id == seg and v.seg_start == seg_start:
-                return v
-        return None
+        found = [v for v in list(self.closing) + list(self.recent.values())
+                 if v is not self.utt and v.state != 'open' and v.seg_id == seg and v.seg_start == seg_start]
+        return max(found, key=lambda v: v.utt_id) if found else None   # the newest: a stall can split it again
 
     def _end(self, u, now):
         """The segment's ticks stopped: read it once more as a finished sentence, then wait for cam.final."""
-        try:
-            return self._pass(u, now, final=True) if u.cam is not None else []
-        finally:                            # even if the pass fails, or the sentence would stay open and retry forever
-            u.state, u.final_deadline = 'ending', now + self.final_wait_s
-            self.closing.append(u)
-            if self.utt is u:
-                self.utt = None
+        out = self._guard('end pass', self._pass, u, now, True) if u.cam is not None else []
+        u.state, u.final_deadline = 'ending', now + self.final_wait_s   # even after a failed pass: never retried
+        self.closing.append(u)
+        if self.utt is u:
+            self.utt = None
+        return out
 
     def _final(self, u, now):
         """The final pass, with the camera's attention n-best: every word left is spoken, unless the sentence as a
         whole is unreadable (LockModel.settle); then the words left end in "Please repeat"."""
-        try:
-            out = self._pass(u, now, final=True, nbest=u.nbest or (), settle=True) if u.cam is not None else []
-        finally:                            # a failed final pass still closes the sentence: its locked words are said
-            u.state = 'done'
+        out = self._guard('final pass', lambda: self._pass(u, now, final=True, nbest=u.nbest or (), settle=True)) \
+            if u.cam is not None else []
+        u.state = 'done'                    # even after a failed pass: its locked words are said, the rest repeated
         rest = list(range(len(u.locked), len(u.locked) + len(u.unlocked)))
         if rest and not u.repeat_sent:
             out.append(('dec.repeat', self._repeat_msg(u, rest)))

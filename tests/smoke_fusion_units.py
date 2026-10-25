@@ -246,8 +246,10 @@ def main():
                 out += core.step(t)
             for k in range(1, 60):
                 out += core.step(t + 0.05 * k)
-                if k == late_at:
-                    out += core.feed('cam.tick', full, t + 0.05 * k)
+                if k == late_at:            # as the camera's: two more frames, the mouth still
+                    late = {kk: (v[:n + 2] if isinstance(v, np.ndarray) else v) for kk, v in full.items()}
+                    late['activity'] = np.full(n + 2, 0.02, np.float32)
+                    out += core.feed('cam.tick', late, t + 0.05 * k)
                 if k == 20:
                     out += core.feed('cam.final', {'seg_id': 1, 'nbest': [{'text': 'I WANT WATER', 'score': 0.0}]},
                                       t + 0.05 * k)
@@ -297,13 +299,13 @@ def main():
         check('words carried over a capped segment are said once', said == ['i', 'want', 'water', 'i', 'want'],
               ' '.join(said))
 
-        # an exception in an end pass never stops fusion: the sentence closes and the next one works
+        # a failing end or final pass never stops fusion, and step() never raises: the sentence closes, its locked
+        # words are said, and the next one is read
         core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
-        real, calls = core.search.candidates, []
+        real = core.search.candidates
 
         def flaky(*a, **kw):     # every end and final pass fails (a CUDA error, say)
             if kw.get('final') or (len(a) > 5 and a[5]):
-                calls.append(1)
                 raise RuntimeError('CUDA error (test)')
             return real(*a, **kw)
         core.search.candidates = flaky
@@ -316,21 +318,97 @@ def main():
         for k in range(1, 80):              # past end_wait_s and final_wait_s
             try:
                 out += core.step(t + 0.05 * k)
-            except RuntimeError:
+            except Exception:  # noqa: BLE001
                 raised += 1
         core.search.candidates = real
+        locked = [x['w'] for tp, m in out if tp == 'dec.lock' for x in m['words']]
+        said = [x for tp, m in out if tp == 'voice.say' and m['utt_id'] == 1 for x in m['words']]
         nxt2 = reading(pieces, ['i', 'want', 'water'], seg_id=2, t0=300.0)
         for n in range(8, T + 1, 3):
             msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in nxt2.items()}
             out += core.feed('cam.tick', msg, float(msg['frame_t'][-1]) + 0.05)
-        check('failed end and final passes raise once each, close the sentence, and the next one is read',
-              raised == 2 and core.utt is not None and core.utt.utt_id == 2 and
-              any(tp == 'voice.say' and m['final'] and m['utt_id'] == 1 for tp, m in out), f'raised {raised}')
-        nxt = reading(pieces, ['i', 'want', 'water'], seg_id=1, t0=500.0)
-        out = core.feed('cam.tick', nxt, 500.0)
+        check('failed end and final passes: step() never raises, the locked words are said, the next sentence is read',
+              raised == 0 and said == locked and core.utt is not None and core.utt.utt_id == 2 and
+              any(tp == 'voice.say' and m['final'] and m['utt_id'] == 1 for tp, m in out),
+              f'raised {raised}; locked {locked}; said {said}')
+
+        # the idle EMG read fails (it runs once no sentence is open, as the last words are released): nothing is lost
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=2.0)    # a long window: words still wait
+
+        def broken(now):
+            raise RuntimeError('CUDA error in svr.read (test)')
+        out = []
+        for n in range(8, T + 1, 3):
+            msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
+            t = float(msg['frame_t'][-1]) + 0.05
+            out += core.feed('cam.tick', msg, t)
+        out += core.feed('cam.final', {'seg_id': 1, 'nbest': [{'text': 'I WANT WATER', 'score': 0.0}]}, t + 0.1)
+        # the final pass is done and no sentence is open: from now on every step also runs the idle EMG read
+        core.use_emg = core.idle_emg = True
+        core._idle_emg = broken
+        for k in range(1, 80):
+            out += core.step(t + 0.1 + 0.05 * k)
+        locked = [x['w'] for tp, m in out if tp == 'dec.lock' for x in m['words']]
+        said = [x for tp, m in out if tp == 'voice.say' for x in m['words']]
+        check('a failing idle EMG read loses no word and no final', said == locked == ['i', 'want', 'water'] and
+              any(tp == 'voice.say' and m['final'] for tp, m in out), f'said {said}')
+
+        # the camera stalls 0.4 s mid-sentence (end_wait_s ends it): it reopens, every word is said once
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+        out = []
+        ns = list(range(8, T + 1, 3))
+        half = len(ns) // 2
+        t_shift = 0.0
+        for j, n in enumerate(ns):
+            msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
+            if j == half:                   # the stall: no tick for 0.4 s, with steps going on
+                t_stall = t
+                for k in range(1, 9):
+                    out += core.step(t_stall + 0.05 * k)
+                t_shift = 0.4
+            t = float(msg['frame_t'][-1]) + 0.05 + t_shift
+            out += core.feed('cam.tick', msg, t)
+            out += core.step(t)
+        for k in range(1, 80):
+            out += core.step(t + 0.05 * k)
+            if k == 10:
+                out += core.feed('cam.final', {'seg_id': 1, 'nbest': [{'text': 'I WANT WATER', 'score': 0.0}]},
+                                  t + 0.05 * k)
+        said = [x for tp, m in out if tp == 'voice.say' for x in m['words']]
+        utts = {m['utt_id'] for tp, m in out if tp in ('voice.say', 'dec.hyp')}
+        check('a mid-sentence stall reopens the sentence: every word said once', said == ['i', 'want', 'water']
+              and utts == {1}, f"{' '.join(said)}; utt_ids {sorted(utts)}")
+
+        # a stall long enough that the sentence already finished, then Austin goes on mouthing in the same segment:
+        # only the new frames are read, every word said once
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+        out = []
+        for n in range(4, cut + 1, 3):
+            msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in long.items()}
+            t = float(msg['frame_t'][-1]) + 0.05
+            out += core.feed('cam.tick', msg, t)
+            out += core.step(t)
+        for k in range(1, 70):              # past end_wait_s and final_wait_s: done
+            out += core.step(t + 0.05 * k)
+        t0 = t + 3.5
+        for n in range(cut + 3, len(long['frame_t']) + 1, 3):
+            msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in long.items()}
+            t = t0 + 0.04 * (n - cut)
+            out += core.feed('cam.tick', msg, t)
+            out += core.step(t)
+        for k in range(1, 80):
+            out += core.step(t + 0.05 * k)
+        said = [x for tp, m in out if tp == 'voice.say' for x in m['words']]
+        check('words after a finished stall are read from the new frames only, said once',
+              said == ['i', 'want', 'water', 'i', 'want'], ' '.join(said))
+
+        core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+        core.feed('cam.tick', reading(pieces, ['i', 'want', 'water'], seg_id=1, t0=100.0), 101.0)
+        for k in range(1, 80):
+            core.step(101.0 + 0.05 * k)
+        out = core.feed('cam.tick', reading(pieces, ['i', 'want', 'water'], seg_id=1, t0=500.0), 501.0)
         check('a restarted camera reusing seg_id 1 still starts a new sentence',
               any(tp == 'dec.hyp' and m['utt_id'] == 2 for tp, m in out))
-
         # a repair changes the captions only: the voice says what locked, even inside the repair window
         core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
         out = []
