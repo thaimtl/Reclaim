@@ -165,7 +165,7 @@ Claude does two jobs:
 
 A locked word waits a short repair window before it is spoken, 0.3 s by default, so that a quick repair can still change it. A repair that arrives later fixes the captions only, with the change highlighted. The window is a single setting: 0 gives the fastest voice, a longer window lets Claude catch more before words are spoken.
 
-Claude runs through the Claude API, as `claude-opus-5-5` at low effort. The rules and the conversation so far form a prefix that stays the same from call to call, so prompt caching keeps each call fast and cheap; only the newest words are new input.
+Claude runs through the Claude API, as `claude-haiku-5-5` with thinking off and low effort, chosen for speed: a call takes about 2 to 3 s (measured: predictions 2.1 to 3.5 s, repairs 2.0 to 2.3 s), where `claude-opus-5-5`, which always thinks first, took about 6 s. A repair that slow can't land inside the 0.3 s repair window, so repairs mostly correct the captions. The rules and the conversation so far form a prefix that stays the same from call to call, so prompt caching keeps each call fast and cheap; only the newest words are new input.
 
 ## The voice and the call
 
@@ -202,6 +202,7 @@ These are design estimates for the RTX 5060; every one gets measured on the lapt
 | Word locked (black) | as soon as the next word starts and confidence is reached, often within one or two passes |
 | Repair window before speaking | 0.3 s (adjustable, 0 for fastest) |
 | First audio from Cartesia | a few tenths of a second |
+| Claude, per call (beside the loop, never in it) | about 2 to 3 s: predictions arrive after the judge's line, repairs after the word was spoken |
 
 A sentence-at-a-time lip reader only starts speaking after the whole sentence is done, plus one or two seconds of decoding. Silent Voice speaks while the sentence is still being mouthed, like a simultaneous interpreter.
 
