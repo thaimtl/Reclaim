@@ -5,12 +5,11 @@ Two lanes, one conversation (docs/REALTIME_PIPELINE.md, "Claude"):
   message (judge lines, Austin's locked words, the repairs made since) and Claude's reply to it, so prompt caching
   reuses everything before. It runs on every final judge line and about every PREDICT_EVERY_S while something
   changed.
-- The live lane: a prediction is always on its way. Whenever the judge's live transcript (Cartesia Ink's partial
-  line) gains a word, a call starts (at most every LIVE_JUDGE_EVERY_S, up to MAX_LIVE in flight); otherwise, as soon
-  as the last live call is back, the next one starts with the newest context: the judge's line so far, their final
-  lines not yet in the conversation, Austin's current sentence (locked and still being read) and the last repairs.
-  A context that hasn't changed is asked again only after LIVE_IDLE_S. Like a repair call it reads the
-  conversation and appends nothing, so the conversation lane stays append-only and cached. No call adds delay.
+- The early lane: while the judge is still speaking, Cartesia Ink's partial transcript starts a prediction call as soon
+  as EARLY_MIN_WORDS words are in, then again every EARLY_STEP_WORDS more (at most every EARLY_EVERY_S, up to
+  MAX_EARLY in flight, so a fresher one is always on its way).
+  Like a repair call it reads the conversation and appends nothing; the final line still goes through the
+  conversation lane, and that newer prediction replaces the early ones. The early call adds no delay to anything.
 - The repair lane: each dec.lock starts its own call at once (up to MAX_REPAIRS in flight), so a repair never waits
   behind another call. A repair call is the conversation so far plus one review message, and its reply is never
   appended: the conversation stays append-only (no thinking block is ever replayed after an edited prefix), and
@@ -45,9 +44,7 @@ requeues its words for review, each until MAX_FAILURES in a row; a refused repai
 import json
 import time
 
-from claude_service.names import always_phrases, always_words
-
-MODEL = "claude-haiku-5-5"           # predictions (conversation and live lanes): speed
+MODEL = "claude-haiku-5-5"           # predictions (conversation and early lanes): speed
 REPAIR_MODEL = "claude-opus-5-5"     # repairs: accuracy (they only fix the captions, so its ~5 s costs nothing)
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 REPAIR_MAX_TOKENS = 16000            # Opus always thinks first: room for the thinking and the reply
@@ -56,15 +53,10 @@ PREDICT_EVERY_S = 2.0  # while Austin is mouthing
 PREDICT_TTL_S = 4.0
 MAX_UTTS = 8           # utterances kept for late locks and reviews
 MAX_REPAIRS = 3        # repair calls in flight at once, besides the conversation call
-MAX_LIVE = 3           # live prediction calls in flight at once
-LIVE_JUDGE_EVERY_S = 0.3  # a new word in the judge's live line starts a live call at most this often
-LIVE_EVERY_S = 0.3     # otherwise the next live call starts this soon after the last one is back
-LIVE_IDLE_S = 3.0      # ... and an unchanged context is asked again only after this long
-# filler the language model already covers: never a hint, so Claude's hints go to the words that decide a sentence
-STOPWORDS = frozenset(
-    'a an the i im i\'m it its it\'s to of in on at for and or but so um uh like is are was were be been am do does did '
-    'have has had will would can could just that this these those my me you your we our they them he she his her yes '
-    'no ok okay yeah sure thanks thank well oh not very really too also then there here what with from'.split())
+MAX_EARLY = 2          # early prediction calls in flight at once
+EARLY_MIN_WORDS = 2    # the judge's partial line starts an early prediction once it has this many words
+EARLY_STEP_WORDS = 2   # ... and another every this many more words
+EARLY_EVERY_S = 0.7    # ... but at most this often
 BACKOFF_S = (1.0, 2.0, 4.0, 8.0)  # wait after 1, 2, 3, 4+ failed calls in a row, from the moment it failed
 MAX_FAILURES = 3       # failed calls in a row after which the failing request's content is dropped
 MAX_PENDING_LINES = 20  # newest judge lines kept while calls fail
@@ -85,22 +77,13 @@ utterance as locked so far, one word per line with its index, and the repairs yo
 list words under "review" with the decoder's confidence (conf), the camera and EMG support (cam, emg, 0 to 1) and \
 the alternatives it considered (alts), including the word's lip look-alikes.
 
-Background: this is Cal Hacks, a student hackathon in San Francisco, and the judge is a hackathon judge evaluating \
-the project, not a court judge. Austin is a student at McGill University; his team (with Frank) built Silent Voice for \
-patients who lost their voice box (laryngectomy, ALS). Words that often come up: Austin, Frank, Cal Hacks, McGill \
-University, Red Bull, coffee, Meta, Anthropic, Cartesia, ASL, ALS, patients, laryngectomy, voice box. The judge may \
-also ask ordinary small talk (food, sleep, school, plans): answer it with concrete, everyday content.
-
 You have two jobs, and every reply does both.
 
-1. Predict what Austin will mouth next, given the whole conversation: his answer to the judge's last question, or the \
-rest of his current sentence. The lip reader already knows filler and grammar words (the, a, i, it, to, and, so, is, \
-yes, okay): never list those. Predict the content words that decide the sentence: nouns, names, numbers, places, \
-foods, verbs and adjectives that answer the question. Give each word a weight from 0 to 1 for how likely it is to \
-appear in his next few words. Then give several full likely sentences Austin could say as phrases, written out in \
-full ("my name is austin", "i had burritos for breakfast", "i study at mcgill university"). Up to 30 words and 8 \
-phrases, lowercase, no punctuation. Set predictability from 0 to 1: high when the next words are strongly constrained \
-(a yes-or-no question, his name, the end of a set phrase), low when he could say almost anything.
+1. Predict. Give the words and short phrases Austin is likely to mouth next, given the whole conversation: answers \
+to the judge's last question, the natural continuation of his current utterance, common short replies. Give each word \
+a weight from 0 to 1 for how likely it is to appear in his next few words. Up to 30 words and 8 phrases, lowercase, no \
+punctuation. Set predictability from 0 to 1: high when the next words are strongly constrained (a yes-or-no question, \
+the end of a set phrase), low when he could say almost anything.
 
 2. Repair. For each word under review, decide whether the locked word is what Austin meant. If an alternative fits \
 the conversation clearly better, return an edit with that word's index, the locked word as "from" and the alternative \
@@ -222,9 +205,8 @@ class Brain:
         self.failures = 0     # failed calls in a row, either lane (see failed)
         self.retry_at = -1e9  # no new call before this, after a failure (bus.now() seconds)
         self.partial = ""     # the judge's line so far, while they speak (Ink's partial transcript)
-        self.live_words = 0   # words in the judge's live line the last live call was asked on
-        self.live_at = -1e9   # when the last live call started
-        self.live_asked = ""  # the context it was asked on
+        self.early_words = 0  # words in the partial line the last early prediction was asked on
+        self.early_at = -1e9
         self.end = None       # the newest dec.pause not yet asked (end lane)
 
     def partner(self, msg):
@@ -232,48 +214,22 @@ class Brain:
         if msg.get("is_final"):
             if text:
                 self.events.append(text)
-            self.partial, self.live_words = "", 0   # the line is done: it is in the next live context and conversation call
+            self.partial, self.early_words = "", 0   # the line is done: the conversation lane takes it from here
         elif text:
             self.partial = text
 
-    def live_context(self):
-        """What a live call is asked on: the newest context, not yet in the conversation."""
-        parts = []
-        if self.events:
-            parts.append("The judge just said (not in the conversation yet):\n" + "\n".join(self.events))
-        if self.partial:
-            parts.append(f"The judge is speaking now. Their line so far (a live transcript, it may change): {self.partial}")
-        if self.utts:
-            utt = next(reversed(self.utts))
-            locked = " ".join(w["w"] for w in self.utts[utt])
-            parts.append(f"Austin's current sentence, locked so far: {locked or '(nothing yet)'}")
-        if self.unlocked:
-            parts.append("Austin is mouthing, still being read (may change): " + " ".join(self.unlocked))
-        if self.notes:
-            parts.append("Your last repairs:\n" + "\n".join(self.notes[-3:]))
-        return "\n\n".join(parts)
-
-    def next_live(self, now, in_flight=0):
-        """A live-lane call: (messages, target), or None when it isn't time. A new word in the judge's live line starts
-        one at once (at most every LIVE_JUDGE_EVERY_S, up to MAX_LIVE in flight); otherwise one starts as soon as the
-        last is back, on the newest context (an unchanged one only after LIVE_IDLE_S). The messages are the
-        conversation so far plus that context; nothing is appended to the conversation."""
-        if now < self.retry_at or in_flight >= MAX_LIVE:
-            return None
-        context = self.live_context()
-        if not context and not self.messages:
-            return None     # the call hasn't started: nothing to predict from
+    def next_early(self, now):
+        """An early-lane call while the judge is still speaking: (messages, target), or None when it isn't time. The
+        messages are the conversation so far plus the partial line; nothing is appended to the conversation."""
         n = len(self.partial.split())
-        judge_new = n > self.live_words and now - self.live_at >= LIVE_JUDGE_EVERY_S
-        settled = in_flight == 0 and now - self.live_at >= LIVE_EVERY_S and \
-            (context != self.live_asked or now - self.live_at >= LIVE_IDLE_S)
-        if not (judge_new or settled):
+        if now < self.retry_at or n < EARLY_MIN_WORDS or n < self.early_words + EARLY_STEP_WORDS \
+                or now - self.early_at < EARLY_EVERY_S:
             return None
-        self.live_words, self.live_at, self.live_asked = n, now, context
-        content = ((context + "\n\n") if context else "") + \
-            "Nothing is under review. Predict what Austin will mouth next: content words and full likely sentences."
+        self.early_words, self.early_at = n, now
+        content = (f"The judge is still speaking. Their line so far (a live transcript, it may change): {self.partial}\n\n"
+                   "Nothing is under review. Predict what Austin is likely to answer.")
         return list(self.messages) + [{"role": "user", "content": content}], \
-            {"utt_id": None, "words": [], "review": [], "sent": now, "lane": "live"}
+            {"utt_id": None, "words": [], "review": [], "sent": now, "lane": "early"}
 
     def pause(self, msg):
         """dec.pause: Austin's lips stopped and the decoder holds his sentence. The newest replaces one not yet sent."""
@@ -387,7 +343,7 @@ class Brain:
         return dict(self.predict, ttl_s=PREDICT_TTL_S, t=now)
 
     def ask(self, messages=None, lane=None):
-        """Call Claude. messages=None: the conversation lane (the reply is appended); else a repair-, live- or end-lane call on
+        """Call Claude. messages=None: the conversation lane (the reply is appended); else a repair- or early-lane call on
         those messages (nothing appended). Runs off the main thread; returns (reply or None, log)."""
         lane = "conversation" if messages is None else (lane or "repair")
         msgs = self.messages if messages is None else messages
@@ -477,17 +433,9 @@ class Brain:
             return [("claude.end", {"utt_id": target["utt_id"], "p_complete": _clip(reply["p_complete"]),
                                     "ask": target.get("ask"), "t": now})], []
         if sent >= self.predict_sent:
-            words = {}
-            for p in reply["predict_words"]:   # content words only: filler is the language model's job
-                w = _norm(p["w"])
-                if w and w not in STOPWORDS:
-                    words[w] = max(words.get(w, 0.0), _clip(p["weight"]))
-            for w, x in always_words().items():   # the demo's names, always (claude_service/names.py)
-                words[w] = max(words.get(w, 0.0), x)
-            phrases = [_norm(p) for p in reply["predict_phrases"] if _norm(p)]
             self.predict = {
-                "words": [{"w": w, "weight": x} for w, x in sorted(words.items(), key=lambda kv: -kv[1])],
-                "phrases": phrases + [p for p in always_phrases() if p not in phrases],
+                "words": [{"w": _norm(p["w"]), "weight": _clip(p["weight"])} for p in reply["predict_words"] if _norm(p["w"])],
+                "phrases": [_norm(p) for p in reply["predict_phrases"] if _norm(p)],
                 "predictability": _clip(reply["predictability"]),
                 "ttl_s": max(0.0, PREDICT_TTL_S - (now - sent)),
                 "t": sent,
