@@ -62,16 +62,18 @@ class LockModel:
         tau = float(np.clip(self.tau0 - self.kappa * (predictability or 0.0), self.tau_min, self.tau_max))
         return min(tau, self.tau_end) if final and self.tau_end is not None else tau
 
-    def settle(self, words, probs):
+    def settle(self, words, probs, floor=None):
         """The final pass: speak every word left (True), unless the sentence is unreadable: no words, or the mean
-        p_lock of its words other than short ones (a, the, to, ...) below repeat_floor. None keeps the plain rule
-        (each word against tau_end)."""
-        if self.repeat_floor is None:
+        p_lock of its words other than short ones (a, the, to, ...) below repeat_floor. words and probs cover the
+        whole sentence, the words locked earlier (with p_lock when they locked) and the ones left. A floor of None
+        keeps the plain rule (each word against tau_end)."""
+        floor = self.repeat_floor if floor is None else floor
+        if floor is None:
             return False
         if not words:
             return True
         content = [p for w, p in zip(words, probs) if w not in SHORT_WORDS] or list(probs)
-        return float(np.mean(content)) >= self.repeat_floor
+        return float(np.mean(content)) >= floor
 
     def may_lock(self, f, p, tau):
         """The lock rule for one word (its predecessors already locked)."""

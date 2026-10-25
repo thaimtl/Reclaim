@@ -143,6 +143,7 @@ def run_session(session, cam_log, svr_path, gate, lock, use_emg=True, use_lm=Tru
         session_gain(live, [r for r in rows if r['id'] in ok_ids])
     if no_lock:
         lock.tau0 = lock.tau_min = lock.tau_max = 2.0       # nothing locks: every word on every pass is an example
+        lock.tau_end = lock.repeat_floor = None
     search = build_search()
     if not use_lm:   # camera alone: no LM-ranked short-word insertions either
         search.inserts = 0
@@ -345,7 +346,7 @@ def simulate_locks(records, lock, tau, tau_end=None, repeat_floor=None):
         if not recs[0]['clip_ok'] or not recs[0]['prompt']:
             continue
         ref = norm_words(recs[0]['prompt'])
-        locked, wrong, times = [], 0, []
+        locked, probs, wrong, times = [], [], 0, []
         for r in recs:
             match = align(list(r['best']), ref)
             for x in r['words']:
@@ -355,15 +356,15 @@ def simulate_locks(records, lock, tau, tau_end=None, repeat_floor=None):
                 if not lock.may_lock(x['f'], p, min(tau, tau_end) if (r['final'] and tau_end is not None) else tau):
                     break
                 locked.append(x['w'])
+                probs.append(p)
                 wrong += int(match[x['i']] is None)
                 times.append((x['i'], r['t']))
         last = recs[-1]
         unlocked = len(last['best']) - len(locked)
         if repeat_floor is not None and unlocked > 0 and last['final']:   # the final pass speaks the rest, unless unreadable
             rest = [x for x in last['words'] if x['i'] >= len(locked)]
-            content = [float(lock.prob(x['f'])) for x in rest if x['w'] not in SHORT_WORDS] or \
-                [float(lock.prob(x['f'])) for x in rest]
-            if not rest or np.mean(content) >= repeat_floor:
+            if lock.settle(locked + [x['w'] for x in rest], probs + [float(lock.prob(x['f'])) for x in rest],
+                           repeat_floor):
                 match = align(list(last['best']), ref)
                 for x in rest:
                     locked.append(x['w'])
@@ -468,43 +469,43 @@ def cmd_fit_lock(a):
         print(f"tau {t:.2f}: wrong locks {100 * s['wrong_lock_rate']:.1f}%  repeat {100 * s['repeat_rate']:.0f}%  "
               f"delay median {s['delay_median_s'] if s['delay_median_s'] is None else round(s['delay_median_s'], 2)} s"
               f"  WER locked {100 * s['wer_locked']:.1f}%", flush=True)
-    ok = [(t, s) for t, s in rows if s['wrong_lock_rate'] <= a.max_wrong and s['delay_median_s'] is not None]
-    if ok:
-        t0, s0 = min(ok, key=lambda ts: (ts[1]['delay_median_s'], ts[0]))
-    else:   # the readers make confident mistakes: weigh each wrong lock as wrong_cost missing words instead
-        def value(s):
-            return (s['locked_words'] - s['wrong_locks']) - a.wrong_cost * s['wrong_locks']
-        t0, s0 = max(rows, key=lambda ts: value(ts[1]))
-        print(f'no tau reaches {100 * a.max_wrong:.0f}% wrong locks; taking the most right locks minus '
-              f'{a.wrong_cost:g} x wrong locks')
-    # then the end-of-sentence threshold, at tau0, by the same value
+    # Every word left at sentence end is spoken (a wrong guess beats "Please repeat"), so an early lock only buys
+    # time: 1. the sentence floor for "Please repeat", the highest that keeps it to at most max_repeat of sentences,
+    # with no early locks; 2. tau0, the lowest whose WER stays within wer_slack of that; 3. tau_end the same way.
     models = {}
     for k in folds:
         train = [r for r in recs if r['fold'] != k] if len(folds) > 1 else recs
         X, y, _ = word_examples(train)
         models[k] = LockModel().fit(X, y)
-    t_end, s_end = t0, s0
-    for te in taus[taus <= t0]:
+
+    def sim(t0, te, fl):
         res = []
         for k in folds:
-            res += simulate_locks([r for r in recs if r['fold'] == k], models[k], t0, float(te))
-        s = lock_summary(res)
-        print(f"tau_end {te:.2f}: wrong locks {100 * s['wrong_lock_rate']:.1f}%  repeat {100 * s['repeat_rate']:.0f}%  "
-              f"WER locked {100 * s['wer_locked']:.1f}%", flush=True)
-        if (s['locked_words'] - s['wrong_locks']) - a.wrong_cost * s['wrong_locks'] > \
-                (s_end['locked_words'] - s_end['wrong_locks']) - a.wrong_cost * s_end['wrong_locks']:
-            t_end, s_end = float(te), s
-    # then the sentence floor for "Please repeat": the highest that keeps it to at most max_repeat of sentences
-    floor, s_floor = 0.0, None
+            res += simulate_locks([r for r in recs if r['fold'] == k], models[k], t0, te, fl)
+        return lock_summary(res)
+
+    top = float(taus[-1])
+    floor, s_floor = 0.0, sim(top, None, 0.0)
     for fl in np.round(np.arange(0.0, 0.61, 0.02), 3):
-        res = []
-        for k in folds:
-            res += simulate_locks([r for r in recs if r['fold'] == k], models[k], t0, t_end, float(fl))
-        s = lock_summary(res)
-        print(f"repeat floor {fl:.2f}: wrong locks {100 * s['wrong_lock_rate']:.1f}%  repeat {100 * s['repeat_rate']:.1f}%  "
-              f"WER locked {100 * s['wer_locked']:.1f}%", flush=True)
+        s = sim(top, None, float(fl))
+        print(f"repeat floor {fl:.2f}: repeat {100 * s['repeat_rate']:.1f}%  WER {100 * s['wer_locked']:.1f}%", flush=True)
         if s['repeat_rate'] <= a.max_repeat:
             floor, s_floor = float(fl), s
+    base = s_floor['wer_locked']
+    t0, s0 = top, s_floor
+    for t in taus[::-1]:
+        s = sim(float(t), None, floor)
+        print(f"tau0 {t:.2f}: WER {100 * s['wer_locked']:.1f}%  wrong locks {100 * s['wrong_lock_rate']:.1f}%  "
+              f"repeat {100 * s['repeat_rate']:.1f}%  delay median {s['delay_median_s']} s", flush=True)
+        if s['wer_locked'] <= base + a.wer_slack:
+            t0, s0 = float(t), s
+    t_end, s_end = t0, s0
+    for te in taus[taus < t0][::-1]:
+        s = sim(t0, float(te), floor)
+        print(f"tau_end {te:.2f}: WER {100 * s['wer_locked']:.1f}%  delay median {s['delay_median_s']} s", flush=True)
+        if s['wer_locked'] <= base + a.wer_slack:
+            t_end, s_end = float(te), s
+    s_floor = s_end
     X, y, _ = word_examples(recs)
     lock = LockModel().fit(X, y)
     lock.tau_end = t_end if t_end < t0 else None
@@ -612,6 +613,8 @@ def main(argv=None):
     q.add_argument('--params', default=PARAMS)
     q.add_argument('--max-wrong', type=float, default=0.02)
     q.add_argument('--max-repeat', type=float, default=0.05, help='share of sentences that may end in Please repeat')
+    q.add_argument('--wer-slack', type=float, default=0.03,
+                   help='early locks may raise the WER by at most this over waiting for the sentence end')
     q.add_argument('--wrong-cost', type=float, default=3.0, help='when max-wrong is out of reach: a wrong lock '
                    'costs this many missing words')
     q.set_defaults(fn=cmd_fit_lock)

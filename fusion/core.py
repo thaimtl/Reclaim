@@ -235,7 +235,8 @@ class Fusion:
                               claude=hints.get(word, 0.0), cands=sorted(d.items(), key=lambda kv: -kv[1])[:3],
                               mc=mc, me=me))
         new = []
-        if settle and self.lock.settle([x['w'] for x in words], [x['p'] for x in words]):
+        if settle and self.lock.settle(locked + [x['w'] for x in words],
+                                       [x['conf'] for x in u.locked] + [x['p'] for x in words]):
             new = list(words)   # a wrong guess beats "Please repeat"
         else:
             for x in words:   # left to right: a word locks only after every word before it
