@@ -298,8 +298,8 @@ class CallState:
         parts.append('logging for replay')
         return dict(ok=True, text='All systems normal: ' + ', '.join(parts) + '.')
 
-    def latency(self, muscles=True):
-        lips = 'Lips and muscles' if muscles else 'Lips only'
+    def latency(self, muscles=True, face=True):
+        lips = 'Muscles only' if not face and muscles else 'Lips and muscles' if muscles else 'Lips only'
         return [dict(key='read', label=lips, ms=_median(self.lat['read'])),
                 dict(key='lock', label='Locking', ms=_median(self.lat['lock'])),
                 self.claude_stage(),
@@ -354,7 +354,7 @@ class CallState:
             face_ok=self.face_ok,
             pads=[dict(pin=pin, name=name, level=round(p['level'], 3), contact=p['contact'])
                   for (pin, name), p in zip(PADS, self.emg)],
-            muscles=muscles, latency=self.latency(muscles), status=self.status(now),
+            muscles=muscles, latency=self.latency(muscles, self.face_ok), status=self.status(now),
             face=self.face_payload(),
         )
         if snap['mode'] == 'end':

@@ -61,6 +61,7 @@ def test_face_hidden(shots):
     s = shots['face_hidden']
     assert not s['face_ok'] and not s['status']['ok'] and s['status']['text'].startswith('Face out of view')
     assert [w['src'] for w in s['austin']['words']] == ['emg', 'emg']
+    assert s['muscles'] and s['latency'][0]['label'] == 'Muscles only'
 
 
 def test_muscles_off(shots):
