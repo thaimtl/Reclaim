@@ -48,8 +48,9 @@ class Writer:
     def __init__(self, folder, meta=None, rotate_bytes=ROTATE_BYTES):
         self.folder, self.rotate_bytes, self.index, self.f = Path(folder), rotate_bytes, -1, None
         self.folder.mkdir(parents=True, exist_ok=False)  # never append to someone else's session
-        meta = dict(meta or {}, t_now=bus.now(), t_wall=time.time())
-        (self.folder / 'meta.json').write_text(json.dumps(meta, indent=2))
+        self.meta = dict(meta or {}, t_now=bus.now(), t_wall=time.time())
+        (self.folder / 'meta.json').write_text(json.dumps(self.meta, indent=2))
+        self.topics = {}    # endpoint -> topics seen, written to meta.json on close so replay reads the log once
         self._next_file()
 
     def _next_file(self):
@@ -59,6 +60,8 @@ class Writer:
         self.f, self.size = open(self.folder / f'bus-{self.index:04d}.msgpack', 'ab'), 0
 
     def write(self, t_recv, endpoint, frames):
+        t = frames[0]
+        self.topics.setdefault(endpoint, set()).add(t if isinstance(t, bytes) else bytes(t))  # recv_multipart: bytes
         rec = msgpack.packb([t_recv, endpoint, [bytes(f) for f in frames]], use_bin_type=True)
         self.f.write(rec)
         self.size += len(rec)
@@ -70,6 +73,29 @@ class Writer:
 
     def close(self):
         self.f.close()
+        topics = {e: sorted(t.decode(errors='replace') for t in ts) for e, ts in self.topics.items()}
+        path = self.folder / 'meta.json'
+        try:                                # keep whatever was added to meta.json while recording
+            meta = json.loads(path.read_text())
+        except (OSError, ValueError):
+            meta = None
+        meta = dict(meta if isinstance(meta, dict) else self.meta, topics=topics)
+        tmp = path.with_suffix('.json.tmp')
+        with open(tmp, 'w') as f:
+            f.write(json.dumps(meta, indent=2))
+            f.flush()
+            os.fsync(f.fileno())            # on disk before the rename, so a power cut can't leave it empty
+        os.replace(tmp, path)               # atomic: a crash leaves the old meta.json, never half of one
+
+
+def session_topics(session):
+    """{endpoint: [topics]} from meta.json, written when the logger closed; None for a session without it (an
+    older log, or a logger that crashed), which the caller then scans."""
+    try:
+        topics = json.loads((resolve(session) / 'meta.json').read_text()).get('topics')
+    except (OSError, ValueError):
+        return None
+    return topics if isinstance(topics, dict) else None
 
 
 def read_raw(session):

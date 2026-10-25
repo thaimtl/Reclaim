@@ -24,15 +24,16 @@ import bus
 from bus import now, pack_nd
 
 VERSION = bus.VERSION
-ACCEPTED = (1, 2)  # the call service (call/bus.py) still stamps v=1 on the same envelope
+ACCEPTED = (1, 2)  # v1: the same envelope for plain maps; the call service stamped it until 2026-10-24, so recorded
+                  # sessions hold it and replay sends it as logged (cam.* messages are checked by their schema)
 CAM_TOPICS = (bus.TICK, bus.FINAL, bus.FACE)
 _DEFAULTS = {
     'emg': 'tcp://127.0.0.1:5555',      # emg.raw (rig/publish.py)
     'cam': bus.DEFAULT_CAM_PUB,         # cam.tick, cam.final, cam.face (lipread/run.py), 5556
-    'dec': 'tcp://127.0.0.1:5557',      # dec.hyp, dec.lock, dec.repeat, voice.say, timing.dec (fusion/run.py)
+    'dec': 'tcp://127.0.0.1:5557',      # dec.hyp, dec.lock, dec.repeat, voice.say, timing.dec (Austin's decoder)
     'claude': 'tcp://127.0.0.1:5558',   # claude.predict, claude.repair, timing.claude (claude_service)
     'call': 'tcp://127.0.0.1:5559',     # partner.text, timing.call (call/)
-    'svr': 'tcp://127.0.0.1:5560',      # emg.read, timing.svr (svr/serve.py)
+    'svr': 'tcp://127.0.0.1:5560',      # emg.read, timing.svr (Austin's live EMG reader)
 }
 ENDPOINTS = {k: os.environ.get(f'RECLAIM_{k.upper()}_PUB', v) for k, v in _DEFAULTS.items()}
 
@@ -41,8 +42,7 @@ def unpack_nd(d):
     return bus.unpack_nd(d).copy()
 
 
-def _is_nd(v):
-    return isinstance(v, dict) and v.get('nd') == 1 and 'data' in v
+_is_nd = bus._is_nd  # one definition of the array-map format
 
 
 def _out(v):
@@ -67,8 +67,9 @@ def _in(v):
     return v
 
 
-def encode(topic, msg, seq=0, t_pub=None):
-    body = dict(_out(msg), v=VERSION, seq=seq, t_pub=now() if t_pub is None else t_pub)
+def encode(topic, msg, seq=0, t_pub=None, v=VERSION):
+    """v: the schema version to stamp (replay passes the logged one, so it sends what was recorded)."""
+    body = dict(_out(msg), v=v, seq=seq, t_pub=now() if t_pub is None else t_pub)
     return [topic.encode(), msgpack.packb(body, use_bin_type=True)]
 
 

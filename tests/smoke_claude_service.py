@@ -136,7 +136,7 @@ def late_lock():
         b.locked(lock(u, ('a', [])))
     check('late lock: bounded', len(b.utts) == brain_mod.MAX_UTTS and 0 not in b.utts)
     b.locked(lock(0, ('late', [])))
-    check('late lock: dropped utterance ignored', 0 not in b.utts and b.utt_id == brain_mod.MAX_UTTS)
+    check('late lock: dropped utterance ignored', 0 not in b.utts and max(b.utts) == brain_mod.MAX_UTTS)
 
 
 def empty_reply():
@@ -148,14 +148,18 @@ def empty_reply():
     b = Brain(fake)
     for k in range(3):
         b.partner({'text': f'line {k}', 'is_final': True})
-        b.next_request(float(k))
+        target = b.next_request(10.0 * k)
         r, log = b.ask()
+        if r is None:
+            b.failed(target, 10.0 * k, refused=log.get('refused', False))
     ok = all(m['content'] for c in fake.calls for m in c['messages'])
     check('empty reply: no empty turn sent', ok and r is not None, [len(c['messages']) for c in fake.calls])
     roles = [m['role'] for m in b.messages]
     check('empty reply: starts on user, no two assistants in a row', roles[0] == 'user'
           and all(not (x == y == 'assistant') for x, y in zip(roles, roles[1:])), roles)
-    check('empty reply: refused turn dropped', 'line 0' not in str(b.messages), b.messages[0]['content'])
+    check('empty reply: refused and empty turns dropped, their judge lines carried into the next request',
+          len(b.messages) == 2 and all(f'line {k}' in b.messages[0]['content'] for k in range(3)),
+          b.messages[0]['content'])
 
 
 def bad_words():
@@ -320,6 +324,72 @@ def live():
     check('live: second call reads the cache', log2['cache_read'] > 0, f"cache_read={log2['cache_read']}")
 
 
+def failed_call():
+    """Every failed call (error, timeout, cut short, bad JSON, refusal) goes through Brain.failed: no half turn stays in
+    the history; after a backoff counted from the failure, the judge lines and the request's own words under review go
+    into the next request; after MAX_FAILURES in a row what the failing request carried is dropped (nothing loops or
+    grows); a success resets it; a refused request's words are not retried. One edit per word."""
+    def boom(kw):
+        raise TimeoutError('read timed out')
+    cut = SimpleNamespace(content=[SimpleNamespace(type='thinking', thinking='hm', signature='x')],
+                          stop_reason='max_tokens', model='claude-opus-5-5', usage=None)
+    bad = SimpleNamespace(content=[SimpleNamespace(type='text', text='{not json')], stop_reason='end_turn',
+                          model='claude-opus-5-5', usage=None)
+    for name, fail in (('error', boom), ('max_tokens', lambda kw: cut), ('bad JSON', lambda kw: bad)):
+        answers = [fail, fail, fail, lambda kw: reply()]
+        b = Brain(FakeClient(lambda kw: answers.pop(0)(kw)))
+        b.partner({'text': 'what did you eat', 'is_final': True})
+        b.locked(lock(3, ('a', ()), ('vine', ('fine',))))
+        b.locked(lock(4, ('so', ())))                                  # another utterance, not in this request
+        target = b.next_request(0.0)
+        r, log = b.ask()
+        kept = b.failed(target, 20.0)                                  # a timeout: handled 20 s after it was sent
+        check(f'{name}: no half turn, content kept', r is None and kept and b.messages == []
+              and b.review == {3: [0, 1], 4: [0]} and b.events == ['what did you eat'], (b.messages, b.review))
+        check(f'{name}: backoff counts from the failure', not b.due(20.5, False) and b.due(21.0, False))
+        b.partner({'text': 'and to drink', 'is_final': True})          # arrives after the failure
+        target = b.next_request(21.0)
+        check(f'{name}: the retry asks the same, and the new line', 'vine' in str(b.messages[-1])
+              and 'what did you eat' in str(b.messages[-1]) and 'and to drink' in str(b.messages[-1]))
+        r, log = b.ask()
+        check(f'{name}: second failure: longer backoff', r is None and b.failed(target, 22.0)
+              and not b.due(23.5, False) and b.due(24.0, False))
+        target = b.next_request(24.0)
+        r, log = b.ask()
+        check(f'{name}: third failure in a row drops what that request carried, not the other utterance',
+              not b.failed(target, 25.0) and 3 not in b.review and b.review.get(4) == [0] and b.events == []
+              and b.messages == [], (b.review, b.events))
+        target = b.next_request(40.0)
+        r, log = b.ask()
+        b.succeeded()
+        check(f'{name}: a success resets the backoff', r is not None and b.failures == 0 and len(b.messages) == 2
+              and b.due(40.0, False) is False)
+    refuse = SimpleNamespace(content=[], stop_reason='refusal', model='claude-opus-5-5', usage=None)
+    b = Brain(FakeClient([refuse]))
+    b.partner({'text': 'how are you', 'is_final': True})
+    b.locked(lock(6, ('fine', ('vine',))))
+    target = b.next_request(0.0)
+    r, log = b.ask()
+    b.failed(target, 0.0, refused=log.get('refused', False))
+    check('refusal: judge line kept, its words not retried', log.get('refused') and b.events == ['how are you']
+          and 6 not in b.review and b.messages == [], (b.events, b.review))
+    b = Brain(FakeClient([]))
+    for k in range(30):
+        b.partner({'text': f'line {k}', 'is_final': True})
+    target = b.next_request(0.0)
+    b.failed(target, 0.0)
+    check('pending judge lines are bounded', len(b.events) == brain_mod.MAX_PENDING_LINES and b.events[-1] == 'line 29')
+    b = Brain(FakeClient([reply(edits=[{'index': 1, 'from': 'vine', 'to': 'fine'},
+                                       {'index': 1, 'from': 'fine', 'to': 'vine'}])]))
+    b.locked(lock(5, ('a', ()), ('vine', ('fine',))))
+    target = b.next_request(0.0)
+    r, log = b.ask()
+    out, rejected = b.apply(r, target, 0.0)
+    rep = [m for t, m in out if t == 'claude.repair'][0]
+    check('one edit per word: the swap back is rejected', rep['edits'] == [{'index': 1, 'from': 'vine', 'to': 'fine'}]
+          and len(rejected) == 1, (rep, rejected))
+
+
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('--live', action='store_true')
@@ -327,6 +397,7 @@ if __name__ == '__main__':
     unit()
     late_lock()
     empty_reply()
+    failed_call()
     bad_words()
     cadence()
     trim()

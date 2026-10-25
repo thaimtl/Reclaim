@@ -74,8 +74,14 @@ def run(brain, sub, pub, stop=lambda: False):
         now = bus.now()
         if call is not None and call.done():
             try:
-                reply, log = call.get()
-                if reply is not None:
+                try:
+                    reply, log = call.get()
+                except Exception as e:  # ask() itself broke: a failed call like any other
+                    reply, log = None, {"stage": "claude", "error": f"{type(e).__name__}: {e}"}
+                if reply is None:
+                    log["kept"] = brain.failed(target, now, refused=log.get("refused", False))
+                else:
+                    brain.succeeded()
                     out, rejected = brain.apply(reply, target, now)
                     log["rejected_edits"] = rejected
                     for topic, msg in out:
@@ -92,7 +98,7 @@ def run(brain, sub, pub, stop=lambda: False):
                 call = Call(brain)
             except Exception as e:
                 report(pub, f"request failed: {type(e).__name__}: {e}")
-                brain.events, brain.review = [], {}  # drop what broke it, or it fails again every loop
+                brain.discard()  # drop what broke it, or it fails again every loop
 
 
 def main():

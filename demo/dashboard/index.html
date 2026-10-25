@@ -283,7 +283,7 @@ pre .l { color: var(--lips) }
       ink: 410, lat: [312, 381, 118, 152], gap: 1.6, wpm: 58 },
     { q: 'Nice. What did you {eat} for lunch?', raw: ['A', 'bureau,', 'it', 'was', 'amazing.'], conf: [.9, .29, .88, .91, .84],
       at: 1, alts: [['burrito', .27], ['bureau', .29], ['pirate', .08]], pick: 'burrito,', why: 'You asked what he ate, so Claude chose “burrito”. He laughs.',
-      nbest: [['a bureau it was amazing', -5.2], ['a burrito it was amazing', -5.4], ['a pirate it was amazing', -7.9]], emo: 'happy', tts: 'A burrito, it was amazing! [laughter]',
+      nbest: [['a bureau it was amazing', -5.2], ['a burrito it was amazing', -5.4], ['a pirate it was amazing', -7.9]], emo: 'happy', tts: 'A burrito, it was amazing!',   // Claude swaps look-alikes only: never adds words or sounds
       ink: 380, lat: [296, 402, 109, 148], gap: 1.5, wpm: 64 },
     { q: 'Anything you want to tell your {mom}?', raw: ['Tell', 'her', 'I', 'glove', 'her.'], conf: [.87, .9, .93, .33, .89],
       at: 3, alts: [['love', .32], ['glove', .33], ['of', .1]], pick: 'love', why: 'A message for his mom, so Claude chose “love”.',
@@ -315,19 +315,6 @@ pre .l { color: var(--lips) }
     pose: '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' };
   const NV = MV.length / 3, base = new Float32Array(MV), cur = new Float32Array(MV.length);
   const vx = i => base[i * 3], vy = i => base[i * 3 + 1];
-  const gauss = (cx, cy, r) => { const w = new Float32Array(NV); for (let i = 0; i < NV; i++) w[i] = Math.exp(-((vx(i) - cx) ** 2 + (vy(i) - cy) ** 2) / (r * r)); return w; };
-  const ss = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
-  const W = {
-    jaw: Float32Array.from({ length: NV }, (_, i) => ss(-4.05, -6.2, vy(i)) * (1 - ss(3.2, 7.5, Math.abs(vx(i))) * .8)),
-    upLip: Float32Array.from(gauss(0, -3.85, 1.5), (g, i) => vy(i) > -4.25 ? g : 0),
-    cornerL: gauss(2.46, -4.34, 1.25), cornerR: gauss(-2.46, -4.34, 1.25),
-    cheekL: gauss(3.6, -1.8, 1.7), cheekR: gauss(-3.6, -1.8, 1.7),
-    lips: gauss(0, -4.3, 2.3),
-    lidL: Float32Array.from(gauss(3.18, 3.0, .8), (g, i) => vy(i) > 2.6 && vy(i) < 3.5 ? g : 0),
-    lidR: Float32Array.from(gauss(-3.18, 3.0, .8), (g, i) => vy(i) > 2.6 && vy(i) < 3.5 ? g : 0),
-    lowLidL: gauss(3.18, 2.2, .7), lowLidR: gauss(-3.18, 2.2, .7),
-    browL: gauss(3.8, 5.0, 1.8), browR: gauss(-3.8, 5.0, 1.8)
-  };
   const LOOPS = {
     oval: [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109,10],
     lipsOut: [61,146,91,181,84,17,314,405,321,375,291,409,270,269,267,0,37,39,40,185,61],
@@ -350,43 +337,18 @@ pre .l { color: var(--lips) }
 
   const rms = new Float32Array(4), uv = new Float32Array(4);
   const pose = { yaw: 0, pitch: 0, roll: 0 };
-  const ex = { smile: 0, brow: 0, blink: 0, pucker: 0 }; let blinkAt = 0, mood = 'calm';
+  const ex = { smile: 0, brow: 0, blink: 0, pucker: 0 };
   function emgLevels(t, dt) {
     for (let i = 0; i < PADS.length; i++) {
       const burst = speaking ? PADS[i].w * (.35 + .65 * Math.abs(Math.sin(t / (85 + i * 23) + i * 1.7) * Math.sin(t / (310 + i * 41)))) : .05 + .02 * Math.random();
       rms[i] += (burst - rms[i]) * Math.min(1, dt / 90);
       uv[i] = Math.round(4 + rms[i] * 86);
     }
-    const ph = frame.dataset.phase, k = Math.min(1, dt / 160);
-    const yaw = Math.sin(t / 3100) * .26 + Math.sin(t / 1300) * .04;
-    const pitch = (ph === 'voice' ? Math.sin(t / 260) * .06 : 0) + Math.sin(t / 2300) * .05 + (ph === 'listen' ? .06 : 0);
-    const roll = Math.sin(t / 4100) * .05;
-    pose.yaw += (yaw - pose.yaw) * k; pose.pitch += (pitch - pose.pitch) * k; pose.roll += (roll - pose.roll) * k;
-    const want = {
-      smile: ph === 'voice' ? (mood === 'happy' ? .95 : mood === 'warm' ? .6 : .35) : ph === 'listen' ? .12 : .05,
-      brow: ph === 'listen' ? .55 + .2 * Math.sin(t / 700) : ph === 'voice' && mood === 'happy' ? .4 : .08,
-      pucker: speaking ? .55 * Math.max(0, Math.sin(t / 170)) : 0
-    };
     trackStep(dt);
     const B = live.b;
     ex.jaw = B[0]; ex.smile = (B[1] + B[2]) / 2; ex.brow = Math.max(B[3], (B[4] + B[5]) / 2); ex.pucker = B[6]; ex.blink = (B[7] + B[8]) / 2;
     pose.yaw = live.pose[0]; pose.pitch = live.pose[1]; pose.roll = live.pose[2];
   }
-  function deform() {
-    const o = mouth, s = ex.smile, p = ex.pucker, b = ex.blink, br = ex.brow;
-    for (let i = 0; i < NV; i++) {
-      let x = base[i * 3], y = base[i * 3 + 1], z = base[i * 3 + 2];
-      y += -o * 1.7 * W.jaw[i] + o * .25 * W.upLip[i];
-      z += -o * .5 * W.jaw[i];
-      x += s * .5 * (W.cornerL[i] - W.cornerR[i]); y += s * .65 * (W.cornerL[i] + W.cornerR[i]);
-      y += s * .35 * (W.cheekL[i] + W.cheekR[i]) + s * .12 * (W.lowLidL[i] + W.lowLidR[i]);
-      x += -x * p * .28 * W.lips[i]; z += p * .5 * W.lips[i];
-      y += -b * .7 * (W.lidL[i] + W.lidR[i]);
-      y += br * .6 * (W.browL[i] + W.browR[i]);
-      cur[i * 3] = x; cur[i * 3 + 1] = y; cur[i * 3 + 2] = z;
-    }
-  }
-
   // Recorded MediaPipe Face Landmarker output (landmarks, 52-blendshape subset, head pose) played back at 15 fps.
   // Segments: quiet (listening), talk (mouthing), smile (his voice playing). Live build: same fields, straight from the webcam.
   const dec = (b64, n) => { const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Int16Array(u.buffer); };
@@ -575,7 +537,6 @@ pre .l { color: var(--lips) }
     for (let i = 0; i < 4; i++) { segs[i].style.width = t.lat[i] / total * 100 + '%'; await sleep(120); }
     $('lat').innerHTML = total + '<small>ms</small>';
 
-    mood = t.emo === 'happy' ? 'happy' : t.q.includes('mom') ? 'warm' : 'calm';
     phase('voice'); voicing = true; node(3, true, t.lat[2]); $('subLab').textContent = 'Austin, in his own voice';
     $('tts').innerHTML = `<span class="k">model</span> sonic-3.6   <span class="k">voice</span> austin (instant clone)\n<span class="k">transcript</span> <span class="v">"${esc(t.tts)}"</span>\n<span class="k">emotion</span> ${t.emo}   <span class="k">output</span> phone audio, streamed`;
     if (firstVoice) { $('origin').classList.add('on'); firstVoice = false; }
@@ -583,7 +544,7 @@ pre .l { color: var(--lips) }
     node(4, true, t.lat[3]);
     await sleep(400); voicing = false;
     $('gap').innerHTML = t.gap.toFixed(1) + '<small>s</small>'; $('wpm').textContent = t.wpm;
-    log.push({ q: plainQ, a: t.tts.replace(' [laughter]', ''), pick: t.pick.replace(/[,.]/g, ''), n: t.raw.length, gap: t.gap });
+    log.push({ q: plainQ, a: t.tts, pick: t.pick.replace(/[,.]/g, ''), n: t.raw.length, gap: t.gap });
     await sleep(2800); $('origin').classList.remove('on');
   }
 

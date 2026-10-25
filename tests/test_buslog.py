@@ -158,3 +158,40 @@ def test_read_raw_skips_bad_records_and_warns(tmp_path, capsys):
     w.close()
     assert [m['i'] for _, _, m in read(tmp_path / 's')] == [1, 2]
     assert 'skipped 1 malformed' in capsys.readouterr().err
+
+
+def test_retime_keeps_the_logged_version():
+    """A recorded v1 message replays as v1 (still accepted on the bus), so the live run's version is reproduced."""
+    old = [b'partner.text', msgpack.packb({'v': 1, 'seq': 4, 't_pub': 1.0, 't': 2.0, 'text': 'hi'}, use_bin_type=True)]
+    msg = msgpack.unpackb(retime(old, 10.0)[1])
+    assert msg['v'] == 1 and msg['seq'] == 4 and msg['t'] == 12.0 and msg['t_pub'] == 11.0
+    assert decode(retime(old, 10.0))[1]['text'] == 'hi'          # and live consumers still read it
+
+
+def test_writer_records_topics_and_replay_reads_the_log_once(tmp_path, monkeypatch):
+    w = Writer(tmp_path / 's')
+    w.write(10.0, 'cam', encode('cam.tick', {'i': 0}))
+    w.write(10.1, 'dec', encode('dec.hyp', {}))
+    w.close()
+    assert buslog.session_topics(tmp_path / 's') == {'cam': ['cam.tick'], 'dec': ['dec.hyp']}
+    passes = []
+    import buslog.replay as rp
+    orig = rp.read_raw
+    monkeypatch.setattr(rp, 'read_raw', lambda s: (passes.append(1), orig(s))[1])
+    eps = {'cam': 'inproc://once-cam', 'dec': 'inproc://once-dec'}
+    sub = Sub([eps['cam']], [''], CTX)
+    n = rp.replay(tmp_path / 's', topics=['cam.'], endpoints=eps, ctx=CTX, wait_s=0.1)
+    sub.close()
+    assert n == 1 and len(passes) == 1, passes      # one streaming pass, endpoints from meta.json
+
+
+def test_close_keeps_notes_added_to_meta_during_recording(tmp_path):
+    import json
+    w = Writer(tmp_path / 's', {'endpoints': {'cam': 'x'}})
+    w.write(1.0, 'cam', encode('cam.tick', {'i': 0}))
+    meta = json.loads((tmp_path / 's' / 'meta.json').read_text())
+    (tmp_path / 's' / 'meta.json').write_text(json.dumps(dict(meta, note='Austin smiled at 12 s')))
+    w.close()
+    meta = json.loads((tmp_path / 's' / 'meta.json').read_text())
+    assert meta['note'] == 'Austin smiled at 12 s' and meta['topics'] == {'cam': ['cam.tick']} and 'endpoints' in meta
+    assert not (tmp_path / 's' / 'meta.json.tmp').exists()

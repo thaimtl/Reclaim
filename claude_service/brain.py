@@ -25,6 +25,9 @@ PREDICT_TTL_S = 4.0
 MAX_UTTS = 8           # utterances kept for late locks and reviews
 MAX_MESSAGES = 400     # history bound: at this many turns, drop to the newest KEEP_MESSAGES
 KEEP_MESSAGES = 200
+BACKOFF_S = (1.0, 2.0, 4.0, 8.0)  # wait after 1, 2, 3, 4+ failed calls in a row, from the moment it failed
+MAX_FAILURES = 3       # failed calls in a row after which what the failing request carried is dropped (see failed)
+MAX_PENDING_LINES = 20  # judge lines kept for the next request while calls fail: the newest
 
 SYSTEM = """You are the conversation model inside Reclaim, a silent-speech system for people who lost their voice box. \
 Austin is on a phone call with a judge. The judge speaks normally; their words reach you as text from a speech \
@@ -120,13 +123,14 @@ class Brain:
         self.client = client
         self.messages = []    # the append-only conversation sent to Claude
         self.events = []      # judge lines not yet sent
-        self.utt_id = None    # Austin's newest utterance
         self.utts = {}        # utt_id -> its locked words (dicts from dec.lock, "w" updated by repairs), last MAX_UTTS
         self.gone = set()     # utt_ids dropped from utts: their late locks are ignored, not restarted at index 0
         self.review = {}      # utt_id -> its indices locked since they were last sent
         self.unlocked = []    # dec.hyp's unlocked words, last seen
         self.fresh = False    # unlocked words changed since the last request
         self.last_request = -1e9
+        self.failures = 0     # failed calls in a row (see failed)
+        self.retry_at = -1e9  # no call before this, after a failure (bus.now() seconds)
 
     def partner(self, msg):
         if msg.get("is_final") and msg.get("text", "").strip():
@@ -141,7 +145,7 @@ class Brain:
         if utt in self.gone:
             return 0
         if utt not in self.utts:
-            self.utts[utt], self.utt_id = [], utt
+            self.utts[utt] = []
             while len(self.utts) > MAX_UTTS:
                 old = next(iter(self.utts))
                 del self.utts[old]
@@ -164,6 +168,9 @@ class Brain:
 
     def due(self, now, mouthing):
         # While mouthing, only when the unlocked words moved, at most every PREDICT_EVERY_S: no "nothing new" calls.
+        # After failed calls, not before the backoff: a 429 or an outage gets a few spaced calls, not one per loop.
+        if now < self.retry_at:
+            return False
         return bool(self.events or self.review) or (mouthing and self.fresh and now - self.last_request >= PREDICT_EVERY_S)
 
     def next_request(self, now):
@@ -197,7 +204,8 @@ class Brain:
         if not parts:
             parts.append("Austin is still mouthing; nothing new has locked.")
         self.messages.append({"role": "user", "content": "\n\n".join(parts)})
-        target = {"utt_id": utt, "words": words, "review": review}
+        target = {"utt_id": utt, "words": words, "review": review, "events": self.events,
+                  "unlocked": self.fresh and bool(self.unlocked)}
         self.events, self.fresh = [], False
         self.last_request = now
         return target
@@ -218,31 +226,61 @@ class Brain:
                 output_config={"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}},
             )
         except Exception as e:  # network, rate limit, timeout: the captions go on without Claude
-            # The unanswered user turn stays: the next one follows it (the API merges consecutive user turns),
-            # so the history stays append-only and the cached prefix holds.
             log.update(ms=1000 * (time.perf_counter() - t0), error=f"{type(e).__name__}: {e}")
             return None, log
-        usage = getattr(r, "usage", None)
-        log.update(ms=1000 * (time.perf_counter() - t0), stop_reason=getattr(r, "stop_reason", None),
-                   model=getattr(r, "model", None), request_id=getattr(r, "_request_id", None),
-                   input_tokens=getattr(usage, "input_tokens", None),
-                   cache_read=getattr(usage, "cache_read_input_tokens", None) or 0,
-                   output_tokens=getattr(usage, "output_tokens", None))
-        content = [b for b in r.content or [] if not (b.type == "text" and not b.text)]
-        if r.stop_reason == "refusal":
-            # Drop the turn that was refused, so it does not refuse again; the prefix before it stays cached.
-            self.messages.pop()
-        elif content:  # an empty assistant turn would make every later request 400; the user turn merges instead
-            self.messages.append({"role": "assistant", "content": content})
-        text = next((b.text for b in content if b.type == "text"), None)
-        log["reply"] = text
-        if r.stop_reason != "end_turn" or text is None:
-            return None, log
         try:
-            return json.loads(text), log
-        except json.JSONDecodeError as e:
-            log["error"] = f"bad JSON: {e}"
+            usage = getattr(r, "usage", None)
+            log.update(ms=1000 * (time.perf_counter() - t0), stop_reason=getattr(r, "stop_reason", None),
+                       model=getattr(r, "model", None), request_id=getattr(r, "_request_id", None),
+                       input_tokens=getattr(usage, "input_tokens", None),
+                       cache_read=getattr(usage, "cache_read_input_tokens", None) or 0,
+                       output_tokens=getattr(usage, "output_tokens", None))
+            content = [b for b in r.content or [] if not (b.type == "text" and not b.text)]
+            text = next((b.text for b in content if b.type == "text"), None)
+            log["reply"] = text
+            if r.stop_reason != "end_turn" or text is None:
+                # Refused, or cut short (max_tokens: maybe a half thinking block): see failed()
+                log["refused"] = r.stop_reason == "refusal"
+                log["error"] = f"no usable reply (stop_reason {r.stop_reason})"
+                return None, log
+            reply = json.loads(text)
+        except Exception as e:  # bad JSON, or a response shape we didn't expect
+            log["error"] = f"unreadable reply: {type(e).__name__}: {e}"
             return None, log
+        self.messages.append({"role": "assistant", "content": content})
+        return reply, log
+
+    def _drop_unanswered(self):
+        if self.messages and self.messages[-1]["role"] == "user":
+            self.messages.pop()
+
+    def failed(self, target, now, refused=False):
+        """Every failed call ends here (error, timeout, refusal, cut short, unreadable). Only whole exchanges stay in
+        the history, so the unanswered turn goes (a half or refused turn would fail every later call; the prefix
+        before it stays cached). Then, after a backoff from now: judge lines and the request's own words under review
+        go into the next request, so a short outage or a 429 loses nothing. After MAX_FAILURES failures in a row,
+        Claude is down or the content itself keeps failing, so what the failing request carried is dropped instead
+        (nothing grows or loops); the captions go on without Claude. A refused request's words are not retried.
+        Returns whether its content was kept."""
+        self._drop_unanswered()
+        self.failures += 1
+        self.retry_at = now + BACKOFF_S[min(self.failures, len(BACKOFF_S)) - 1]
+        if self.failures >= MAX_FAILURES:
+            return False
+        self.events = (target["events"] + self.events)[-MAX_PENDING_LINES:]
+        self.fresh = self.fresh or target["unlocked"]
+        utt = target["utt_id"]
+        if not refused and target["review"] and utt in self.utts:
+            self.review[utt] = sorted(set(target["review"]) | set(self.review.get(utt, [])))
+        return True
+
+    def succeeded(self):
+        self.failures, self.retry_at = 0, -1e9
+
+    def discard(self):
+        """Building a request failed (our bug, not Claude's): drop what broke it, keep the backoff."""
+        self._drop_unanswered()
+        self.events, self.review = [], {}
 
     def apply(self, reply, target, now):
         """Turn a reply into bus messages, keeping only edits that swap a word under review for one of its alts."""
@@ -256,10 +294,10 @@ class Brain:
         review, words = target["review"], target["words"]
         if not review:
             return out, list(reply["edits"])
-        edits, rejected = [], []
+        edits, rejected, done = [], [], set()
         for e in reply["edits"]:
             i = e["index"]
-            ok = i in review and _norm(words[i]["w"]) == _norm(e["from"]) \
+            ok = i not in done and i in review and _norm(words[i]["w"]) == _norm(e["from"]) \
                 and _norm(e["to"]) in {_norm(a) for a in words[i].get("alts", [])} \
                 and _norm(e["to"]) != _norm(e["from"])
             if not ok:
@@ -270,6 +308,7 @@ class Brain:
             w = words[i]
             w["alts"] =[a for a in w.get("alts", []) if _norm(a) != _norm(e["to"])] + [w["w"]]
             edits.append({"index": i, "from": w["w"], "to": _norm(e["to"])})
+            done.add(i)                 # one edit per word: a second (e.g. swapping it back) is rejected
             w["w"] = _norm(e["to"])
         out.append(("claude.repair", {"utt_id": target["utt_id"], "edits": edits,
                                       "please_repeat": bool(reply["please_repeat"]), "t": now}))

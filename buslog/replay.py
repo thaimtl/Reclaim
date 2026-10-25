@@ -23,11 +23,11 @@ import numpy as np
 
 import bus
 from bus.team import ENDPOINTS, Pub, decode, encode
-from buslog import matches, read_raw, topic_of
+from buslog import matches, read_raw, session_topics, topic_of
 
 SNDHWM = 10000  # a fast replay must not drop at the default 100
-# topic prefix -> fields holding bus.now() seconds (numbers or arrays), from the Interfaces table and
-# fusion/decoder.py; 'words[].t' is the t of every item in the list words. t_pub is in every message.
+# topic prefix -> fields holding bus.now() seconds (numbers or arrays), from the Interfaces table
+# (docs/TEAM_TASKS_AND_INTERFACES.md); 'words[].t' is the t of every item in the list words. t_pub is in every message.
 TIME_FIELDS = {
     '': ('t_pub',),
     'emg.raw': ('t0',),
@@ -66,15 +66,21 @@ def retime(frames, offset):
         if topic.startswith(prefix):
             for f in fields:
                 _shift(msg, f, offset)
-    return encode(topic, msg, seq=msg.get('seq', 0), t_pub=msg.get('t_pub'))  # no t_pub: stamped now
+    # seq and v as logged (a v1 message stays v1, so a version bug replays); no t_pub: stamped now
+    return encode(topic, msg, seq=msg.get('seq', 0), t_pub=msg.get('t_pub'), v=msg['v'])
 
 
 def replay(session, speed=1.0, topics=None, endpoints=None, ctx=None, wait_s=1.0, retime_times=True,
            stop=lambda: False):
     """Re-publish the session; returns the number of messages sent."""
     endpoints = dict(endpoints or ENDPOINTS)
-    # a first pass finds the endpoints to bind, the second streams, so a long session never sits in memory
-    names = {name for _, name, frames in read_raw(session) if matches(topic_of(frames), topics)}
+    # the endpoints to bind: from meta.json when the logger closed cleanly, else a first pass over the log (the
+    # second pass streams, so a long session never sits in memory)
+    logged = session_topics(session)
+    if logged is not None:
+        names = {name for name, ts in logged.items() if any(matches(t, topics) for t in ts)}
+    else:
+        names = {name for _, name, frames in read_raw(session) if matches(topic_of(frames), topics)}
     pubs = {name: Pub(endpoints[name], ctx=ctx, sndhwm=SNDHWM) for name in names if name in endpoints}
     if names - set(pubs):
         print(f'replay: no endpoint for {sorted(names - set(pubs))}, skipping those', file=sys.stderr)

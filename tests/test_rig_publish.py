@@ -57,3 +57,24 @@ def test_a_gap_past_the_counter_wrap_is_recovered_from_the_clock():
 def test_a_late_read_without_a_reported_gap_invents_nothing():
     out = list(batches([chunk(0.0095, 0, 10), chunk(0.0995, 10, 10)]))   # 80 ms late, nothing lost
     assert out[-1]['counter'] == 10
+
+
+def test_t0_never_goes_back_when_the_offset_drops():
+    # Windows USB: the first reads arrive ~12 ms late, then one only ~1 ms late: the offset drops 11 ms at once
+    chunks = [chunk(0.009 + 0.012, 0, 10), chunk(0.019 + 0.012, 10, 10), chunk(0.029 + 0.001, 20, 10)]
+    chunks += [chunk(0.039 + 0.001 + 0.010 * k, 30 + 10 * k, 10) for k in range(40)]
+    out = list(batches(chunks))
+    t0 = [m['t0'] for m in out]
+    ends = [m['t0'] + (len(m['samples']) - 1) / m['fs'] for m in out]
+    assert all(b > a for a, b in zip(t0, t0[1:])), 'a message never starts before the previous one'
+    assert all(b0 > e for e, b0 in zip(ends, t0[1:])), 'nor before the previous one ended'
+    assert abs(out[-1]['t0'] - (0.001 + out[-1]['counter'] / 1000)) < 1e-3   # and it still converges to 1 ms
+
+
+def test_no_overlap_for_any_batch_size():
+    for size in (10, 32, 100):
+        chunks = [chunk(0.009 + 0.012 + 0.010 * k, 10 * k, 10) for k in range(3)]
+        chunks += [chunk(0.039 + 0.001 + 0.010 * k, 30 + 10 * k, 10) for k in range(60)]
+        out = list(batches(chunks, size=size))
+        ends = [m['t0'] + (len(m['samples']) - 1) / m['fs'] for m in out]
+        assert all(b['t0'] > e for e, b in zip(ends, out[1:])), size
