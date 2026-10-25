@@ -2,7 +2,7 @@
 
 Source: track brief the organizers posted, October 2026.
 Challenge: pick a narrow community, find a real problem they face, and build something with Claude that helps.
-This track fits Reclaim closely, because Claude is what turns rough lip reading into a conversation someone who lost their voice can actually hold.
+This track fits Reclaim closely, because Claude uses the conversation to fix the look-alike words lip reading gets wrong.
 
 Prizes:
 - $5,000 in Claude credits
@@ -22,8 +22,8 @@ Prizes:
 
 ## What to emphasize about Claude
 
-- Claude makes the product work at all.
-  Lip reading gets about 1 in 5 words wrong, and Claude turns that rough text into the sentence the user meant.
+- Claude fixes what the readers can't see.
+  Lip reading gets about 1 in 5 words wrong, and Claude uses the conversation to settle the look-alike ones.
 - Claude uses the partner's question as context, so "bills" becomes "pills" when someone asks about medicine.
 - Claude hears both sides of the conversation (the partner through Cartesia Ink) and predicts the words likely to come next, so the lip and muscle readers are pointed at the right words before the speaker starts.
 - Claude is held back on purpose.
