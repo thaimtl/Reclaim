@@ -720,7 +720,6 @@ function renderThread(turns) {
       if (r.index < ws.length && bare(ws[r.index]) === bare(r.to)) ws[r.index] = `<s>${esc(r.frm)}</s> ${ws[r.index]}`;
     const notes = [
       (x.repairs || []).length ? `<div class="cnote claude">${use('claude-mark')}Claude fixed a look-alike</div>` : '',
-      x.caption_fixed ? `<div class="cnote claude">${use('claude-mark')}Claude corrected the caption (read as “${esc(x.original || '')}”)</div>` : '',
       x.repeat ? `<div class="cnote repeat">${use('repeat-icon')}Asked to repeat, nothing wrong was said</div>` : '',
       x.face_hidden ? `<div class="cnote face">${liveIcon('read')}Face hidden, muscles carried it</div>` : ''].join('');
     return `<div class="msg austin${x.repeat ? ' unspoken' : ''}"><div class="bubble">${ws.join(' ')}${x.repeat ? ' …' : ''}</div>${notes}</div>`;
