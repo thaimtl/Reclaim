@@ -64,7 +64,7 @@ class Bot:
                 await asyncio.sleep(0.15)                   # two sockets: let the emotion land before the words
                 self.utt += 1
                 await self.dec.send(bus.VOICE_SAY, {'utt_id': self.utt, 'words': line.split(), 'final': True,
-                                                    'pace': 1.0, 'effort': 0.5})
+                                                    'pace': 1.0, 'effort': 1.0})
 
     async def reply(self, heard):
         if self.history and self.history[-1]['role'] == 'user':     # they kept talking before we answered
