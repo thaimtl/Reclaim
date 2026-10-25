@@ -197,19 +197,30 @@ class Twilio:
                 msg = None
             raise RuntimeError(f'Twilio said {e.code}: {msg or e.reason}') from None
 
-    def point_at(self, voice_url, sms_url=None):
+    def point_at(self, voice_url, sms_url=None, sms_required=False):
+        """Voice first (the call needs it: any failure raises). Then SMS, so the dashboard can switch to SMS mode at
+        any time; a failure there raises only when SMS mode is required now, else it comes back as a warning."""
         found = self._call(f'{self.base}.json?' + urllib.parse.urlencode({'PhoneNumber': self.number}))
         nums = found.get('incoming_phone_numbers') or []
         if not nums:
             raise RuntimeError(f'{self.number} is not a number on this Twilio account (TWILIO_NUMBER)')
-        sid = nums[0]['sid']
-        want = {'voice_url': voice_url} | ({'sms_url': sms_url} if sms_url else {})
-        self._call(f'{self.base}/{sid}.json', {'VoiceUrl': voice_url, 'VoiceMethod': 'POST'} |
-                   ({'SmsUrl': sms_url, 'SmsMethod': 'POST'} if sms_url else {}))
-        back = self._call(f'{self.base}/{sid}.json')
-        for key, want in want.items():
-            if back.get(key) != want:
-                raise RuntimeError(f'Twilio still has {back.get(key)!r} as {key}')
+        url = f'{self.base}/{nums[0]["sid"]}.json'
+        self._set(url, 'voice_url', {'VoiceUrl': voice_url, 'VoiceMethod': 'POST'})
+        if not sms_url:
+            return None
+        try:
+            self._set(url, 'sms_url', {'SmsUrl': sms_url, 'SmsMethod': 'POST'})
+        except RuntimeError as e:
+            if sms_required:
+                raise
+            return f'SMS webhook not set ({e}): texts won\'t arrive if you switch to SMS mode'
+        return None
+
+    def _set(self, url, key, data):
+        self._call(url, data)
+        back = self._call(url).get(key)
+        if back != list(data.values())[0]:
+            raise RuntimeError(f'Twilio still has {back!r} as {key}')
 
 
 # ------------------------------------------------------------------------------------------------ parts
@@ -312,6 +323,7 @@ class Launcher:
             self.env['TWILIO_NUMBER'] = args.number
         self.ep = endpoints(self.env)
         self.call_port, self.dash_port = args.call_port, args.dash_port
+        self.control_port = args.call_port + 1          # the call server's mode switch, on the loopback only
         self.uno = args.port
 
     def py(self, venv):
@@ -422,7 +434,8 @@ class Launcher:
             self.start(decoder)
             self.start(Part('Dashboard', self.module('venv-call', 'dashboard.server', '--port', str(self.dash_port),
                                                      '--number', pretty_number(self.keys.get('TWILIO_NUMBER')),
-                                                     '--channel', self.args.mode),
+                                                     '--channel', self.args.mode,
+                                                     '--control', f'http://127.0.0.1:{self.control_port}'),
                             ('http', f'http://127.0.0.1:{self.dash_port}/', (200,)), 30))
             self.ready_banner()
             self.watch()
@@ -463,7 +476,8 @@ class Launcher:
         self.public_url = TUNNEL_URL.search(tunnel.output()).group(0)
         host = urllib.parse.urlparse(self.public_url).hostname
         self.start(Part('Call', self.module('venv-call', 'call.server'), ('line', r'Sonic websocket open'), 60,
-                        env={'PUBLIC_HOST': host, 'PORT': str(self.call_port), 'CALL_CHANNEL': self.args.mode}))
+                        env={'PUBLIC_HOST': host, 'PORT': str(self.call_port), 'CALL_CHANNEL': self.args.mode,
+                             'CALL_CONTROL_PORT': str(self.control_port)}))
         say('waiting for the tunnel to reach the call server from outside')
         end = time.monotonic() + 90
         while public_status(self.public_url) not in (200, 405):
@@ -475,10 +489,13 @@ class Launcher:
             say('--no-webhook: Twilio left as it is', None)
             return
         try:
-            Twilio(self.keys['TWILIO_ACCOUNT_SID'], self.keys['TWILIO_AUTH_TOKEN'], self.keys['TWILIO_NUMBER']).point_at(
-                self.public_url + '/twiml', self.public_url + '/sms' if self.args.mode == 'sms' else None)
+            warning = Twilio(self.keys['TWILIO_ACCOUNT_SID'], self.keys['TWILIO_AUTH_TOKEN'],
+                             self.keys['TWILIO_NUMBER']).point_at(self.public_url + '/twiml', self.public_url + '/sms',
+                                                                  sms_required=self.args.mode == 'sms')
         except (urllib.error.URLError, OSError, RuntimeError, ValueError, KeyError) as e:
             raise StartFailed(f'Twilio webhook not updated: {e}') from None
+        if warning:
+            say(warning, None)
         say(f'Twilio number {pretty_number(self.keys["TWILIO_NUMBER"])} points at this laptop', True)
 
     def ready_banner(self):
@@ -492,6 +509,7 @@ class Launcher:
         if self.args.mode == 'sms':
             lines.insert(3, 'SMS mode:   call the number from our phone (headphones on the judge), then the judge '
                             'texts it from that phone')
+        lines.insert(3, 'Mode:       switch Call / Text on the dashboard (or press M there), even mid-call')
         if self.args.rehearse:
             lines.insert(3, 'Rehearsal:  call the number; session 3 plays once the call connects')
         print('\n' + '=' * 72 + '\n' + '\n'.join('  ' + x for x in lines) + '\n' + '=' * 72 + '\n', flush=True)

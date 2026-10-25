@@ -42,6 +42,8 @@ class Config:
     # 'call': the judge talks on the call (Ink transcribes them). 'sms': too loud to talk, so the judge texts our number
     # from the phone on the call and hears Austin on it; Ink stays off (the room never reaches the captions)
     channel: str = field(default_factory=lambda: _env('CALL_CHANNEL', 'call'))
+    # the mode switch (GET/POST /channel), on the loopback only, for the dashboard
+    control_port: int = field(default_factory=lambda: int(_env('CALL_CONTROL_PORT', '8788')))
     noise_gate: bool = field(default_factory=lambda: _env('NOISE_GATE', '1') != '0')
     # Ink turn detection: how sure it must be that the caller started a turn (Cartesia: 0.5-0.9, default 0.8)
     turn_start_threshold: float = field(default_factory=lambda: float(_env('INK_TURN_START', '0.8')))

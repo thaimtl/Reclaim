@@ -183,18 +183,20 @@ def test_the_mode_reaches_the_call_server_the_dashboard_and_twilio(tmp_path, mon
     monkeypatch.setattr(lc, 'start', start)
     monkeypatch.setattr(lc, 'cloudflared', lambda: 'cloudflared')
     monkeypatch.setattr(launch, 'public_status', lambda url: 405)
-    monkeypatch.setattr(launch.Twilio, 'point_at', lambda self, voice, sms=None: hooks.append((voice, sms)))
+    monkeypatch.setattr(launch.Twilio, 'point_at',
+                        lambda self, voice, sms=None, sms_required=False: hooks.append((voice, sms, sms_required)))
     with redirect_stdout(io.StringIO()):
         lc.start_call()
     assert parts['Call'].env['CALL_CHANNEL'] == mode
-    assert hooks == [('https://a-b.trycloudflare.com/twiml',
-                      'https://a-b.trycloudflare.com/sms' if mode == 'sms' else None)]
+    assert hooks == [('https://a-b.trycloudflare.com/twiml', 'https://a-b.trycloudflare.com/sms', mode == 'sms')]
+    assert parts['Call'].env['CALL_CONTROL_PORT'] == str(lc.call_port + 1)
     for name in ('start_call', 'ready_banner', 'watch'):
         monkeypatch.setattr(lc, name, lambda: None)
     with redirect_stdout(io.StringIO()):
         lc.run()
     dash = parts['Dashboard'].cmd
     assert dash[dash.index('--channel') + 1] == mode
+    assert dash[dash.index('--control') + 1] == f'http://127.0.0.1:{lc.call_port + 1}'
 
 
 def test_a_restart_is_ready_only_from_its_own_output(tmp_path):
@@ -268,8 +270,8 @@ class FakeTwilio:
     def __call__(self, req, timeout=None):
         self.calls.append((req.get_method(), req.full_url, req.data, req.headers.get('Authorization')))
         if req.data:
-            self.sent = dict(urllib.parse.parse_qsl(req.data.decode()))
-            self.url = self.sent['VoiceUrl']
+            self.sent.update(urllib.parse.parse_qsl(req.data.decode()))     # voice and SMS go in separate POSTs
+            self.url = self.sent.get('VoiceUrl')
         body = ({'incoming_phone_numbers': [{'sid': 'PN1'}]} if 'PhoneNumber=' in req.full_url
                 else {'voice_url': self.back or self.url, 'sms_url': self.sms_back or self.sent.get('SmsUrl')})
         return io.BytesIO(json.dumps(body).encode())
@@ -280,18 +282,19 @@ def test_twilio_points_the_number_and_reads_it_back():
     base = 'https://a-b.trycloudflare.com'
     Twilio('AC1', 'secret-token', '+16288886598', opener=fake).point_at(base + '/twiml', base + '/sms')
     methods = [m for m, *_ in fake.calls]
-    assert methods == ['GET', 'POST', 'GET'] and all(a.startswith('Basic ') for *_, a in fake.calls)
+    assert methods == ['GET', 'POST', 'GET', 'POST', 'GET'] and all(a.startswith('Basic ') for *_, a in fake.calls)
     assert fake.sent == {'VoiceUrl': base + '/twiml', 'VoiceMethod': 'POST', 'SmsUrl': base + '/sms',
                          'SmsMethod': 'POST'}
-    call_mode = FakeTwilio(sms_back='https://old/sms')          # call mode never touches (or checks) the SMS webhook
-    Twilio('AC1', 'secret-token', '+16288886598', opener=call_mode).point_at(base + '/twiml')
-    assert call_mode.sent == {'VoiceUrl': base + '/twiml', 'VoiceMethod': 'POST'}
+    # call mode: the SMS webhook is set too (the dashboard can switch), but a failure there only warns
+    warn = Twilio('AC1', 'secret-token', '+16288886598', opener=FakeTwilio(sms_back='https://old/sms')).point_at(
+        base + '/twiml', base + '/sms')
+    assert 'SMS webhook not set' in warn
     with pytest.raises(RuntimeError, match='still has'):
         Twilio('AC1', 'secret-token', '+16288886598', opener=FakeTwilio(back='https://old/twiml')).point_at(
             'https://new.trycloudflare.com/twiml', 'https://new.trycloudflare.com/sms')
-    with pytest.raises(RuntimeError, match='sms_url'):             # the voice took, the SMS webhook didn't
+    with pytest.raises(RuntimeError, match='sms_url'):             # SMS mode needs it: the start fails
         Twilio('AC1', 'secret-token', '+16288886598', opener=FakeTwilio(sms_back='https://old/sms')).point_at(
-            'https://new.trycloudflare.com/twiml', 'https://new.trycloudflare.com/sms')
+            'https://new.trycloudflare.com/twiml', 'https://new.trycloudflare.com/sms', sms_required=True)
 
 
 def test_preflight_never_prints_a_key(tmp_path, monkeypatch):

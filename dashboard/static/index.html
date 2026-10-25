@@ -14,7 +14,14 @@
       <header id="header">
         <div>
           <div class="title"><i class="dot" id="live-dot"></i><span id="title">Waiting for the call</span></div>
-          <div class="sub" id="sub"></div>
+          <div class="subrow"><div class="sub" id="sub"></div>
+            <div class="mode off" id="mode" role="radiogroup" aria-label="How the judge talks" data-ch="call"
+                 title="How the judge talks: on the call, or by text (press M to switch)">
+              <i class="thumb"></i>
+              <button type="button" role="radio" data-ch="call" aria-checked="true">Call</button>
+              <button type="button" role="radio" data-ch="sms" aria-checked="false">Text</button>
+            </div>
+            <span class="mode-note" id="mode-note" role="status"></span></div>
         </div>
         <div class="metrics">
           <div class="metric"><b id="m-lips">--</b><span>lips to voice</span></div>

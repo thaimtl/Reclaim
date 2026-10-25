@@ -17,7 +17,7 @@ Each start points the Twilio number at the tunnel of that run, so there is nothi
 
 ## A loud room: SMS mode
 
-When the room is too loud to talk on the phone, start with `"Launch Silent Voice.bat" --mode sms`.
+When the room is too loud to talk on the phone, switch to **Text** on the dashboard (the Call / Text switch under the title, or press **M**). It works any time, even in the middle of a call, and back again. Or start in it: `"Launch Silent Voice.bat" --mode sms`.
 1. Call the Twilio number from our phone, with **headphones** plugged into it, and hand both to the judge.
 2. The judge **texts the same number from that phone** during the call. Each text is the judge's next line: it shows on the dashboard and goes to Claude, exactly as typed.
 3. Austin mouths his answer. The judge hears his cloned voice on the call, in the headphones.

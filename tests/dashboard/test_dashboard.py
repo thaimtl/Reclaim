@@ -193,6 +193,33 @@ def test_logging_is_seen_in_the_launchers_bus_folder_and_a_restarts(tmp_path, mo
         (folder / 'bus-0001.msgpack').unlink()
 
 
+async def test_the_call_text_switch_goes_through_to_the_call_server(aiohttp_server, aiohttp_client):
+    from aiohttp import web
+    mode = {'channel': 'call'}
+
+    async def channel(request):         # a stand-in for the call server's /channel (call/server.py)
+        if request.method == 'POST':
+            assert request.headers.get('X-Silent-Voice') == '1'
+            mode['channel'] = (await request.json())['channel']
+        return web.json_response(mode)
+    ctl = web.Application()
+    ctl.router.add_route('*', '/channel', channel)
+    call_server = await aiohttp_server(ctl)
+    d = Dashboard(control=str(call_server.make_url('')))
+    page = await aiohttp_client(d.app())
+    await asyncio.sleep(0.1)            # the control loop reads the mode once
+    assert d.state.snapshot(bus.now())['switchable'] is True
+    assert (await page.post('/api/channel', json={'channel': 'sms'})).status == 403     # another site, no header
+    hdr = {'X-Silent-Voice': '1'}
+    assert (await page.post('/api/channel', json={'channel': 'fax'}, headers=hdr)).status == 400
+    r = await page.post('/api/channel', json={'channel': 'sms'}, headers=hdr)
+    assert r.status == 200 and mode['channel'] == 'sms' and d.state.snapshot(bus.now())['channel'] == 'sms'
+    await call_server.close()           # the call server goes away: the switch says so instead of pretending
+    assert (await page.post('/api/channel', json={'channel': 'call'}, headers=hdr)).status == 502
+    alone = await aiohttp_client(Dashboard().app())
+    assert (await alone.post('/api/channel', json={'channel': 'call'}, headers=hdr)).status == 503
+
+
 def test_server_decodes_skips_bad_frames_and_keeps_the_newest_preview():
     d = Dashboard('(628) 888-6598', endpoints={})
     d.handle(encode('partner.text', {'text': 'hello', 'is_final': True, 't': 1.0}))

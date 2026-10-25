@@ -40,6 +40,50 @@ function connect() {
 window.reclaimRender = s => { snap = s; render(s); };
 if (!new URLSearchParams(location.search).has('offline')) connect();
 
+// ---- the Call / Text switch ------------------------------------------------------------------------------
+// The call server owns the mode; a click (or M) asks the dashboard server to switch it. The thumb moves at once
+// and settles on what the call server says; if it can't switch, the thumb goes back and says why.
+let modeWant = null, noteTimer = null;
+function renderMode(s) {
+  const el = $('mode'), ch = modeWant || s.channel || 'call';
+  el.dataset.ch = ch;
+  el.classList.toggle('off', !s.switchable);
+  el.classList.toggle('busy', !!modeWant);
+  el.querySelectorAll('button').forEach(b => {
+    b.setAttribute('aria-checked', String(b.dataset.ch === ch));
+    b.disabled = !s.switchable;
+  });
+}
+async function switchMode(ch) {
+  if (!snap || !snap.switchable || modeWant || ch === snap.channel) return;
+  modeWant = ch;
+  renderMode(snap);
+  try {
+    const r = await fetch('/api/channel', { method: 'POST', body: JSON.stringify({ channel: ch }),
+      headers: { 'Content-Type': 'application/json', 'X-Silent-Voice': '1' } });
+    if (!r.ok) throw new Error((await r.text()) || r.statusText);
+    snap.channel = (await r.json()).channel;
+    modeNote('');
+  } catch (e) {
+    modeNote(`Couldn't switch: ${e.message}`);
+  } finally {
+    modeWant = null;
+    renderMode(snap);
+  }
+}
+function modeNote(text) {
+  const el = $('mode-note');
+  el.textContent = text;
+  el.classList.toggle('show', !!text);
+  clearTimeout(noteTimer);
+  if (text) noteTimer = setTimeout(() => el.classList.remove('show'), 5000);
+}
+$('mode').addEventListener('click', e => { const b = e.target.closest('button'); if (b) switchMode(b.dataset.ch); });
+addEventListener('keydown', e => {
+  if ((e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey && !e.altKey && snap && snap.mode !== 'end')
+    switchMode(snap.channel === 'sms' ? 'call' : 'sms');
+});
+
 // ---- live screen -----------------------------------------------------------------------------------------
 const mmss = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -56,6 +100,7 @@ function render(s) {
   $('m-lips').textContent = s.metrics.lips_to_voice == null ? '--' : (s.metrics.lips_to_voice / 1000).toFixed(2) + ' s';
   $('m-fixed').textContent = s.metrics.fixed;
   $('m-repeats').textContent = s.metrics.repeats;
+  renderMode(s);
   renderConversation(s);
   renderLatency(s);
   $('status').classList.toggle('warn', !s.status.ok);

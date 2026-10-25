@@ -25,6 +25,25 @@ body { font-family: var(--font); font-variant-numeric: tabular-nums; color: var(
 .title .dot { width: 14px; height: 14px; border-radius: 7px; background: var(--live); }
 .title .dot.off { background: var(--text-pending); }
 .sub { padding-top: 6px; font-size: 20px; line-height: 28px; color: var(--text-muted); }
+/* the Call / Text switch: how the judge talks (the call server owns the mode; this asks it to change) */
+.subrow { display: flex; align-items: center; gap: 18px; }
+.subrow .sub { padding-top: 0; }
+.mode { position: relative; display: grid; grid-template-columns: 1fr 1fr; height: 36px; padding: 3px;
+  border-radius: 18px; background: var(--bg-sunken); user-select: none; }
+.mode .thumb { position: absolute; top: 3px; left: 3px; width: calc(50% - 3px); height: 30px; border-radius: 15px;
+  background: var(--bg); box-shadow: 0 1px 3px rgba(11, 15, 20, .16), 0 0 0 .5px rgba(11, 15, 20, .06);
+  transition: transform .34s cubic-bezier(.22, 1, .36, 1); }
+.mode[data-ch="sms"] .thumb { transform: translateX(100%); }
+.mode button { position: relative; min-width: 72px; padding: 0 16px; border: 0; background: none; border-radius: 15px;
+  font: 600 16px/30px var(--font); color: var(--text-muted); cursor: pointer; transition: color .25s; }
+.mode button[aria-checked="true"] { color: var(--text-primary); }
+.mode button:focus-visible { outline: 2px solid var(--camera); outline-offset: 2px; }
+.mode.off { opacity: .45; }
+.mode.off button { cursor: default; }
+.mode.busy .thumb { box-shadow: 0 0 0 2px var(--camera); }
+.mode-note { font-size: 16px; color: var(--repeat); opacity: 0; transition: opacity .3s; }
+.mode-note.show { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .mode .thumb, .mode button, .mode-note { transition: none; } }
 .metrics { display: flex; gap: 44px; }
 .metric { min-width: 96px; }
 .metric b { display: block; font-weight: 700; font-size: 34px; line-height: 41px; }

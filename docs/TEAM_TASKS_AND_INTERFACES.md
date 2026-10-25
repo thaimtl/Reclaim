@@ -112,7 +112,7 @@ flowchart TD
 | `dec.sentence` | Austin → logger | on each hold, continuation and close | `utt_id`, `event` (`hold` / `continue` / `close`), `reason` (judge spoke, Claude: finished, Claude did not answer, backstop, no Claude, please repeat), `held_s`, `p`, `asks`, `segments`, `words` |
 | `voice.say` | Austin → Frank | words leaving the repair window | `utt_id`, `words` (only the new ones), `offset` (index of `words[0]` in the sentence, optional), `final`, `pace`, `effort` (both relative, 1.0 = Austin's normal; below) |
 | `partner.text` | Frank → Claude, dashboard | streaming | `text`, `is_final`, `t`, `source` (`ink`, or `sms` when the judge texts: one final line per text) |
-| `call.state` | Frank → dashboard | on change | `state` (`connected` / `ended`), `t`, plus `call_sid`, `ink` and `channel` (`call` or `sms`) on connect |
+| `call.state` | Frank → dashboard | on change | `state` (`connected` / `ended` / `channel`), `t`, plus `call_sid`, `ink` and `channel` (`call` or `sms`) on connect; `state: channel` when the mode is switched (dashboard Call / Text switch), with `channel` and `ink` |
 | `timing.*` | everyone → logger | every event | the stage and its duration in ms (the camera's ride in `cam.tick.timing_ms`); the dashboard's latency strip reads `timing.dec` {`stage`: `lock` (lock decision) or `window` (repair window), `ms`}, `timing.voice` {`stage`: `sonic_first_audio` or `played_to_judge`, `utt_id`, `ms`} and `timing.claude` {`ms`, `error`} |
 
 Austin applies Claude's repairs before forwarding words on `voice.say`, so the voice never needs to know about Claude. The logger subscribes to every topic.

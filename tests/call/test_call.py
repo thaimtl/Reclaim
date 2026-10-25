@@ -781,6 +781,7 @@ async def sms_service(aiohttp_client, channel, addr):
     FakeInk.instances.clear()
     svc = Service(c, voice=voice, ink_factory=FakeInk, pub=pub, sub=ListSub())
     voice.sink = svc._audio
+    sms_service.last = svc
     client = await aiohttp_client(svc.app())
 
     async def text(body, sender, signed=True):
@@ -852,3 +853,37 @@ async def test_sms_mode_with_an_unknown_caller_takes_no_texts(aiohttp_client):
     assert not [m for t, m in await drain(listen) if t == 'partner.text']
     await ws.close()
     listen.close()
+
+
+async def test_switching_modes_mid_call_turns_ink_off_and_on(aiohttp_client):
+    text, call, listen = await sms_service(aiohttp_client, 'call', 'inproc://switch-test')
+    svc = sms_service.last
+    phone = '+14155550100'
+    ws = await call(phone)
+    ink = FakeInk.instances[-1]
+    await text('ignored: call mode', phone)
+    await svc.set_channel('sms')
+    assert ink.closed and svc.call.ink is None, 'SMS mode: Ink off at once'
+    await text('now it counts', phone)
+    await svc.set_channel('call')
+    assert svc.call.ink is not None and svc.call.ink is not ink, 'back to call mode: a fresh Ink'
+    msgs = await drain(listen)
+    assert [m['text'] for t, m in msgs if t == 'partner.text'] == ['now it counts']
+    assert [(m['state'], m.get('channel')) for t, m in msgs if t == 'call.state'] == [
+        ('connected', 'call'), ('channel', 'sms'), ('channel', 'call')]
+    await ws.close()
+    listen.close()
+
+
+async def test_the_mode_switch_is_local_and_needs_its_header(aiohttp_client):
+    await sms_service(aiohttp_client, 'call', 'inproc://control-test')
+    svc = sms_service.last
+    ctl = await aiohttp_client(svc.control_app())
+    assert (await (await ctl.get('/channel')).json()) == {'channel': 'call'}
+    assert (await ctl.post('/channel', json={'channel': 'sms'})).status == 403            # no header: a web page
+    hdr = {'X-Silent-Voice': '1'}
+    assert (await ctl.post('/channel', json={'channel': 'fax'}, headers=hdr)).status == 400
+    r = await ctl.post('/channel', json={'channel': 'sms'}, headers=hdr)
+    assert r.status == 200 and (await r.json()) == {'channel': 'sms'} and svc.channel == 'sms'
+    main = await aiohttp_client(svc.app())                  # the public app (behind the tunnel) has no switch
+    assert (await main.post('/channel', json={'channel': 'call'}, headers=hdr)).status in (404, 405)

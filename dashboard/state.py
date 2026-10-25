@@ -60,6 +60,7 @@ class CallState:
     def __init__(self, number='', benchmark=None, channel='call'):
         self.number = number
         self.channel = channel               # how the judge talks: 'call' (Ink hears them) or 'sms' (they text)
+        self.switchable = False              # the page's Call / Text switch works (the call server answers)
         self.benchmark = benchmark           # word error per reader on a scored session (end screen), or None
         self.seen = {}                       # producer -> last bus.now() a message came from it
         self.emg = [dict(level=0.0, contact=False) for _ in PADS]
@@ -112,13 +113,18 @@ class CallState:
         if handler is not None:
             handler(self, topic, msg, now)
 
+    def set_channel(self, channel, switchable):
+        if channel in ('call', 'sms'):
+            self.channel = channel
+        self.switchable = bool(switchable)
+
     def _call_state(self, topic, msg, now):
         self.seen['voice'] = now
+        if msg.get('channel') in ('call', 'sms'):       # on connect and on every switch (a replay carries it too)
+            self.channel = msg['channel']
         if msg.get('state') == 'connected':      # call time on our clock: right for a replay at any speed too
             self.reset_call(now)
             self.call.update(call_sid=msg.get('call_sid'), ink=msg.get('ink'))
-            if msg.get('channel') in ('call', 'sms'):       # the call server knows best (a replay carries it too)
-                self.channel = msg['channel']
         elif msg.get('state') == 'ended' and self.call['state'] == 'connected':
             t_end = now
             if self.face_hidden_since is not None:          # close the open interval at the end of the call
@@ -374,7 +380,7 @@ class CallState:
         muscles = self.muscles(now)
         snap = dict(
             mode={'waiting': 'waiting', 'connected': 'live', 'ended': 'end'}[c['state']],
-            number=self.number, channel=self.channel, elapsed=elapsed,
+            number=self.number, channel=self.channel, switchable=self.switchable, elapsed=elapsed,
             metrics=dict(lips_to_voice=_median(self.lat['lips_to_voice']), fixed=len(self.repairs),
                          repeats=len(self.repeats)),
             judge_live=self.judge_live, transcript=self.transcript[-12:],
