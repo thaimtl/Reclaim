@@ -57,8 +57,10 @@ def _median(xs):
 
 
 class CallState:
-    def __init__(self, number='', benchmark=None):
+    def __init__(self, number='', benchmark=None, channel='call'):
         self.number = number
+        self.channel = channel               # how the judge talks: 'call' (Ink hears them) or 'sms' (they text)
+        self.switchable = False              # the page's Call / Text switch works (the call server answers)
         self.benchmark = benchmark           # word error per reader on a scored session (end screen), or None
         self.seen = {}                       # producer -> last bus.now() a message came from it
         self.emg = [dict(level=0.0, contact=False) for _ in PADS]
@@ -74,7 +76,8 @@ class CallState:
         if self.face_hidden_since is not None and t is not None:
             self.face_hidden_since = t       # hidden when the call starts: count from the start, not before
         self.judge_live = ''
-        self.transcript = []                 # {who, text, t, ...}: judge lines and Austin's sentences, in order
+        self.transcript = []                 # {who, text, t, seq, ...}: judge lines and Austin's sentences, in order
+        self.seq = 0                         # each line's own number: the page keys its bubbles on it (utt_id can repeat)
         self.utts = {}                       # utt_id -> Austin's sentence as it builds
         self.cur_utt = None
         self.repairs, self.repeats = [], []
@@ -111,8 +114,15 @@ class CallState:
         if handler is not None:
             handler(self, topic, msg, now)
 
+    def set_channel(self, channel, switchable):
+        if channel in ('call', 'sms'):
+            self.channel = channel
+        self.switchable = bool(switchable)
+
     def _call_state(self, topic, msg, now):
         self.seen['voice'] = now
+        if msg.get('channel') in ('call', 'sms'):       # on connect and on every switch (a replay carries it too)
+            self.channel = msg['channel']
         if msg.get('state') == 'connected':      # call time on our clock: right for a replay at any speed too
             self.reset_call(now)
             self.call.update(call_sid=msg.get('call_sid'), ink=msg.get('ink'))
@@ -129,7 +139,7 @@ class CallState:
         text = str(msg.get('text', '')).strip()
         if msg.get('is_final'):
             if text:
-                self.transcript.append(dict(who='judge', text=text, t=msg.get('t', now)))
+                self._line(dict(who='judge', text=text, t=now))     # our clock, like Austin's (a replay too)
             self.judge_live = ''
         else:
             self.judge_live = text
@@ -204,11 +214,15 @@ class CallState:
         text = self._said(u) or pretty(u['locked'])
         if text:
             emotion = u['emotion'] or self.emotion[0]
-            self.transcript.append(dict(who='austin', text=text, t=t, utt_id=u['utt_id'], emotion=emotion,
+            self._line(dict(who='austin', text=text, t=t, utt_id=u['utt_id'], emotion=emotion,
                                         tone=TONE.get(emotion, '').replace('Sounds', 'sounded'),
                                         repairs=[dict(index=i, frm=pretty([f], False), to=pretty([to], False))
                                                  for i, (f, to) in u['repaired'].items()],
                                         repeat=u['repeat'], face_hidden=u['face_hidden']))
+
+    def _line(self, line):
+        self.seq += 1
+        self.transcript.append(dict(line, seq=self.seq))
 
     def _close_open_sentences(self, t):
         for u in self.utts.values():
@@ -371,10 +385,10 @@ class CallState:
         muscles = self.muscles(now)
         snap = dict(
             mode={'waiting': 'waiting', 'connected': 'live', 'ended': 'end'}[c['state']],
-            number=self.number, elapsed=elapsed,
+            number=self.number, channel=self.channel, switchable=self.switchable, elapsed=elapsed,
             metrics=dict(lips_to_voice=_median(self.lat['lips_to_voice']), fixed=len(self.repairs),
                          repeats=len(self.repeats)),
-            judge_live=self.judge_live, transcript=self.transcript[-12:],
+            judge_live=self.judge_live, transcript=self._recent(),
             austin=self._sentence(cur, now),
             emotion=dict(label=self.emotion[0], chip=CHIP.get(self.emotion[0], self.emotion[0]),
                          tone=TONE.get(self.emotion[0], '')),
@@ -389,6 +403,15 @@ class CallState:
                 self._summary = self.summary(elapsed, self.face_hidden_s)
             snap['summary'] = self._summary
         return snap
+
+    def _recent(self, n=12, most=40):
+        """The last n lines, reaching back to the judge's last line (the page shows it big) when Austin said more
+        than n sentences since, up to `most` lines."""
+        start = max(0, len(self.transcript) - n)
+        judge = next((i for i in range(len(self.transcript) - 1, -1, -1) if self.transcript[i]['who'] == 'judge'), None)
+        if judge is not None and judge < start:     # the judge's line, then at most `most` of Austin's after it
+            return [self.transcript[judge]] + self.transcript[max(judge + 1, len(self.transcript) - most):]
+        return self.transcript[start:]
 
     def muscles(self, now):
         """The muscle sensors are on: emg.raw is arriving and at least one pad touches the skin."""

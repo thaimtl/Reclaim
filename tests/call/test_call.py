@@ -750,3 +750,140 @@ def test_gate_keeps_the_callers_level_through_their_own_soft_syllables():
     level = g.talker
     out = [g.push(f) != silent for f in frames(0.018, 100)]         # then a bystander, ~ -35 dBFS
     assert abs(g.talker - level) < 1.5 and not any(out[16:])
+
+
+# --- SMS mode: the judge texts from the phone on the call ------------------------------------------------------
+def test_twiml_hands_the_peer_back_to_the_stream():
+    x = twilio_media.twiml_stream('h', 'tok', '+14155550100')
+    assert '<Parameter name="peer" value="+14155550100"/>' in x
+    assert '<Parameter' not in twilio_media.twiml_stream('h', 'tok')
+
+
+async def drain(listen):
+    out = []
+    while True:
+        try:
+            out.append(bus.decode(await asyncio.wait_for(listen.recv_multipart(), 0.2)))
+        except asyncio.TimeoutError:
+            return out
+
+
+async def sms_service(aiohttp_client, channel, addr):
+    from twilio.request_validator import RequestValidator
+    from call.server import Service
+    ctx = zmq.asyncio.Context()
+    pub = bus.Publisher(addr, ctx)
+    listen = ctx.socket(zmq.SUB)
+    listen.connect(addr)
+    listen.setsockopt(zmq.SUBSCRIBE, b'')
+    c = cfg(twilio_token='secret', public_host='h.example', channel=channel)
+    voice = Voice(c, None, client=SimpleNamespace(tts=FakeTTS(FakeConn())))
+    FakeInk.instances.clear()
+    svc = Service(c, voice=voice, ink_factory=FakeInk, pub=pub, sub=ListSub())
+    voice.sink = svc._audio
+    sms_service.last = svc
+    client = await aiohttp_client(svc.app())
+
+    async def text(body, sender, signed=True):
+        params = {'Body': body, 'From': sender, 'MessageSid': 'SM1'}
+        sig = RequestValidator('secret').compute_signature('https://h.example/sms', params) if signed else 'forged'
+        return await client.post('/sms', data=params, headers={'X-Twilio-Signature': sig})
+
+    async def call(peer):
+        ws = await client.ws_connect('/media/tok')
+        await ws.send_str(json.dumps({'event': 'start', 'start': {'streamSid': 'MZ1', 'callSid': 'CA1',
+                                                                   'customParameters': {'peer': peer}}}))
+        await asyncio.sleep(0.05)
+        return ws
+    return text, call, listen
+
+
+async def test_sms_mode_takes_texts_only_from_the_phone_on_the_call(aiohttp_client):
+    text, call, listen = await sms_service(aiohttp_client, 'sms', 'inproc://sms-test')
+    phone = '+14155550100'
+    r = await text('before the call', phone)
+    assert r.status == 200 and await r.text() == twilio_media.EMPTY_TWIML        # never a reply text
+    ws = await call(phone)
+    assert not FakeInk.instances, 'SMS mode: the room never goes to Ink'
+    assert (await text('forged one', phone, signed=False)).status == 403
+    await text('a stranger', '+19995550123')
+    await text('a stranger', '')
+    await text('  How was\nthe flight? ', phone)
+    await text('   ', phone)
+    msgs = await drain(listen)
+    states = [m for t, m in msgs if t == 'call.state']
+    assert states[0]['state'] == 'connected' and states[0]['channel'] == 'sms' and states[0]['ink'] is False
+    judge = [m for t, m in msgs if t == 'partner.text']
+    assert [(m['text'], m['is_final'], m['source']) for m in judge] == [('How was the flight?', True, 'sms')]
+    await ws.close()
+    listen.close()
+
+
+async def test_call_mode_ignores_texts_and_keeps_ink(aiohttp_client):
+    text, call, listen = await sms_service(aiohttp_client, 'call', 'inproc://sms-call-test')
+    phone = '+14155550100'
+    ws = await call(phone)
+    assert FakeInk.instances, 'call mode: Ink hears the judge'
+    assert (await text('hello', phone)).status == 200
+    msgs = await drain(listen)
+    assert not [m for t, m in msgs if t == 'partner.text']
+    assert [m['channel'] for t, m in msgs if t == 'call.state'] == ['call']
+    await ws.close()
+    listen.close()
+
+
+async def test_signed_twiml_carries_the_callers_number(aiohttp_client):
+    from twilio.request_validator import RequestValidator
+    from call.server import Service
+    c = cfg(twilio_token='secret', public_host='h.example')
+    voice = Voice(c, None, client=SimpleNamespace(tts=FakeTTS(FakeConn())))
+    svc = Service(c, voice=voice, ink_factory=FakeInk,
+                  pub=bus.Publisher('inproc://twiml-peer-test', zmq.asyncio.Context()), sub=ListSub())
+    client = await aiohttp_client(svc.app())
+    params = {'CallSid': 'CA9', 'From': '+14155550100'}
+    sig = RequestValidator('secret').compute_signature('https://h.example/twiml', params)
+    body = await (await client.post('/twiml', data=params, headers={'X-Twilio-Signature': sig})).text()
+    assert '<Parameter name="peer" value="+14155550100"/>' in body
+
+
+async def test_sms_mode_with_an_unknown_caller_takes_no_texts(aiohttp_client):
+    text, call, listen = await sms_service(aiohttp_client, 'sms', 'inproc://sms-anon-test')
+    ws = await call(None)                       # caller ID blocked: no peer to match a text against
+    await text('hello', '+14155550100')
+    assert not [m for t, m in await drain(listen) if t == 'partner.text']
+    await ws.close()
+    listen.close()
+
+
+async def test_switching_modes_mid_call_turns_ink_off_and_on(aiohttp_client):
+    text, call, listen = await sms_service(aiohttp_client, 'call', 'inproc://switch-test')
+    svc = sms_service.last
+    phone = '+14155550100'
+    ws = await call(phone)
+    ink = FakeInk.instances[-1]
+    await text('ignored: call mode', phone)
+    await svc.set_channel('sms')
+    assert ink.closed and svc.call.ink is None, 'SMS mode: Ink off at once'
+    await text('now it counts', phone)
+    await svc.set_channel('call')
+    assert svc.call.ink is not None and svc.call.ink is not ink, 'back to call mode: a fresh Ink'
+    msgs = await drain(listen)
+    assert [m['text'] for t, m in msgs if t == 'partner.text'] == ['now it counts']
+    assert [(m['state'], m.get('channel')) for t, m in msgs if t == 'call.state'] == [
+        ('connected', 'call'), ('channel', 'sms'), ('channel', 'call')]
+    await ws.close()
+    listen.close()
+
+
+async def test_the_mode_switch_is_local_and_needs_its_header(aiohttp_client):
+    await sms_service(aiohttp_client, 'call', 'inproc://control-test')
+    svc = sms_service.last
+    ctl = await aiohttp_client(svc.control_app())
+    assert (await (await ctl.get('/channel')).json()) == {'channel': 'call'}
+    assert (await ctl.post('/channel', json={'channel': 'sms'})).status == 403            # no header: a web page
+    hdr = {'X-Silent-Voice': '1'}
+    assert (await ctl.post('/channel', json={'channel': 'fax'}, headers=hdr)).status == 400
+    r = await ctl.post('/channel', json={'channel': 'sms'}, headers=hdr)
+    assert r.status == 200 and (await r.json()) == {'channel': 'sms'} and svc.channel == 'sms'
+    main = await aiohttp_client(svc.app())                  # the public app (behind the tunnel) has no switch
+    assert (await main.post('/channel', json={'channel': 'call'}, headers=hdr)).status in (404, 405)

@@ -10,6 +10,7 @@ import pytest
 
 pytest.importorskip('aiohttp')      # the dashboard runs in venv-call; venv-live's suite skips it
 
+import bus
 from bus.team import encode
 from dashboard.demo_feed import simulate
 from dashboard.server import Dashboard
@@ -107,6 +108,33 @@ def test_judge_partial_then_final_and_a_new_call_resets():
     assert st.snapshot(20.0)['transcript'] == []
 
 
+def test_sms_mode_shows_texts_as_the_judges_lines():
+    st = CallState(channel='sms')
+    assert st.snapshot(0.0)['channel'] == 'sms'
+    st.feed('call.state', {'state': 'connected', 't': 1.0, 'ink': False, 'channel': 'sms'}, 1.0)
+    st.feed('partner.text', {'text': 'How was the flight?', 'is_final': True, 't': 2.0, 'source': 'sms'}, 2.0)
+    snap = st.snapshot(3.0)
+    assert snap['mode'] == 'live' and snap['channel'] == 'sms'
+    assert [(x['who'], x['text']) for x in snap['transcript']] == [('judge', 'How was the flight?')]
+    st = CallState()                    # the dashboard started in call mode: the call server's word wins
+    st.feed('call.state', {'state': 'connected', 't': 1.0, 'channel': 'sms'}, 1.0)
+    assert st.snapshot(2.0)['channel'] == 'sms'
+
+
+def test_each_line_has_its_own_number_and_the_judges_last_line_stays_in_view():
+    st = CallState()
+    st.feed('call.state', {'state': 'connected'}, 1.0)
+    st.feed('partner.text', {'text': 'Tell me everything.', 'is_final': True, 't': 999.0}, 2.0)
+    for i in range(15):                 # a long answer, the same utt_id reused (a decoder restart)
+        st._line(dict(who='austin', text=f'sentence {i}', t=3.0 + i, utt_id=1))
+    lines = st.snapshot(20.0)['transcript']
+    assert lines[0]['who'] == 'judge' and lines[0]['t'] == 2.0      # on our clock, not the message's
+    assert len({x['seq'] for x in lines}) == len(lines) == 16
+    for i in range(40):                 # an answer past the cap: the judge's line still leads
+        st._line(dict(who='austin', text=f'more {i}', t=30.0 + i, utt_id=2))
+    lines = st.snapshot(80.0)['transcript']
+    assert lines[0]['who'] == 'judge' and len(lines) == 41 and lines[-1]['text'] == 'more 39'
+
 def test_voice_offset_skips_resent_words_and_keeps_real_repeats():
     st = fed(('voice.say', {'utt_id': 1, 'words': ['no'], 'offset': 0}),
              ('voice.say', {'utt_id': 1, 'words': ['no', 'no', 'way'], 'offset': 0}),
@@ -163,6 +191,49 @@ def test_odd_messages_never_break_the_state():
 
 
 # --- server ----------------------------------------------------------------------------------------------------
+def test_logging_is_seen_in_the_launchers_bus_folder_and_a_restarts(tmp_path, monkeypatch):
+    monkeypatch.setenv('RECLAIM_WORKDIR', str(tmp_path))
+    run = tmp_path / 'logs' / '20261025-120000-demo'
+    (run / 'bus').mkdir(parents=True)
+    d = Dashboard()
+    d.check_logging()
+    assert 'Not logging' in d.state.status(bus.now())['text']           # nothing written yet
+    for folder in (run / 'bus', run / 'bus-r1', run):                   # launcher, a logger restart, buslog's own
+        folder.mkdir(exist_ok=True)
+        (folder / 'bus-0001.msgpack').write_bytes(b'x')
+        d = Dashboard()
+        d.check_logging()
+        assert 'Not logging' not in d.state.status(bus.now())['text'], folder
+        (folder / 'bus-0001.msgpack').unlink()
+
+
+async def test_the_call_text_switch_goes_through_to_the_call_server(aiohttp_server, aiohttp_client):
+    from aiohttp import web
+    mode = {'channel': 'call'}
+
+    async def channel(request):         # a stand-in for the call server's /channel (call/server.py)
+        if request.method == 'POST':
+            assert request.headers.get('X-Silent-Voice') == '1'
+            mode['channel'] = (await request.json())['channel']
+        return web.json_response(mode)
+    ctl = web.Application()
+    ctl.router.add_route('*', '/channel', channel)
+    call_server = await aiohttp_server(ctl)
+    d = Dashboard(control=str(call_server.make_url('')))
+    page = await aiohttp_client(d.app())
+    await asyncio.sleep(0.1)            # the control loop reads the mode once
+    assert d.state.snapshot(bus.now())['switchable'] is True
+    assert (await page.post('/api/channel', json={'channel': 'sms'})).status == 403     # another site, no header
+    hdr = {'X-Silent-Voice': '1'}
+    assert (await page.post('/api/channel', json={'channel': 'fax'}, headers=hdr)).status == 400
+    r = await page.post('/api/channel', json={'channel': 'sms'}, headers=hdr)
+    assert r.status == 200 and mode['channel'] == 'sms' and d.state.snapshot(bus.now())['channel'] == 'sms'
+    await call_server.close()           # the call server goes away: the switch says so instead of pretending
+    assert (await page.post('/api/channel', json={'channel': 'call'}, headers=hdr)).status == 502
+    alone = await aiohttp_client(Dashboard().app())
+    assert (await alone.post('/api/channel', json={'channel': 'call'}, headers=hdr)).status == 503
+
+
 def test_server_decodes_skips_bad_frames_and_keeps_the_newest_preview():
     d = Dashboard('(628) 888-6598', endpoints={})
     d.handle(encode('partner.text', {'text': 'hello', 'is_final': True, 't': 1.0}))

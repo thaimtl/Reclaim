@@ -20,7 +20,7 @@ from collections import deque
 import numpy as np
 import zmq
 import zmq.asyncio
-from aiohttp import WSMsgType, web
+from aiohttp import ClientError, ClientSession, ClientTimeout, WSMsgType, web
 
 import bus
 from bus.team import ENDPOINTS, decode
@@ -36,6 +36,7 @@ SNAPSHOT_HZ = 15
 FRAME_MAGIC = b'RCF1'   # binary frame: magic, 4-byte big-endian header length, JSON header, JPEG
 FACE_MATCH_S = 0.06     # max gap between a preview and its cam.face
 LOG_FRESH_S = 5.0   # the logger flushes every 0.2 s: older than this, it isn't running
+CONTROL_EVERY_S = 3.0   # how often the page's mode switch re-reads the call server's mode
 
 
 SHIPPED_BENCHMARK = os.path.join(os.path.dirname(__file__), 'benchmark_session3.json')
@@ -64,8 +65,10 @@ def load_benchmark(path=None):
 
 
 class Dashboard:
-    def __init__(self, number='', endpoints=None, ctx=None, benchmark=None):
-        self.state = CallState(number, benchmark)
+    def __init__(self, number='', endpoints=None, ctx=None, benchmark=None, channel='call', control=None):
+        self.state = CallState(number, benchmark, channel)
+        self.control = control.rstrip('/') if control else None     # the call server's mode switch (loopback)
+        self.http = None
         self.endpoints = dict(endpoints or ENDPOINTS)
         self.ctx = ctx or zmq.asyncio.Context.instance()
         self.clients = set()
@@ -130,10 +133,12 @@ class Dashboard:
             sock.close(linger=0)
 
     def check_logging(self):
-        """The bus logger (buslog.record) wrote within the last few seconds: its newest file is fresh."""
+        """The bus logger (buslog.record) wrote within the last few seconds: its newest file is fresh. The files sit in
+        the newest session folder, or one folder down (the launcher's <run>-demo/bus/, bus-r1/ after a restart)."""
         try:
             sessions = sorted(log_root().iterdir())
-            newest = max((f.stat().st_mtime for f in sessions[-1].glob('bus-*.msgpack')), default=0) if sessions else 0
+            files = [*sessions[-1].glob('bus-*.msgpack'), *sessions[-1].glob('*/bus-*.msgpack')] if sessions else []
+            newest = max((f.stat().st_mtime for f in files), default=0)
         except OSError:
             return
         if time.time() - newest < LOG_FRESH_S:
@@ -186,6 +191,43 @@ class Dashboard:
             self.viewers.pop(ws, None)
         return ws
 
+    # --- the Call / Text switch: the page asks us, we ask the call server (which owns the mode) ---------------
+    async def _control(self, method, body=None):
+        async with self.http.request(method, self.control + '/channel', json=body,
+                                     headers={'X-Silent-Voice': '1'} if body else None) as r:
+            if r.status != 200:
+                raise ClientError(f'call server said {r.status}: {await r.text()}')
+            return (await r.json())['channel']
+
+    async def control_loop(self):
+        """Keeps the switch honest: the call server's mode, and whether it can be switched (call server up)."""
+        while True:
+            try:
+                self.state.set_channel(await self._control('GET'), switchable=True)
+            except (ClientError, asyncio.TimeoutError, OSError, ValueError, KeyError, TypeError):
+                self.state.set_channel(None, switchable=False)
+            await asyncio.sleep(CONTROL_EVERY_S)
+
+    async def channel(self, request):
+        """POST {"channel": "call" | "sms"} from the page. Same origin only: the header forces a browser preflight."""
+        if request.headers.get('X-Silent-Voice') != '1':
+            raise web.HTTPForbidden()
+        if not self.control:
+            raise web.HTTPServiceUnavailable(text='no call server to switch (start the demo with the launcher)')
+        try:
+            want = (await request.json()).get('channel')
+            if want not in ('call', 'sms'):
+                raise ValueError(want)
+        except (ValueError, AttributeError, TypeError):
+            raise web.HTTPBadRequest(text='channel must be "call" or "sms"') from None
+        try:
+            got = await self._control('POST', {'channel': want})
+        except (ClientError, asyncio.TimeoutError, OSError, ValueError, KeyError, TypeError) as e:
+            log.warning('mode switch failed: %s', e)
+            raise web.HTTPBadGateway(text='the call server did not switch: is it running?') from None
+        self.state.set_channel(got, switchable=True)
+        return web.json_response({'channel': got})
+
     async def index(self, request):
         return web.FileResponse(os.path.join(STATIC, 'index.html'))
 
@@ -193,16 +235,22 @@ class Dashboard:
         app = web.Application()
         app.router.add_get('/', self.index)
         app.router.add_get('/ws', self.websocket)
+        app.router.add_post('/api/channel', self.channel)
         app.router.add_static('/static/', STATIC)
 
         async def start(app):
             self.tasks = [asyncio.create_task(self.bus_loop()), asyncio.create_task(self.push_loop())]
+            if self.control:
+                self.http = ClientSession(timeout=ClientTimeout(total=4))
+                self.tasks.append(asyncio.create_task(self.control_loop()))
 
         async def stop(app):
             for t in self.tasks:
                 t.cancel()
             for ws in list(self.clients):
                 await ws.close()
+            if self.http is not None:
+                await self.http.close()
         app.on_startup.append(start)
         app.on_cleanup.append(stop)
         return app
@@ -229,13 +277,17 @@ def main():
     ap.add_argument('--port', type=int, default=8790)
     ap.add_argument('--host', default='127.0.0.1')
     ap.add_argument('--number', default='', help="the judge's number as shown in the header, e.g. '(628) 888-6598'")
+    ap.add_argument('--channel', choices=('call', 'sms'), default='call',
+                    help="how the judge talks: on the call (Ink) or by text (SMS mode); call.state confirms it")
+    ap.add_argument('--control', help="the call server's mode switch, e.g. http://127.0.0.1:8788 (the launcher sets it); "
+                                      'without it the page has no Call / Text switch')
     ap.add_argument('--benchmark', help='scored word error JSON (default: $RECLAIM_WORKDIR/results/wer_session3.json)')
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(message)s')
     print(f'dashboard: http://{args.host}:{args.port}')
     benchmark = load_benchmark(args.benchmark)
     print('end screen word error:', f"from {benchmark['session'] or 'the benchmark file'}" if benchmark else 'placeholder')
-    web.run_app(Dashboard(args.number, benchmark=benchmark).app(), host=args.host, port=args.port, print=None,
+    web.run_app(Dashboard(args.number, benchmark=benchmark, channel=args.channel, control=args.control).app(), host=args.host, port=args.port, print=None,
                 access_log=None)
 
 

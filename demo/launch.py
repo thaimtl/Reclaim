@@ -4,6 +4,8 @@
     venv-call/bin/python -m demo.launch                 # the live demo: camera + EMG + Claude + call + dashboard
     venv-call/bin/python -m demo.launch --check         # pre-flight checks only, nothing starts
     venv-call/bin/python -m demo.launch --no-emg        # pads off: camera + Claude
+    venv-call/bin/python -m demo.launch --mode sms      # a loud room: the judge calls from our phone, listens on
+                                                        # headphones, and texts the same number instead of speaking
     venv-call/bin/python -m demo.launch --rehearse      # no camera, no pads: session 3's camera log plays when a call
                                                         # connects (a dry run of everything after the camera)
 
@@ -174,7 +176,8 @@ def public_status(url, path='/twiml', timeout=8.0):
 
 # ------------------------------------------------------------------------------------------------ Twilio
 class Twilio:
-    """Points the number's voice webhook at this run's tunnel, then reads it back. opener: injectable for tests."""
+    """Points the number's voice webhook (and in SMS mode its SMS webhook) at this run's tunnel, then reads them back.
+    opener: injectable for tests."""
 
     def __init__(self, sid, token, number, opener=urllib.request.urlopen):
         self.sid, self.number, self.opener = sid, number, opener
@@ -194,16 +197,30 @@ class Twilio:
                 msg = None
             raise RuntimeError(f'Twilio said {e.code}: {msg or e.reason}') from None
 
-    def point_at(self, voice_url):
+    def point_at(self, voice_url, sms_url=None, sms_required=False):
+        """Voice first (the call needs it: any failure raises). Then SMS, so the dashboard can switch to SMS mode at
+        any time; a failure there raises only when SMS mode is required now, else it comes back as a warning."""
         found = self._call(f'{self.base}.json?' + urllib.parse.urlencode({'PhoneNumber': self.number}))
         nums = found.get('incoming_phone_numbers') or []
         if not nums:
             raise RuntimeError(f'{self.number} is not a number on this Twilio account (TWILIO_NUMBER)')
-        sid = nums[0]['sid']
-        self._call(f'{self.base}/{sid}.json', {'VoiceUrl': voice_url, 'VoiceMethod': 'POST'})
-        back = self._call(f'{self.base}/{sid}.json').get('voice_url')
-        if back != voice_url:
-            raise RuntimeError(f'Twilio still has {back!r}')
+        url = f'{self.base}/{nums[0]["sid"]}.json'
+        self._set(url, 'voice_url', {'VoiceUrl': voice_url, 'VoiceMethod': 'POST'})
+        if not sms_url:
+            return None
+        try:
+            self._set(url, 'sms_url', {'SmsUrl': sms_url, 'SmsMethod': 'POST'})
+        except RuntimeError as e:
+            if sms_required:
+                raise
+            return f'SMS webhook not set ({e}): texts won\'t arrive if you switch to SMS mode'
+        return None
+
+    def _set(self, url, key, data):
+        self._call(url, data)
+        back = self._call(url).get(key)
+        if back != list(data.values())[0]:
+            raise RuntimeError(f'Twilio still has {back!r} as {key}')
 
 
 # ------------------------------------------------------------------------------------------------ parts
@@ -306,6 +323,7 @@ class Launcher:
             self.env['TWILIO_NUMBER'] = args.number
         self.ep = endpoints(self.env)
         self.call_port, self.dash_port = args.call_port, args.dash_port
+        self.control_port = args.call_port + 1          # the call server's mode switch, on the loopback only
         self.uno = args.port
 
     def py(self, venv):
@@ -415,7 +433,9 @@ class Launcher:
             self.start_call()                   # the network can fail: before the calibration, not after it
             self.start(decoder)
             self.start(Part('Dashboard', self.module('venv-call', 'dashboard.server', '--port', str(self.dash_port),
-                                                     '--number', pretty_number(self.keys.get('TWILIO_NUMBER'))),
+                                                     '--number', pretty_number(self.keys.get('TWILIO_NUMBER')),
+                                                     '--channel', self.args.mode,
+                                                     '--control', f'http://127.0.0.1:{self.control_port}'),
                             ('http', f'http://127.0.0.1:{self.dash_port}/', (200,)), 30))
             self.ready_banner()
             self.watch()
@@ -456,7 +476,8 @@ class Launcher:
         self.public_url = TUNNEL_URL.search(tunnel.output()).group(0)
         host = urllib.parse.urlparse(self.public_url).hostname
         self.start(Part('Call', self.module('venv-call', 'call.server'), ('line', r'Sonic websocket open'), 60,
-                        env={'PUBLIC_HOST': host, 'PORT': str(self.call_port)}))
+                        env={'PUBLIC_HOST': host, 'PORT': str(self.call_port), 'CALL_CHANNEL': self.args.mode,
+                             'CALL_CONTROL_PORT': str(self.control_port)}))
         say('waiting for the tunnel to reach the call server from outside')
         end = time.monotonic() + 90
         while public_status(self.public_url) not in (200, 405):
@@ -468,10 +489,13 @@ class Launcher:
             say('--no-webhook: Twilio left as it is', None)
             return
         try:
-            Twilio(self.keys['TWILIO_ACCOUNT_SID'], self.keys['TWILIO_AUTH_TOKEN'], self.keys['TWILIO_NUMBER']).point_at(
-                self.public_url + '/twiml')
+            warning = Twilio(self.keys['TWILIO_ACCOUNT_SID'], self.keys['TWILIO_AUTH_TOKEN'],
+                             self.keys['TWILIO_NUMBER']).point_at(self.public_url + '/twiml', self.public_url + '/sms',
+                                                                  sms_required=self.args.mode == 'sms')
         except (urllib.error.URLError, OSError, RuntimeError, ValueError, KeyError) as e:
             raise StartFailed(f'Twilio webhook not updated: {e}') from None
+        if warning:
+            say(warning, None)
         say(f'Twilio number {pretty_number(self.keys["TWILIO_NUMBER"])} points at this laptop', True)
 
     def ready_banner(self):
@@ -482,6 +506,10 @@ class Launcher:
                  f'Running:    {", ".join(p.name for p in self.parts)}',
                  f'Logs:       {self.folder}',
                  'Stop:       Ctrl-C in this window']
+        if self.args.mode == 'sms':
+            lines.insert(3, 'SMS mode:   call the number from our phone (headphones on the judge), then the judge '
+                            'texts it from that phone')
+        lines.insert(3, 'Mode:       switch Call / Text on the dashboard (or press M there), even mid-call')
         if self.args.rehearse:
             lines.insert(3, 'Rehearsal:  call the number; session 3 plays once the call connects')
         print('\n' + '=' * 72 + '\n' + '\n'.join('  ' + x for x in lines) + '\n' + '=' * 72 + '\n', flush=True)
@@ -620,6 +648,9 @@ def gpu_ok():
 def main(argv=None):
     ap = argparse.ArgumentParser(description='Start the Silent Voice demo, in order.')
     ap.add_argument('--check', action='store_true', help='pre-flight checks only')
+    ap.add_argument('--mode', choices=('call', 'sms'), default='call',
+                    help="call: the judge speaks on the call (default). sms: a loud room: the judge texts the number "
+                         "from the phone on the call and hears Austin on it")
     ap.add_argument('--no-emg', action='store_true', help='pads off: camera + Claude only')
     ap.add_argument('--no-claude', action='store_true', help='without Claude (fallback)')
     ap.add_argument('--rehearse', action='store_true', help='no camera or pads: session 3 plays when a call connects')

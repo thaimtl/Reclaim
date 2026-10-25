@@ -25,36 +25,74 @@ body { font-family: var(--font); font-variant-numeric: tabular-nums; color: var(
 .title .dot { width: 14px; height: 14px; border-radius: 7px; background: var(--live); }
 .title .dot.off { background: var(--text-pending); }
 .sub { padding-top: 6px; font-size: 20px; line-height: 28px; color: var(--text-muted); }
+/* the Call / Text switch: how the judge talks (the call server owns the mode; this asks it to change) */
+.subrow { display: flex; align-items: center; gap: 18px; }
+.subrow .sub { padding-top: 0; }
+.mode { position: relative; display: grid; grid-template-columns: 1fr 1fr; height: 36px; padding: 3px;
+  border-radius: 18px; background: var(--bg-sunken); user-select: none; }
+.mode .thumb { position: absolute; top: 3px; left: 3px; width: calc(50% - 3px); height: 30px; border-radius: 15px;
+  background: var(--bg); box-shadow: 0 1px 3px rgba(11, 15, 20, .16), 0 0 0 .5px rgba(11, 15, 20, .06);
+  transition: transform .34s cubic-bezier(.22, 1, .36, 1); }
+.mode[data-ch="sms"] .thumb { transform: translateX(100%); }
+.mode button { position: relative; min-width: 72px; padding: 0 16px; border: 0; background: none; border-radius: 15px;
+  font: 600 16px/30px var(--font); color: var(--text-muted); cursor: pointer; transition: color .25s; }
+.mode button[aria-checked="true"] { color: var(--text-primary); }
+.mode button:focus-visible { outline: 2px solid var(--camera); outline-offset: 2px; }
+.mode.off { opacity: .45; }
+.mode.off button { cursor: default; }
+.mode.busy .thumb { box-shadow: 0 0 0 2px var(--camera); }
+.mode-note { font-size: 16px; color: var(--repeat); opacity: 0; transition: opacity .3s; }
+.mode-note.show { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .mode .thumb, .mode button, .mode-note { transition: none; } }
 .metrics { display: flex; gap: 44px; }
 .metric { min-width: 96px; }
 .metric b { display: block; font-weight: 700; font-size: 34px; line-height: 41px; }
 .metric span { font-size: 16px; line-height: 21px; color: var(--text-muted); letter-spacing: .2px; }
 
-#middle { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-end;
-  min-height: 0; overflow: hidden; }
-#history { width: 100%; display: flex; flex-direction: column; gap: 14px; margin-bottom: 28px; }
-.past { max-width: 640px; padding: 9px 16px; font-size: 22px; line-height: 30px; color: var(--text-muted);
+/* anchored to the bottom like a chat: the newest is always in view, older lines leave at the top (app.js fits it) */
+#middle { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end;
+  min-height: 0; overflow: hidden; padding-top: 24px; }
+#history { flex: 1 1 0; min-height: 0; width: 100%; display: flex; flex-direction: column; justify-content: flex-end;
+  gap: 14px; overflow: hidden; padding-bottom: 28px;
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,.35), #000 64px); mask-image: linear-gradient(to bottom, rgba(0,0,0,.35), #000 64px); }
+#history:empty { padding-bottom: 0; }
+#turn { flex: none; width: 100%; display: flex; flex-direction: column; gap: 10px; padding-top: 20px; }
+#turn:empty { display: none; }
+.past { flex: none; max-width: 640px; padding: 9px 16px; font-size: 22px; line-height: 30px; color: var(--text-muted);
   border-radius: 16px; }
 .past.judge { align-self: flex-start; background: var(--bg-sunken); border-bottom-left-radius: 4px; }
 .past.austin { align-self: flex-end; background: var(--bg-austin); border-bottom-right-radius: 4px; }
 .label { font-weight: 600; font-size: 18px; line-height: 23px; color: var(--text-muted); }
 .label small { font-weight: 400; font-size: 16px; }
-#judge { width: 100%; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+#judge { flex: none; width: 100%; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; --jw: 40px; }
 .judge-bubble { max-width: 900px; background: var(--bg-sunken); padding: 18px 30px 20px;
-  border-radius: 28px 28px 28px 6px; font-weight: 500; font-size: 40px; line-height: 50px;
-  color: var(--text-secondary); }
+  border-radius: 28px 28px 28px 6px; font-weight: 500; font-size: var(--jw); line-height: 1.25;
+  color: var(--text-secondary); overflow: hidden; }
+.clipped { -webkit-mask-image: linear-gradient(to bottom, transparent, #000 56px); mask-image: linear-gradient(to bottom, transparent, #000 56px); }
 .judge-bubble.live { color: var(--text-pending); }
-#austin { width: 1024px; padding-top: 28px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+#austin { flex: none; width: 1024px; padding-top: 28px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
+  --aw: 80px; }
 #austin .label { color: var(--emg); }
 #austin.waiting .label { visibility: hidden; }
 .austin-bubble { position: relative; background: var(--bg-austin); padding: 20px 28px 24px;
   border-radius: 28px 28px 6px 28px; max-width: 1024px; }
-.words { display: flex; flex-wrap: wrap; gap: 0 18px; align-items: flex-end; }
+.words { display: flex; flex-wrap: wrap; gap: 0 calc(var(--aw) * .225); align-items: flex-end; }
+.words.clipped { overflow: hidden; }   /* only then: the struck-out word Claude replaced sits above the first line */
 .word { display: flex; flex-direction: column; gap: 2px; position: relative; }
-.word .w { font-weight: 700; font-size: 80px; line-height: 92px; letter-spacing: -1px; white-space: nowrap; }
+.word .w { font-weight: 700; font-size: var(--aw); line-height: 1.15; letter-spacing: calc(var(--aw) * -.0125);
+  white-space: nowrap; }
 .word.pending .w { color: var(--text-pending); }
 .word .bar { height: 5px; border-radius: 2px; background: rgba(11, 15, 20, .1); overflow: hidden; }
-.word .bar i { display: block; height: 5px; }
+.word .bar i { display: block; height: 5px; transition: width .28s ease-out, background-color .28s; }
+.word .w { transition: color .28s; }
+.word.enter { animation: word-in .38s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes word-in { from { opacity: 0; transform: translateY(.22em); } }
+.past { transition: opacity .35s; }
+.past.gone { opacity: 0; }
+.cand .track i { transition: width .3s ease-out; }
+.cand .track .thr { transition: left .3s ease-out; }
+@media (prefers-reduced-motion: reduce) { .word.enter { animation: none; } .word .bar i, .word .w, .past,
+  .cand .track i, .cand .track .thr { transition: none; } }
 .word .was { position: absolute; right: 0; top: -14px; font-weight: 700; font-size: 22px; line-height: 26px;
   color: var(--claude); text-decoration: line-through; }
 .src-camera { background: var(--camera); } .src-emg { background: var(--emg); }
@@ -62,7 +100,10 @@ body { font-family: var(--font); font-variant-numeric: tabular-nums; color: var(
 .caret { position: absolute; right: -16px; bottom: 0; width: 16px; height: 22px; }
 .words.empty .w { color: var(--text-pending); font-weight: 500; font-size: 40px; line-height: 50px; letter-spacing: 0; }
 
-#explain { width: 760px; min-height: 220px; padding-top: 12px; }
+#explain { flex: none; width: 760px; min-height: 220px; padding-top: 12px; }
+#explain[data-panel="compact"], #explain:empty { min-height: 0; }
+#explain[data-panel="compact"] .note, #explain[data-panel="compact"] .legend { display: none; }
+#explain[data-panel="none"] { display: none; }
 .note { padding: 10px 0 6px; font-size: 18px; line-height: 24px; color: var(--text-muted); }
 .note.claude { color: var(--claude); display: flex; gap: 8px; }
 .legend { display: flex; gap: 22px; padding: 2px 0 6px 164px; font-size: 16px; line-height: 22px; color: var(--text-muted); }
@@ -131,11 +172,12 @@ body { font-family: var(--font); font-variant-numeric: tabular-nums; color: var(
 .segs { display: flex; gap: 2px; }
 .segs i { width: 3px; height: 8px; background: var(--track-dark); }
 .segs i.lit { background: var(--emg-dark); }
-.heard { position: absolute; left: 40px; top: 866px; width: 680px; }
+.heard { position: absolute; left: 40px; top: 836px; width: 680px; }
 .heard .row { display: flex; justify-content: space-between; font-weight: 600; font-size: 18px; line-height: 23px; }
 .heard .row span:first-child { color: var(--on-dark-2); }
-.heard .quote { padding-top: 14px; height: 69px; font-weight: 600; font-size: 44px; line-height: 55px;
-  color: var(--on-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.heard .quote { margin-top: 14px; height: 88px; font-weight: 600; font-size: 44px; line-height: 55px;
+  color: var(--on-dark); overflow: hidden; }
+.heard .quote.small { font-size: 34px; line-height: 44px; }   /* two lines; app.js keeps the newest words */
 #wave { margin-top: 14px; width: 680px; height: 60px; display: block; }
 
 /* ---- end of call ------------------------------------------------------------------------------------- */

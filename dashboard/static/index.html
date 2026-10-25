@@ -14,7 +14,14 @@
       <header id="header">
         <div>
           <div class="title"><i class="dot" id="live-dot"></i><span id="title">Waiting for the call</span></div>
-          <div class="sub" id="sub"></div>
+          <div class="subrow"><div class="sub" id="sub"></div>
+            <div class="mode off" id="mode" role="radiogroup" aria-label="How the judge talks" data-ch="call"
+                 title="How the judge talks: on the call, or by text (press M to switch)">
+              <i class="thumb"></i>
+              <button type="button" role="radio" data-ch="call" aria-checked="true">Call</button>
+              <button type="button" role="radio" data-ch="sms" aria-checked="false">Text</button>
+            </div>
+            <span class="mode-note" id="mode-note" role="status"></span></div>
         </div>
         <div class="metrics">
           <div class="metric"><b id="m-lips">--</b><span>lips to voice</span></div>
@@ -24,10 +31,11 @@
       </header>
       <div id="middle">
         <div id="history"></div>
-        <div id="judge"><div class="label">Judge <small>· transcribed by Cartesia Ink</small></div>
+        <div id="judge"><div class="label" id="judge-label">Judge <small id="judge-via">· transcribed by Cartesia Ink</small></div>
           <div class="judge-bubble" id="judge-text"></div></div>
-        <div id="austin"><div class="label">Austin, mouthing silently</div>
-          <div class="austin-bubble"><div class="words" id="words"></div>
+        <div id="turn"></div>
+        <div id="austin"><div class="label" id="austin-label">Austin, mouthing silently</div>
+          <div class="austin-bubble" id="austin-bubble"><div class="words" id="words"></div>
             <img class="caret" src="/static/icons/caret.svg" alt=""></div></div>
         <div id="explain"></div>
       </div>
@@ -80,7 +88,7 @@
     </section>
     <aside id="end-chat">
       <h2>The call</h2>
-      <div class="who"><span>Judge, heard by Cartesia Ink</span><span>Austin, in his voice by Cartesia Sonic</span></div>
+      <div class="who"><span id="end-judge-who">Judge, heard by Cartesia Ink</span><span>Austin, in his voice by Cartesia Sonic</span></div>
       <div class="thread" id="end-thread"></div>
       <div class="credits"><span class="cr">Voice<img src="/static/icons/cartesia-logo.svg" alt="Cartesia" class="cartesia-logo"></span>
         <span class="cr">Repairs<span class="claude-lockup"><svg class="cmark"><use href="#claude-mark"/></svg>Claude</span></span></div>
