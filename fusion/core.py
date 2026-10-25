@@ -132,6 +132,11 @@ class Fusion:
     def _tick(self, msg, now):
         out = []
         seg = int(msg['seg_id'])
+        ended = self._ended(seg, float(msg['seg_start']))
+        if ended is not None:   # the camera's last tick of a segment comes ~0.55 s late, after end_wait_s ended it:
+            if ended.state == 'ending':     # still that sentence (its final pass reads it), never a new one
+                ended.cam = CamReading(msg)
+            return out
         if self.utt is not None and self.utt.seg_id != seg:
             out += self._end(self.utt, now)
         if self.utt is None:
@@ -145,6 +150,13 @@ class Fusion:
         u.cam, u.last_tick = CamReading(msg), now
         out += self._pass(u, now, final=False)
         return out
+
+    def _ended(self, seg, seg_start):
+        """The ended utterance of this camera segment, if any (seg_start too: a restarted camera reuses seg_ids)."""
+        for v in list(self.closing) + list(self.recent.values()):
+            if v is not self.utt and v.state != 'open' and v.seg_id == seg and v.seg_start == seg_start:
+                return v
+        return None
 
     def _end(self, u, now):
         """The segment's ticks stopped: read it once more as a finished sentence, then wait for cam.final."""

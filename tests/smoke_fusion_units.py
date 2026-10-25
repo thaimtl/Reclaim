@@ -234,6 +234,32 @@ def main():
         check('every lock carries its time, cam and alts', len(lock_t) == 3 and all(
             set(x) >= {'w', 'conf', 'alts', 'cam', 'emg', 't'} for tp, m in out if tp == 'dec.lock' for x in m['words']))
 
+        # the camera's last tick of a segment comes ~0.55 s after the one before it (every sentence of session 3),
+        # after end_wait_s has ended the sentence: it is still that sentence, so the voice never says it twice
+        for late_at in (12, 30):                    # while waiting for cam.final, and after it
+            core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
+            out = []
+            for n in range(8, T - 2, 3):
+                msg = {k: (v[:n] if isinstance(v, np.ndarray) else v) for k, v in full.items()}
+                t = float(msg['frame_t'][-1]) + 0.05
+                out += core.feed('cam.tick', msg, t)
+                out += core.step(t)
+            for k in range(1, 60):
+                out += core.step(t + 0.05 * k)
+                if k == late_at:
+                    out += core.feed('cam.tick', full, t + 0.05 * k)
+                if k == 20:
+                    out += core.feed('cam.final', {'seg_id': 1, 'nbest': [{'text': 'I WANT WATER', 'score': 0.0}]},
+                                      t + 0.05 * k)
+            said = [x for tp, m in out if tp == 'voice.say' for x in m['words']]
+            utts = {m['utt_id'] for tp, m in out if tp in ('voice.say', 'dec.hyp')}
+            check(f'a late last tick (step {late_at}) is not a new sentence', said == ['i', 'want', 'water'] and
+                  utts == {1}, f"{' '.join(said)}; utt_ids {sorted(utts)}")
+        nxt = reading(pieces, ['i', 'want', 'water'], seg_id=1, t0=500.0)
+        out = core.feed('cam.tick', nxt, 500.0)
+        check('a restarted camera reusing seg_id 1 still starts a new sentence',
+              any(tp == 'dec.hyp' and m['utt_id'] == 2 for tp, m in out))
+
         # a repair inside the repair window changes what the voice says
         core = Fusion(search, Gate(), lock, svr=None, repair_s=0.3)
         out = []
