@@ -16,13 +16,13 @@ Our demo speaker is Austin, who is healthy; no patients take part in the demo.
 ## How it works
 
 One mode: open mouth, no sound, real time.
-Three readers work together, because each sees what the others can't, and every 100 ms a decoder combines them and locks in each word as soon as they're confident enough.
+Three readers work together, because each sees what the others can't, and every 100 ms one joint search combines them and locks in each word as soon as they're confident enough.
 
 ```mermaid
 flowchart LR
     W[Webcam] --> AV[Camera reader<br/>Auto-AVSR]
     P[4 EMG pads] --> E[EMG reader<br/>SVR-1]
-    AV --> D[Fusion decoder]
+    AV --> D[Joint search + language model]
     E --> D
     M[Phone call<br/>the other person] --> I[Cartesia Ink]
     I --> C[Claude<br/>whole conversation]
@@ -70,11 +70,16 @@ All code lives in this repo; datasets, checkpoints, results and Python environme
 | Folder | What it is |
 | --- | --- |
 | `svr/` | SVR-1, the EMG model: model, training, fine-tuning, preprocessing ([docs/SVR1_SPEC.md](docs/SVR1_SPEC.md)) |
+| `fusion/` | The joint search over camera + EMG + Claude, and its language model: a conversational 4-gram with a cache of the call (`fusion/lm.py`, built by `fusion/build_lm.py`) |
 | `bench/` | Benchmarks and their frozen test splits |
 | `cluster/` | H100/H200 job scripts (PBS), smoke tests, runbook |
 | `camera/` | Camera-only baselines (Auto-AVSR, BRAVEn, LipLearner) |
-| `rig/` | EMG rig: Arduino firmware, serial reader, live hum filter, signal check |
+| `rig/` | EMG rig: Arduino firmware, serial reader, live hum filter, signal check, `emg.raw` publisher (`publish.py`) |
 | `recorder/` | The recording app: camera + EMG + the session sentences ([recorder/README.md](recorder/README.md)) |
+| `bus/` | The team bus: ZeroMQ wire format, the camera's topics (`__init__.py`) and every other endpoint and port (`team.py`) |
+| `buslog/` | Logs every bus message to `$RECLAIM_WORKDIR/logs/` (`record.py`) and replays a session (`replay.py`) |
+| `claude_service/` | The Claude service: predicts Austin's next words and repairs look-alikes (`brain.py`), on the bus (`service.py`) |
+| `demo/dashboard/` | Captions dashboard prototype, sample data ([demo/dashboard/README.md](demo/dashboard/README.md)) |
 | `call/` | The phone call: Twilio, Austin's cloned voice (Cartesia Sonic) and the judge's captions (Cartesia Ink) ([call/README.md](call/README.md)) |
 | `figures/` | The SVR-1 architecture figure, the SVR-1 vs Gaddy & Klein results (`svr1_vs_gaddy_4ch*`), and the scripts that draw them |
 | `tests/` | Smoke and unit tests |

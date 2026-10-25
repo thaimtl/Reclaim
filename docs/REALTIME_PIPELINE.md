@@ -2,14 +2,14 @@
 
 Reclaim turns silently mouthed speech into live captions and a live voice. In the demo, Austin calls a judge on the phone (through Twilio). The judge talks normally; Austin only mouths, mouth open, no sound. His words appear on screen as he mouths them and play into the call in his own cloned voice, with the emotion on his face, while he is still mouthing. The judge's words, transcribed from the call, appear in the same captions. Everything runs on one laptop (RTX 5060, 115 W), and the goal at every step is the lowest possible delay.
 
-Three readers work together, because each one sees something the others cannot. The camera reads the lips. The EMG model reads the muscles under the skin. Claude reads the conversation. Every 100 ms, a decoder in the middle combines them, and each word is locked in as soon as the three together are confident enough.
+Three readers work together, because each one sees something the others cannot. The camera reads the lips. The EMG model reads the muscles under the skin. Claude reads the conversation. Every 100 ms, one joint search in the middle combines them, and each word is locked in as soon as the three together are confident enough.
 
 ```mermaid
 flowchart TD
     cam["Webcam<br/>lips + face"] --> avsr["Camera reader<br/>Auto-AVSR, as is"]
     emg["4 EMG pads<br/>face muscles"] --> svr["EMG reader<br/>SVR-1, trained on Austin"]
     call["Twilio phone call<br/>the judge's voice"] --> ink["Cartesia Ink<br/>transcribes the judge"]
-    avsr --> dec["Fusion decoder, every 100 ms<br/>one search, three judges,<br/>confidence-based locking"]
+    avsr --> dec["Joint search, every 100 ms<br/>one search, three judges,<br/>confidence-based locking"]
     svr --> dec
     ink --> claude["Claude<br/>the whole conversation"]
     claude -- "predicted words, repairs" --> dec
@@ -63,19 +63,19 @@ The decision to lock a word comes from one score, computed fresh on every pass. 
 - how strongly the camera's reading supports the word;
 - how strongly the EMG reading supports it, and whether camera and EMG agree;
 - how strongly Claude predicted it from the conversation (the camera and EMG must carry most of the weight, so Claude alone can never lock a word);
-- whether the word looks finished: the decoder has moved on to the next word, the lips pause, or the muscles go quiet;
+- whether the word looks finished: the joint search has moved on to the next word, the lips pause, or the muscles go quiet;
 - how many passes the word has survived unchanged;
 - signal quality: is the face clearly visible, are the electrodes clean.
 
 These ingredients are not weighed by hand. A small model learns the weights from Austin's recordings, where the true sentence is known: every word on every pass becomes an example of "was this word right and final?". Sessions 1 and 2 give thousands of examples; session 3 checks the result on recordings it never saw.
 
-The threshold moves with the conversation. When Claude finds the next words highly predictable (the judge asked a yes-or-no question, say), the threshold drops and words lock sooner; when anything could come next, it rises. Claude affects the threshold, and its predicted words feed the decoder's scores, but Claude's own share of the confidence is capped so its guess is never counted twice.
+The threshold moves with the conversation. When Claude finds the next words highly predictable (the judge asked a yes-or-no question, say), the threshold drops and words lock sooner; when anything could come next, it rises. Claude affects the threshold, and its predicted words feed the joint search's scores, but Claude's own share of the confidence is capped so its guess is never counted twice.
 
 A sentence ends when the lips are still and the muscles quiet for about half a second. A slower final pass then reads the whole sentence once more, with Auto-AVSR's own careful search, look-alike checks and a Claude repair, and settles any word that never locked. If a word is still below the threshold after that, the screen says "Please repeat" instead of guessing, and the debug panel shows why: which reader disagreed and how confident each one was.
 
 ## The camera reader
 
-The camera reader is Auto-AVSR's visual model, used as is: no recording, no fine-tuning. For every webcam frame, MediaPipe finds the face and 478 landmarks, and we cut a 96×96 grey patch around the mouth, aligned the same way as the model's training data. A small image network turns each patch into a feature vector once, as the frame arrives. Every 100 ms, the model's 12-layer Conformer reads all feature vectors of the current sentence and outputs, for each video frame (25 per second), how likely each word piece is. Those per-frame probabilities, not just the camera's best sentence, go to the decoder.
+The camera reader is Auto-AVSR's visual model, used as is: no recording, no fine-tuning. For every webcam frame, MediaPipe finds the face and 478 landmarks, and we cut a 96×96 grey patch around the mouth, aligned the same way as the model's training data. A small image network turns each patch into a feature vector once, as the frame arrives. Every 100 ms, the model's 12-layer Conformer reads all feature vectors of the current sentence and outputs, for each video frame (25 per second), how likely each word piece is. Those per-frame probabilities, not just the camera's best sentence, go to the joint search.
 
 The same MediaPipe pass finds the face for the emotion tag. An open-source expression network (HSEmotion) reads the face picture, and a small head fitted on Austin's recorded smile, frown and surprised sentences turns that, with MediaPipe's 52 expression scores, into neutral, happy, sad or surprised, measured against his own neutral face from the first 3 s. Smoothed and held for half a second so it doesn't flicker, this becomes the emotion tag that Cartesia applies to the voice. The mouth landmarks also tell the system whether Austin is mouthing at all.
 
@@ -104,12 +104,12 @@ First, Thai's live filter removes the 60 Hz mains hum, its echoes and slow drift
 
 What SVR-1 contributes:
 
-- **It proposes its own words and settles look-alikes, inside the same search as the camera.** SVR-1 gives the probability of each letter and each speech sound at every frame, so it can grade any sentence the decoder considers while the sentence is being built, not just afterwards. Its own best guesses join the drafts as well.
+- **It proposes its own words and settles look-alikes, inside the same search as the camera.** SVR-1 gives the probability of each letter and each speech sound at every frame, so it can grade any sentence the joint search considers while the sentence is being built, not just afterwards. Its own best guesses join the drafts as well.
 - **It finds the start and end of speech first.** Muscles fire a few tens of milliseconds before the lips visibly move, so EMG notices the start of a sentence first, notices when a word ends (which lets words lock sooner), and notices the end of a sentence reliably even when the lips pause mid-word.
 - **It keeps captions going when the face is hard to see.** When Austin turns his head or something covers his mouth, the camera's confidence drops and EMG carries the decoding until the face is back.
 - **It drives the voice's pace and loudness.** How fast Austin is articulating and how hard his muscles work pass to Cartesia as the voice's speed and volume, so the voice follows the rhythm and emphasis of his mouthing. Nothing else in the system can sense effort.
-- **It tells Claude where the doubt is.** For each recent word, the decoder sends Claude how strongly camera and EMG supported it and which look-alikes competed, so Claude only touches the words that are actually uncertain.
-- **The look-alike verifier.** Given the few candidates the decoder is unsure between, it looks only at the words they disagree on and scores those against the muscle signal, so words everyone agrees on cannot drown out the one word that matters.
+- **It tells Claude where the doubt is.** For each recent word, the joint search sends Claude how strongly camera and EMG supported it and which look-alikes competed, so Claude only touches the words that are actually uncertain.
+- **The look-alike verifier.** Given the few candidates the joint search is unsure between, it looks only at the words they disagree on and scores those against the muscle signal, so words everyone agrees on cannot drown out the one word that matters.
 
 Compared with Gaddy and Klein's model, which only writes letters for open-mouth speech recorded with 8 electrodes in a lab, SVR-1 is built for this job: it runs on our 4 sites, it is trained to grade the camera's look-alike guesses, it is trained on sped-up and slurred signals so it holds up at natural speed, and it gives the same answer whether it reads a whole sentence or a partial one.
 
@@ -123,19 +123,21 @@ Because the live system reads partial sentences every 100 ms, SVR-1 also practis
 
 Then it is fine-tuned on Austin, from three recording sessions of varied conversational sentences, with the camera recording at the same time. Nothing is trained on the pitch: the judge can ask anything. Sessions 1 and 2 (500 sentences) are for training; session 3 (100 sentences, never trained on), recorded last and in demo conditions, is the honest test. The pads come off and go back on between sessions, so the model learns to handle small shifts in placement.
 
-## The fusion decoder: one search, three judges
+## The joint search: one search, three judges
 
-The decoder writes the sentence from left to right and keeps the best few drafts, typically 8 to 16. Each time it considers extending a draft by a word piece, it asks three questions and adds up the answers:
+The joint search writes the sentence from left to right and keeps the best few drafts, typically 8 to 16. Each time it considers extending a draft by a word piece, it asks three questions and adds up the answers:
 
 1. The camera: how well does this draft match the lips seen so far?
 2. The EMG model: how well does it match the muscles?
-3. The language side: is this a likely thing to say here? A small word-level language model answers instantly, and Claude's list of predicted words for this moment adds a boost.
+3. The language side: is this a likely thing to say here? Our language model answers instantly, and Claude's list of predicted words for this moment adds a boost.
 
-The camera and the EMG model each grade every draft as it grows, so a word the camera ranked fifth can still win if the muscles clearly favour it. Two extra sources feed the drafts: SVR-1's own guesses, and look-alike expansion. Whenever a draft finishes a word, the decoder also tries the words that look identical on the lips ("bat" → "mat", "pat"), so the right word is in the race even when the camera never thought of it.
+The camera and the EMG model each grade every draft as it grows, so a word the camera ranked fifth can still win if the muscles clearly favour it. Two extra sources feed the drafts: SVR-1's own guesses, and look-alike expansion. Whenever a draft finishes a word, the joint search also tries the words that look identical on the lips ("bat" → "mat", "pat"), so the right word is in the race even when the camera never thought of it.
 
 How much each judge counts changes from moment to moment. A small gate looks at how confident the camera is, whether the face is clearly visible, how clean the EMG signal is and how fast Austin is going, and sets the weights. When he turns his head or covers his mouth, the camera's weight drops and EMG carries the captions; if an electrode peels off, EMG's weight drops and the camera and Claude carry on.
 
-The decoder's output on every pass: the drafts, the confidence ingredients of every unlocked word, which words lock, and for each recent word the alternatives it considered.
+**The language model** is ours too, and it is built for a phone call, not a book. Gaddy and Klein's language model learned from audiobook text. Ours learned from 72 million words of everyday dialogue (film and TV subtitles and three chat datasets), with every sentence we recorded kept out. It finds our conversational sentences three times more predictable (perplexity 61 against 181) at a ninth of the size. On top of it sits a cache of the call itself: the judge's words from Cartesia Ink and Austin's locked words. A name or topic the judge just mentioned becomes likely at once, within the same 100 ms pass, while Claude, smarter but slower, adds its predictions every couple of seconds. It is the joint search's only language model: SVR-1 has none of its own, and the camera's own language model only runs in its end-of-sentence pass.
+
+The joint search's output on every pass: the drafts, the confidence ingredients of every unlocked word, which words lock, and for each recent word the alternatives it considered.
 
 ## Claude: the conversation brain
 
@@ -145,7 +147,7 @@ Claude follows the whole conversation: the judge's words, transcribed from the c
 sequenceDiagram
     participant J as Judge (phone)
     participant C as Claude
-    participant D as Decoder
+    participant D as Joint search
     participant V as Voice
     J->>C: "Are you feeling nervous about the demo?"
     C->>D: predicted words: yes, a little, nervous, excited, ready...<br/>next words are predictable: lower threshold
@@ -158,8 +160,8 @@ sequenceDiagram
 
 Claude does two jobs:
 
-- **Predict, before Austin mouths.** Whenever the judge finishes speaking, and again every couple of seconds while Austin talks, Claude returns the words and short phrases Austin is likely to use next, and how predictable the next words are. The predicted words get a boost in the decoder, and the predictability sets the locking threshold. This costs no waiting: the prediction is ready before Austin starts.
-- **Repair.** As words lock, the decoder sends Claude the last few words with the alternatives it considered and how sure it was. Claude may swap a word only for one of those alternatives or a lip look-alike, never add or reword ideas, and answers "please repeat" when it cannot tell. The reply is a short structured list of edits.
+- **Predict, before Austin mouths.** Whenever the judge finishes speaking, and again every couple of seconds while Austin talks, Claude returns the words and short phrases Austin is likely to use next, and how predictable the next words are. The predicted words get a boost in the joint search, and the predictability sets the locking threshold. This costs no waiting: the prediction is ready before Austin starts.
+- **Repair.** As words lock, the joint search sends Claude the last few words with the alternatives it considered and how sure it was. Claude may swap a word only for one of those alternatives or a lip look-alike, never add or reword ideas, and answers "please repeat" when it cannot tell. The reply is a short structured list of edits.
 
 A locked word waits a short repair window before it is spoken, 0.3 s by default, so that a quick repair can still change it. A repair that arrives later fixes the captions only, with the change highlighted. The window is a single setting: 0 gives the fastest voice, a longer window lets Claude catch more before words are spoken.
 
@@ -177,7 +179,7 @@ Everything is recorded, all the time, so any mistake can be traced afterwards. E
 
 - raw EMG and video;
 - every pass's camera and EMG outputs;
-- the decoder's drafts, scores and confidence ingredients;
+- the joint search's drafts, scores and confidence ingredients;
 - every lock decision;
 - every Claude request, reply and delay;
 - Cartesia and Twilio timings;
@@ -195,7 +197,7 @@ These are design estimates for the RTX 5060; every one gets measured on the lapt
 | Face, landmarks and mouth crop, per frame | about 5 to 10 ms |
 | Camera re-read of the current sentence, per 100 ms pass | about 15 to 40 ms |
 | SVR-1 re-read, per pass | about 5 to 10 ms |
-| Decoder and locking, per pass | about 5 to 15 ms |
+| Joint search and locking, per pass | about 5 to 15 ms |
 | Word on screen (grey) after it is mouthed | about 0.15 to 0.2 s |
 | Word locked (black) | as soon as the next word starts and confidence is reached, often within one or two passes |
 | Repair window before speaking | 0.3 s (adjustable, 0 for fastest) |
@@ -206,7 +208,7 @@ A sentence-at-a-time lip reader only starts speaking after the whole sentence is
 ## What we train, and what we don't
 
 - **SVR-1:** pretrained on Berkeley's data on the H100/H200 cluster, then fine-tuned on Austin's sessions 1 and 2.
-- **The decoder's weights, the gate and the locking model:** fitted in minutes on sessions 1 and 2, where camera, EMG and the true text are all known; checked on session 3. This is how the three readers are trained to work together, without retraining the camera or Claude.
+- **The joint search's weights, the gate and the locking model:** fitted in minutes on sessions 1 and 2, where camera, EMG and the true text are all known; checked on session 3. This is how the three readers are trained to work together, without retraining the camera or Claude.
 - **Auto-AVSR:** used as is.
 - **Claude:** prompted, not trained.
 - **Cartesia:** a voice clone from Austin's voice sample.
