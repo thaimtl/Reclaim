@@ -190,8 +190,11 @@ class Dashboard:
 
 
 def points(pts):
-    """Face points as (N, 2) floats; ValueError if they aren't."""
-    return np.asarray(pts, np.float64).reshape(-1, 2)
+    """Face points as (N, 2) or (N, 3) floats (x, y, and z when the camera reader sends it); ValueError otherwise."""
+    a = np.asarray(pts, np.float64)
+    if a.ndim != 2 or a.shape[1] not in (2, 3):
+        a = a.reshape(-1, 2)
+    return a
 
 
 def pack_frame(msg, pts):

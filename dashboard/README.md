@@ -65,8 +65,8 @@ Everything on the screen is measured on the call, from the bus. The rules:
 These are in docs/TEAM_TASKS_AND_INTERFACES.md; the screen works without them and shows more with them.
 
 - `cam.preview` (camera reader): `t`, `w`, `h`, `jpeg`, about 10 fps, 640 px wide. Mirrors the webcam, which only
-  the lip reader can open. Optional `pts` (478 x 2, as in `cam.face`): that frame's own face points, so the pads are
-  placed exactly; without them the dashboard takes the `cam.face` closest in time (within 60 ms).
+  the lip reader can open, with `pts`: that frame's own face points (x, y, z), so the pads are placed exactly;
+  without them the dashboard takes the `cam.face` closest in time (within 60 ms).
 - `dec.hyp` `cands` [{`w`, `cam`, `emg`, `claude`}] (top 3 for the newest word) and `threshold` (decoder).
 - `dec.lock` words `cam_top`, `emg_top`: each reader's own pick for that word, for the end screen's disagreement
   bars (decoder).

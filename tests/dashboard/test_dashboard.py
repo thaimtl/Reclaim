@@ -309,3 +309,11 @@ def test_bad_face_points_never_stop_the_dashboard():
     d.handle(encode('cam.preview', {'t': 5.0, 'w': 640, 'h': 360, 'jpeg': b'\xff\xd8a', 'pts': [1, 2, 3]}))
     head, jpeg = unpack(d.frame)
     assert head['pts'] is None and jpeg == b'\xff\xd8a'        # the picture still goes out
+
+
+def test_a_preview_with_x_y_z_points_keeps_them():
+    from dashboard.server import Dashboard
+    d = Dashboard(endpoints={'none': 'inproc://dashboard-test-none'})
+    own = [[0.5, 0.6, -0.02]] * 478
+    d.handle(encode('cam.preview', {'t': 1.0, 'w': 640, 'h': 360, 'jpeg': b'\xff\xd8z', 'pts': own}))
+    assert unpack(d.frame)[0]['pts'][0] == [0.5, 0.6, -0.02]
