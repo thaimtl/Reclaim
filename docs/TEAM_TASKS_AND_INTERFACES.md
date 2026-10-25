@@ -69,7 +69,7 @@ Follow [EVAN_REALTIME_LIP_READING.md](EVAN_REALTIME_LIP_READING.md). You can pro
 5. The Claude service:
     - **Predict:** while the judge is still speaking, from the partial `partner.text` (once 2 words are in, then every 2 more, at most every 0.7 s, up to two calls in flight), again on the final line, and every ~2 s while Austin mouths, publish `claude.predict`: likely words and phrases, plus how predictable the next words are. The newest prediction always replaces older ones.
     - **Repair:** on each `dec.lock`, publish `claude.repair`.
-    - **How it calls Claude:** `claude-haiku-5-5` with thinking off and low effort (about 2 to 3 s a call; `claude-opus-5-5` took about 6 s), structured outputs, prompt caching (rules and conversation kept as an append-only prefix).
+    - **How it calls Claude:** predictions on `claude-haiku-5-5` with thinking off and low effort (about 2 to 3 s a call), repairs on `claude-opus-5-5` (accuracy; they fix the captions only, never the voice), structured outputs, prompt caching (rules and conversation kept as an append-only prefix).
     - **Prompt rules:** swap a word only for one of the alternatives given or a lip look-alike, never add ideas, answer "please repeat" when unsure.
 
 ## Interfaces
