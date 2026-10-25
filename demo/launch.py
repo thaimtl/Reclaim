@@ -369,7 +369,9 @@ class Launcher:
             return False
 
     def find_uno(self):
-        code = ('from serial.tools import list_ports; from rig.signal_check import ARDUINO_VIDS;'
+        # rig/signal_check.py imports its neighbours as a script does (`from filters import ...`): rig/ goes on the path
+        code = ('import sys; sys.path.insert(0, "rig"); from serial.tools import list_ports;'
+                'from signal_check import ARDUINO_VIDS;'
                 'print(next((p.device for p in list_ports.comports() if p.vid in ARDUINO_VIDS), ""))')
         try:
             r = subprocess.run([self.py('venv-svr'), '-c', code], cwd=REPO, env=self.env, capture_output=True,
