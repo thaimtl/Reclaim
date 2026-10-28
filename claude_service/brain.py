@@ -80,7 +80,9 @@ t/d/n, k/g, and sounds hidden behind the teeth. The muscle reader helps, but bot
 You know the conversation, so you can tell which look-alike Austin meant.
 
 Each message tells you what happened since the last one: lines the judge finished saying, and Austin's current \
-utterance as locked so far, one word per line with its index, and the repairs you already made. Some messages \
+utterance as locked so far, one word per line with its index, and the repairs you already made. A word marked \
+"(unsure, or: a/b)" was a low-confidence reading and may really be one of those look-alikes, or something else: \
+don't build your predictions on it as if it were certain. Some messages \
 list words under "review" with the decoder's confidence (conf), the camera and EMG support (cam, emg, 0 to 1) and \
 the alternatives it considered (alts), including the word's lip look-alikes.
 
@@ -199,6 +201,17 @@ def _word(w):
             "conf": _num(w.get("conf")), "cam": _num(w.get("cam")), "emg": _num(w.get("emg")), "t": _num(w.get("t"))}, True
 
 
+UNSURE = 0.6   # a locked word below this confidence is shown with its look-alikes: it may be a misreading
+
+
+def _shown(w):
+    """A locked word as the prediction lanes see it: an unsure one with its look-alikes, so Claude never builds the
+    next prediction on a misreading (or on its own earlier prediction, if that is what the decoder picked)."""
+    if w["w"] != "?" and w.get("conf") is not None and w["conf"] < UNSURE and w.get("alts"):
+        return f"{w['w']} (unsure, or: {'/'.join(w['alts'][:3])})"
+    return w["w"]
+
+
 def _cached(messages):
     """The conversation with a cache breakpoint on its last block: repairs run on another model than the
     conversation lane, so they can't read its cache, and each ends in its own review message, so the top-level
@@ -259,7 +272,7 @@ class Brain:
             parts.append(f"The judge is speaking now. Their line so far (a live transcript, it may change): {self.partial}")
         if self.utts:
             utt = next(reversed(self.utts))
-            locked = " ".join(w["w"] for w in self.utts[utt])
+            locked = " ".join(_shown(w) for w in self.utts[utt])
             parts.append(f"Austin's current sentence, locked so far: {locked or '(nothing yet)'}")
         if self.unlocked:
             parts.append("Austin is mouthing, still being read (may change): " + " ".join(self.unlocked))
@@ -382,7 +395,7 @@ class Brain:
             parts.append("\n".join(f"Judge: {t}" for t in self.events))
         for utt in self.updated:
             words = self.utts.get(utt, [])
-            parts.append(f"Austin, utterance {utt}, locked so far:\n" + "\n".join(f"{i} {w['w']}" for i, w in enumerate(words)))
+            parts.append(f"Austin, utterance {utt}, locked so far:\n" + "\n".join(f"{i} {_shown(w)}" for i, w in enumerate(words)))
         if self.notes:
             parts.append("Your repair checks since the last message:\n" + "\n".join(self.notes))
         if self.fresh and self.unlocked:
