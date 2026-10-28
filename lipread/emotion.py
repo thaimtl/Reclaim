@@ -211,12 +211,17 @@ class NetTagger:
 
     GENERIC_SMOOTHING = (0.6, 0.5, 1.0)     # margin, hold_s, tau_s: best on RAVDESS without a head
 
-    def __init__(self, net, head=None, baseline_s=BASELINE_S, labels=EMOTIONS, window_s=BASELINE_WINDOW_S):
+    def __init__(self, net, head=None, baseline_s=BASELINE_S, labels=EMOTIONS, window_s=BASELINE_WINDOW_S,
+                 own=None, smoothing=None):
         from lipread.expression import GENERIC
         self.net, self.head, self.labels = net, head, tuple(labels)
         self.baseline = RunningBaseline(window_s=window_s, warm_s=baseline_s)
-        self.own = head.labels if head else tuple(GENERIC.values())
-        self.margin, self.hold_s, self.tau = (head.margin, head.hold_s, head.tau_s) if head else self.GENERIC_SMOOTHING
+        if head is not None:
+            self.own = head.labels
+            self.margin, self.hold_s, self.tau = head.margin, head.hold_s, head.tau_s
+        else:
+            self.own = tuple(GENERIC.values()) if own is None else tuple(own)
+            self.margin, self.hold_s, self.tau = self.GENERIC_SMOOTHING if smoothing is None else smoothing
         if NEUTRAL not in self.own or NEUTRAL not in self.labels:
             raise ValueError(f'{NEUTRAL!r} must be a label of the head and of the bus')
         self.reset_baseline()
@@ -300,7 +305,7 @@ class EmotionWorker:
     JOIN_S = 1.0
 
     def __init__(self, net='auto', head='auto', sync=False):
-        self.tagger = EmotionTagger()
+        self.tagger = None
         self.emotion = RESTING
         self.failed = False
         self.sync = sync
@@ -314,7 +319,9 @@ class EmotionWorker:
             self.net_tagger = self._make_net(net, head)
         except Exception:  # noqa: BLE001
             log.exception('expression network failed to start: rule tagger only')
-        if self.net_tagger is not None and not sync:
+        if self.net_tagger is None:
+            self.tagger = EmotionTagger()
+        elif not sync:
             self._thread = threading.Thread(target=self._net_loop, name='emotion-net', daemon=True)
             self._thread.start()
 
@@ -336,13 +343,13 @@ class EmotionWorker:
         return NetTagger(net, head)
 
     def submit(self, t, image, face):
-        try:
-            self.emotion = self.tagger.push(SimpleNamespace(t=t, blend=None if face is None else face[2]))
-        except Exception:  # noqa: BLE001
-            if not self.failed:
-                self.failed = True
-                log.exception('emotion failed (logged once; the lip reader goes on)')
         if self.net_tagger is None:
+            try:
+                self.emotion = self.tagger.push(SimpleNamespace(t=t, blend=None if face is None else face[2]))
+            except Exception:  # noqa: BLE001
+                if not self.failed:
+                    self.failed = True
+                    log.exception('emotion failed (logged once; the lip reader goes on)')
             return
         if self.sync:
             if self._last_t is None or t - self._last_t >= 1.0 / self.NET_HZ - 1e-9:
@@ -377,7 +384,8 @@ class EmotionWorker:
             self._stop.wait(max(0.0, started + period - time.monotonic()))
 
     def reset_baseline(self):
-        self.tagger.reset_baseline()
+        if self.tagger is not None:
+            self.tagger.reset_baseline()
         if self.net_tagger is not None:
             with self._lock:
                 self.net_tagger.reset_baseline()
