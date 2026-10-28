@@ -13,6 +13,7 @@ import os
 import sys
 import time
 from collections import Counter
+from typing import NamedTuple
 
 import numpy as np
 
@@ -44,13 +45,16 @@ def session_rows(root, session):
     return sorted(rows, key=lambda r: r['clip_t0'])
 
 
+class ClipFrame(NamedTuple):
+    recorder_t: float
+    image: np.ndarray
+
+
 def clip_frames(root, session, row, size=PROCESS):
-    """25 fps frames the crop thread detects, shrunk to size. Times are the recorder clock (ReplaySource t plus
-    t_offset) so one face tracker stays increasing across the clips of a session."""
     src = ReplaySource(row['id'], realtime=False, root=os.path.join(root, session))
     try:
         for frame in src.frames():
-            yield frame.t + src.t_offset, fit(frame, size).image
+            yield ClipFrame(frame.t + src.t_offset, fit(frame, size).image)
     finally:
         src.close()
 
@@ -72,11 +76,11 @@ def extract(root, session, cache=FEATURE_DIR):
     out, store, t0 = [], {}, time.time()
     for n, r in enumerate(rows):
         times, feats = [], []
-        for t, img in clip_frames(root, session, r):
-            obs = tracker.detect(img, int(round(t * 1000)))
-            lg = None if obs is None or obs.blend is None else net.logits(img, obs.pts)
+        for frame in clip_frames(root, session, r):
+            obs = tracker.detect(frame.image, int(round(frame.recorder_t * 1000)))
+            lg = None if obs is None or obs.blend is None else net.logits(frame.image, obs.pts)
             feats.append(np.full(N_FEATURES, np.nan, np.float32) if lg is None else np.concatenate([lg, obs.blend]))
-            times.append(t)
+            times.append(frame.recorder_t)
         t = np.asarray(times, np.float64)
         f = np.asarray(feats, np.float32).reshape(-1, N_FEATURES)
         out.append((r['id'], truth(r), bool(r.get('cue')), t, f))

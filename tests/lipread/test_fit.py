@@ -41,6 +41,6 @@ def test_clip_frames_follow_replay_source(tmp_path):
     finally:
         src.close()
     got = list(clip_frames(str(tmp_path), 'session_01', {'id': 'c'}))
-    assert [t for t, _ in got] == expected
+    assert [frame.recorder_t for frame in got] == expected
     assert len(got) != 12
-    assert all(img.shape[:2] == (720, 1280) for _, img in got)
+    assert all(frame.image.shape[:2] == (720, 1280) for frame in got)

@@ -346,7 +346,7 @@ class EmotionWorker:
         if self.net_tagger is None:
             try:
                 self.emotion = self.tagger.push(SimpleNamespace(t=t, blend=None if face is None else face[2]))
-            except Exception:  # noqa: BLE001
+            except (AttributeError, TypeError, ValueError, IndexError, KeyError):
                 if not self.failed:
                     self.failed = True
                     log.exception('emotion failed (logged once; the lip reader goes on)')

@@ -40,7 +40,6 @@ class Crop:
 
 
 def fit(frame, size):
-    """The frame shrunk (INTER_AREA, aspect kept) to fit size = (w, h); unchanged if it fits or size is None."""
     h, w = frame.image.shape[:2]
     if size is None or (w <= size[0] and h <= size[1]):
         return frame
