@@ -13,8 +13,9 @@ Data flow (lipread/run.py):
     final    -> CamFinal  (beam + LM over a closed segment)             -> bus cam.final
 Message types and the wire format: bus/__init__.py and bus/schema.md.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
+import cv2
 import numpy as np
 
 FPS = 25
@@ -36,3 +37,13 @@ class Crop:
     blend: np.ndarray = None
     mouth_pts: np.ndarray = None
     eye_dist: float = 0.0
+
+
+def fit(frame, size):
+    """The frame shrunk (INTER_AREA, aspect kept) to fit size = (w, h); unchanged if it fits or size is None."""
+    h, w = frame.image.shape[:2]
+    if size is None or (w <= size[0] and h <= size[1]):
+        return frame
+    k = min(size[0] / w, size[1] / h)
+    img = cv2.resize(frame.image, (round(w * k), round(h * k)), interpolation=cv2.INTER_AREA)
+    return replace(frame, image=img)
