@@ -18,7 +18,7 @@ from typing import NamedTuple
 import numpy as np
 
 import lipread
-from lipread.emotion import BASELINE_S
+from lipread.emotion import BASELINE_S, EmotionWorker, Hold
 from lipread.expression import HEAD_PATH, LOGITS, MODEL_SHA256, N_FEATURES, Head
 from lipread.source import ReplaySource, fit
 
@@ -143,17 +143,15 @@ def training_frames(clips, base):
 
 
 def replay(clips, probs, t_start, margin, hold_s, tau_s, hz=None):
-    """Published labels per frame from the live NetTagger.step, fed at EmotionWorker.NET_HZ."""
-    from lipread.emotion import EmotionWorker, NetTagger
     hz = hz or EmotionWorker.NET_HZ
-    tagger = NetTagger(None, own=LABELS, smoothing=(margin, hold_s, tau_s))
+    hold = Hold(LABELS, margin, hold_s, tau_s)
     label, last, res = 'neutral', None, []
     for (_, _, _, t, _), p in zip(clips, probs):
         labs = []
         for ti, pi in zip(t, p):
             if ti > t_start and (last is None or ti - last >= 1.0 / hz - 1e-9):
                 last = ti
-                label = tagger.step(ti, None if np.isnan(pi[0]) else pi).label
+                label = hold.step(ti, None if np.isnan(pi[0]) else pi).label
             labs.append(label)
         res.append(labs)
     return res
