@@ -15,8 +15,8 @@ import numpy as np
 
 import lipread
 from lipread.crop import BLEND_NAMES, LiveCropper
-from lipread.source import CameraSource, ReplaySource
-from lipread.types import FPS, fit
+from lipread.source import CameraSource, ReplaySource, fit
+from lipread.types import FPS
 
 SCALE = 4
 

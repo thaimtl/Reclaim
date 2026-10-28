@@ -29,8 +29,7 @@ import torch
 import lipread
 from bus import bus_text
 from lipread.model import FACE_ADAPTER_PREFIXES
-from lipread.source import RECORDINGS, ReplaySource
-from lipread.types import fit
+from lipread.source import RECORDINGS, ReplaySource, fit
 
 DEFAULT_OUT = os.path.join(lipread.WORK, 'data', 'face_adapter', 'austin.pth')
 CROP_CACHE = os.path.join(lipread.WORK, 'data', 'face_adapter', 'crops')

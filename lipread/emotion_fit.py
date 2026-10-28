@@ -20,8 +20,7 @@ import numpy as np
 import lipread
 from lipread.emotion import BASELINE_S
 from lipread.expression import HEAD_PATH, LOGITS, MODEL_SHA256, N_FEATURES, Head
-from lipread.source import ReplaySource
-from lipread.types import fit
+from lipread.source import ReplaySource, fit
 
 LABELS = ('neutral', 'happy', 'sad', 'surprised')
 TRUTH = {'smile': 'happy', 'frown': 'sad', 'surprised': 'surprised'}

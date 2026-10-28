@@ -5,8 +5,8 @@ import cv2
 import numpy as np
 
 from lipread.emotion_fit import clip_frames
-from lipread.source import ReplaySource
-from lipread.types import Frame, fit
+from lipread.source import ReplaySource, fit
+from lipread.types import Frame
 
 
 def test_fit_shrinks_1080p_and_leaves_a_small_frame():

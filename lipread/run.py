@@ -57,7 +57,8 @@ from lipread.crop import LiveCropper
 from lipread.emotion import RESTING, EmotionWorker
 from lipread.endpoint import START, Segmenter
 from bus import CamTick
-from lipread.types import FPS, Frame, fit
+from lipread.source import fit
+from lipread.types import FPS, Frame
 
 log = logging.getLogger('lipread.run')
 TICK_MS = 100
